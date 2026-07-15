@@ -17,13 +17,16 @@ else
 fi
 
 echo "Ejecutando scripts de esquema y roles..."
-for script in 01_schema.sql 02_indices.sql 03_auditoria.sql 04_roles_bd.sql; do
+for script in 01_schema.sql 02_indices.sql 03_auditoria.sql 04_roles_bd.sql 06_matricula_campos.sql 09_estudiante_usuario.sql; do
   echo "  -> $script"
   psql -d "$DB_NAME" -f "$SCRIPT_DIR/$script"
 done
 
 echo "Si necesitas datos de desarrollo, ejecuta:"
 echo "  psql -d $DB_NAME -f $SCRIPT_DIR/05_datos_prueba.sql"
+echo "Cuentas de personal iniciales (usuario/contraseña reales, ejecutar manualmente una sola vez):"
+echo "  psql -d $DB_NAME -f $SCRIPT_DIR/07_usuario_username.sql"
+echo "  psql -d $DB_NAME -f $SCRIPT_DIR/08_usuario_aaron.sql"
 
 echo "Base de datos inicializada. Asegúrate de definir las variables de entorno:" 
 
