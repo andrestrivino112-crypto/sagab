@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 import {
   BookOpen, Users, DollarSign, MessageSquare, Home, LogOut, Bell,
-  AlertTriangle, CheckCircle, Clock, FileText, Eye, EyeOff,
+  AlertTriangle, CheckCircle, Clock, Eye, EyeOff,
   GraduationCap, ChevronRight, TrendingUp, AlertCircle, Save,
   Smartphone, UserPlus, Info, Loader2, BarChart3, Receipt, Search,
 } from "lucide-react";
@@ -16,12 +18,13 @@ import {
   asistencia as asistenciaApi, dashboard as dashboardApi, finanzas as finanzasApi, mensajes as mensajesApi,
   type ParaleloOpcion, type AsignacionOpcion, type MatriculaRequest, type EstudianteResumen,
   type ResumenDashboard, type ObligacionResponse, type EstudianteConParalelo, type EstadoAsistencia,
-  type NotaEstudianteResponse, type AsistenciaRegistro, type MensajeResponse,
+  type NotaEstudianteResponse, type AsistenciaRegistro, type MensajeResponse, type NotaBusquedaResponse,
 } from "../api/sagab";
 import { EmptyState } from "./components/EmptyState";
+import { useToast } from "./components/Toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Screen = "login" | "dashboard" | "grades" | "attendance" | "parent" | "financial" | "validation" | "matricula";
+type Screen = "login" | "dashboard" | "grades" | "attendance" | "parent" | "financial" | "matricula";
 type AttendanceStatus = "present" | "justified" | "unjustified";
 type PaymentStatus = "paid" | "pending" | "overdue" | "cancelled";
 
@@ -29,11 +32,11 @@ type PaymentStatus = "paid" | "pending" | "overdue" | "cancelled";
 function calcAvg(t: string, c: string, e: string): number | null {
   const [tv, cv, ev] = [parseFloat(t), parseFloat(c), parseFloat(e)];
   if ([tv,cv,ev].some(isNaN)) return null;
-  if ([tv,cv,ev].some(v => v < 1 || v > 10)) return null;
+  if ([tv,cv,ev].some(v => v < 0 || v > 10)) return null;
   return Math.round((tv * 0.2 + cv * 0.2 + ev * 0.6) * 100) / 100;
 }
-function isValid(v: string) { if (!v) return true; const n = parseFloat(v); return !isNaN(n) && n >= 1 && n <= 10; }
-function isComplete(v: string) { if (!v) return false; const n = parseFloat(v); return !isNaN(n) && n >= 1 && n <= 10; }
+function isValid(v: string) { if (!v) return true; const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 10; }
+function isComplete(v: string) { if (!v) return false; const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 10; }
 function initials(name: string) { return name.split(" ").map(n => n[0]).slice(0,2).join(""); }
 function barColor(v: number) { return v >= 8 ? "#2E7D32" : v < 7 ? "#C62828" : "#2E75B6"; }
 
@@ -208,12 +211,11 @@ const NAV = [
   { id:"attendance" as Screen, label:"Asistencia",       icon: Users },
   { id:"financial"  as Screen, label:"Financiero",       icon: DollarSign },
   { id:"parent"     as Screen, label:"Portal Familiar",  icon: Smartphone },
-  { id:"validation" as Screen, label:"Componentes UI",   icon: FileText },
 ];
 
 /** Qué módulos ve cada rol — el docente no debe ver Matrícula ni Financiero. */
 const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
-  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "financial", "parent", "validation"],
+  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "financial", "parent"],
   DOCENTE:       ["dashboard", "grades", "attendance"],
   DECE:          ["dashboard", "attendance"],
   AUDITOR:       ["dashboard"],
@@ -383,16 +385,23 @@ function DashboardView() {
 
 // ── Grades ─────────────────────────────────────────────────────────────────
 interface NotaRow { idEstudiante: number; nombre: string; tarea: string; clase: string; examen: string; }
+type NotaSortKey = "nombre" | "promedio";
+const FILAS_POR_PAGINA = 15;
 
 function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const toast = useToast();
+  const [modo, setModo] = useState<"ingreso" | "consulta">("ingreso");
   const [asignacionesOpciones, setAsignacionesOpciones] = useState<AsignacionOpcion[]>([]);
   const [idAsignacion, setIdAsignacion] = useState<number | "">("");
   const [parcial, setParcial] = useState(1);
   const [rows, setRows] = useState<NotaRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
+
+  const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState<{ campo: NotaSortKey; asc: boolean }>({ campo: "nombre", asc: true });
+  const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     asignacionesApi.mias().then(lista => {
@@ -422,9 +431,10 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       .finally(() => setLoading(false));
   }, [asignacion?.idAsignacion, asignacion?.idParalelo, parcial]);
 
+  useEffect(() => { setPagina(1); }, [busqueda, idAsignacion, parcial]);
+
   const update = (idEstudiante: number, f: "tarea"|"clase"|"examen", v: string) => {
     setRows(p => p.map(r => r.idEstudiante === idEstudiante ? {...r,[f]:v} : r));
-    setSaved(false);
   };
 
   const completas = rows.filter(r => isComplete(r.tarea) && isComplete(r.clase) && isComplete(r.examen));
@@ -433,24 +443,50 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const guardar = async () => {
     if (!asignacion || completas.length === 0) return;
     setSaving(true);
-    setErrorApi(null);
     try {
       await calificacionesApi.registrarMasivo(asignacion.idAsignacion, parcial, completas.map(r => ({
         idEstudiante: r.idEstudiante,
         notaTarea: parseFloat(r.tarea), notaClase: parseFloat(r.clase), notaExamen: parseFloat(r.examen),
       })));
-      setSaved(true);
+      toast.success("Nota guardada correctamente");
     } catch (e) {
-      setErrorApi(e instanceof ApiError ? e.message : "No se pudieron guardar las calificaciones.");
+      toast.error(e instanceof ApiError ? e.message : "No se pudieron guardar las calificaciones.");
     } finally {
       setSaving(false);
     }
   };
 
+  const filas = rows
+    .filter(r => r.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+    .sort((a, b) => {
+      const dir = orden.asc ? 1 : -1;
+      if (orden.campo === "nombre") return a.nombre.localeCompare(b.nombre) * dir;
+      const pa = calcAvg(a.tarea, a.clase, a.examen) ?? -1;
+      const pb = calcAvg(b.tarea, b.clase, b.examen) ?? -1;
+      return (pa - pb) * dir;
+    });
+  const totalPaginas = Math.max(1, Math.ceil(filas.length / FILAS_POR_PAGINA));
+  const filasPagina = filas.slice((pagina - 1) * FILAS_POR_PAGINA, pagina * FILAS_POR_PAGINA);
+
+  const ordenarPor = (campo: NotaSortKey) =>
+    setOrden(o => o.campo === campo ? { campo, asc: !o.asc } : { campo, asc: true });
+
   return (
     <div>
-      <TopBar title="Ingreso de Calificaciones" subtitle="Tabla editable · Escala 1.0–10.0 · Aprobación ≥ 7.0" />
+      <TopBar title="Calificaciones" subtitle="Escala 0.0–10.0 · Aprobación ≥ 7.0" />
       <div className="p-6">
+        {/* Modo */}
+        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 w-fit mb-4">
+          {(["ingreso", "consulta"] as const).map(m => (
+            <button key={m} onClick={() => setModo(m)}
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all
+                ${modo === m ? "bg-[#1F4E79] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+              {m === "ingreso" ? "Ingreso de notas" : "Búsqueda avanzada"}
+            </button>
+          ))}
+        </div>
+
+        {modo === "ingreso" && <>
         {/* Controls */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-end gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
@@ -467,13 +503,20 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Parcial</label>
-            <select value={parcial} onChange={e => { setParcial(Number(e.target.value)); setSaved(false); }}
+            <select value={parcial} onChange={e => setParcial(Number(e.target.value))}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
               {[1,2,3].map(p => <option key={p} value={p}>Parcial {p}</option>)}
             </select>
           </div>
+          <div className="flex flex-col gap-1 min-w-[220px]">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Buscar estudiante</label>
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Nombre…"
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+            </div>
+          </div>
           <div className="ml-auto flex items-center gap-3">
-            {saved && <span className="text-sm text-[#2E7D32] font-medium flex items-center gap-1.5"><CheckCircle size={15} />Guardado correctamente</span>}
             <Btn onClick={guardar} disabled={!allOk || saving || completas.length === 0}>
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {saving ? "Guardando…" : allOk ? "Guardar calificaciones" : "Completar todos los campos"}
@@ -488,25 +531,30 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
         )}
 
         {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center text-sm text-gray-400">
-            No tiene asignaciones de materias registradas todavía.
-          </div>
+          <EmptyState icon={BookOpen} title="No tiene asignaciones de materias registradas todavía." />
         )}
 
         {/* Table */}
         {asignacion && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#F5F7FA] border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estudiante</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => ordenarPor("nombre")}>
+                  Estudiante {orden.campo === "nombre" && (orden.asc ? "▲" : "▼")}
+                </th>
                 {(["Tarea","Clase","Examen"] as const).map((h, i) => (
-                  <th key={h} className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <th key={h} className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                     {h} <span className="font-normal text-gray-400 normal-case">{["(20%)","(20%)","(60%)"][i]}</span>
                   </th>
                 ))}
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => ordenarPor("promedio")}>
+                  Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -521,13 +569,19 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
                     action={{ label: "Ir a Matrículas", onClick: () => onNavigate("matricula") }} />
                 </td></tr>
               )}
-              {!loading && rows.map((row, idx) => {
+              {!loading && rows.length > 0 && filas.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-4">
+                  <EmptyState icon={Search} title="Ningún estudiante coincide con la búsqueda." />
+                </td></tr>
+              )}
+              {!loading && filasPagina.map((row) => {
+                const idx = rows.findIndex(r => r.idEstudiante === row.idEstudiante);
                 const avg = calcAvg(row.tarea, row.clase, row.examen);
                 return (
                   <tr key={row.idEstudiante}
                     className={`border-b border-gray-100 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"} hover:bg-[#EAF2FB]/25`}>
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx+1}</td>
-                    <td className="px-4 py-3 font-medium text-[#1A1A1A] text-sm">{row.nombre}</td>
+                    <td className="px-4 py-3 font-medium text-[#1A1A1A] text-sm whitespace-nowrap">{row.nombre}</td>
                     {(["tarea","clase","examen"] as const).map(f => {
                       const val = row[f];
                       const invalid = val !== "" && !isValid(val);
@@ -535,7 +589,7 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
                         <td key={f} className="px-4 py-2">
                           <div className="flex flex-col items-center gap-0.5">
                             <div className="flex items-center gap-1">
-                              <input type="number" min="1" max="10" step="0.5" value={val}
+                              <input type="number" min="0" max="10" step="0.5" value={val}
                                 onChange={e => update(row.idEstudiante, f, e.target.value)}
                                 className={`w-20 text-center px-2 py-1.5 rounded-lg border text-sm font-mono outline-none transition-all
                                   ${invalid
@@ -543,7 +597,7 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
                                     : "border-gray-300 focus:border-[#2E75B6] focus:ring-2 focus:ring-[#2E75B6]/20"}`} />
                               {invalid && <AlertCircle size={14} className="text-[#C62828] flex-shrink-0" />}
                             </div>
-                            {invalid && <p className="text-[10px] text-[#C62828]">Valor: 1–10</p>}
+                            {invalid && <p className="text-[10px] text-[#C62828]">Valor: 0–10</p>}
                           </div>
                         </td>
                       );
@@ -562,13 +616,240 @@ function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
               })}
             </tbody>
           </table>
-          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex justify-between text-xs text-gray-400">
-            <span>{rows.length} estudiantes · {asignacion.paralelo} · {asignacion.materia} · {asignacion.periodo}</span>
+          </div>
+          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-between text-xs text-gray-400 flex-wrap gap-2">
+            <span>{filas.length} de {rows.length} estudiantes · {asignacion.paralelo} · {asignacion.materia} · {asignacion.periodo}</span>
+            {totalPaginas > 1 && (
+              <div className="flex items-center gap-2">
+                <button disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
+                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">‹</button>
+                <span>Página {pagina} de {totalPaginas}</span>
+                <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
+                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">›</button>
+              </div>
+            )}
             <span>Promedio = Tarea×0.2 + Clase×0.2 + Examen×0.6</span>
           </div>
         </div>
         )}
+        </>}
+
+        {modo === "consulta" && (
+          <BusquedaCalificaciones asignaciones={asignacionesOpciones} toast={toast} />
+        )}
       </div>
+    </div>
+  );
+}
+
+// ── Grades: búsqueda avanzada (estudiante, curso, materia, período, docente) ─
+function BusquedaCalificaciones({ asignaciones, toast }: {
+  asignaciones: AsignacionOpcion[]; toast: ReturnType<typeof useToast>;
+}) {
+  const dedupe = <T,>(items: { id: number; label: string }[]): { id: number; label: string }[] => {
+    const seen = new Map<number, string>();
+    items.forEach(i => { if (!seen.has(i.id)) seen.set(i.id, i.label); });
+    return Array.from(seen, ([id, label]) => ({ id, label }));
+  };
+  const paralelosOp = dedupe(asignaciones.map(a => ({ id: a.idParalelo, label: a.paralelo })));
+  const materiasOp = dedupe(asignaciones.map(a => ({ id: a.idMateria, label: a.materia })));
+  const periodosOp = dedupe(asignaciones.map(a => ({ id: a.idPeriodo, label: a.periodo })));
+  const docentesOp = dedupe(asignaciones.map(a => ({ id: a.idDocente, label: a.docente })));
+
+  const [idParalelo, setIdParalelo] = useState<number | "">("");
+  const [idMateria, setIdMateria] = useState<number | "">("");
+  const [idPeriodo, setIdPeriodo] = useState<number | "">("");
+  const [idDocente, setIdDocente] = useState<number | "">("");
+  const [parcial, setParcial] = useState<number | "">("");
+  const [queryEstudiante, setQueryEstudiante] = useState("");
+  const [estudianteSel, setEstudianteSel] = useState<EstudianteConParalelo | null>(null);
+  const [resultadosEstudiante, setResultadosEstudiante] = useState<EstudianteConParalelo[]>([]);
+
+  const [resultados, setResultados] = useState<NotaBusquedaResponse[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [buscado, setBuscado] = useState(false);
+  const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
+  const [orden, setOrden] = useState<{ campo: "estudiante" | "promedio"; asc: boolean }>({ campo: "estudiante", asc: true });
+  const [pagina, setPagina] = useState(1);
+
+  useEffect(() => {
+    if (queryEstudiante.trim().length < 2) { setResultadosEstudiante([]); return; }
+    const t = setTimeout(() => {
+      estudiantesApi.buscar(queryEstudiante.trim()).then(setResultadosEstudiante).catch(() => setResultadosEstudiante([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [queryEstudiante]);
+
+  const buscar = async () => {
+    setBuscando(true);
+    setBuscado(true);
+    try {
+      const r = await calificacionesApi.buscar({
+        idEstudiante: estudianteSel?.id,
+        idParalelo: idParalelo || undefined,
+        idMateria: idMateria || undefined,
+        idPeriodo: idPeriodo || undefined,
+        idDocente: idDocente || undefined,
+        parcial: parcial || undefined,
+      });
+      setResultados(r);
+      setPagina(1);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo completar la búsqueda.");
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const eliminar = async (idCalificacion: number) => {
+    if (confirmandoId !== idCalificacion) {
+      setConfirmandoId(idCalificacion);
+      setTimeout(() => setConfirmandoId(p => p === idCalificacion ? null : p), 4000);
+      return;
+    }
+    try {
+      await calificacionesApi.eliminar(idCalificacion);
+      setResultados(p => p.filter(r => r.idCalificacion !== idCalificacion));
+      toast.success("Calificación eliminada correctamente");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo eliminar la calificación.");
+    } finally {
+      setConfirmandoId(null);
+    }
+  };
+
+  const filas = [...resultados].sort((a, b) => {
+    const dir = orden.asc ? 1 : -1;
+    if (orden.campo === "estudiante") return a.estudiante.localeCompare(b.estudiante) * dir;
+    return (a.promedio - b.promedio) * dir;
+  });
+  const totalPaginas = Math.max(1, Math.ceil(filas.length / FILAS_POR_PAGINA));
+  const filasPagina = filas.slice((pagina - 1) * FILAS_POR_PAGINA, pagina * FILAS_POR_PAGINA);
+  const ordenarPor = (campo: "estudiante" | "promedio") =>
+    setOrden(o => o.campo === campo ? { campo, asc: !o.asc } : { campo, asc: true });
+
+  const selectCls = "border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white";
+
+  return (
+    <div>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+          <div className="flex flex-col gap-1 relative">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Estudiante</label>
+            <input value={estudianteSel ? estudianteSel.nombreCompleto : queryEstudiante}
+              onChange={e => { setEstudianteSel(null); setQueryEstudiante(e.target.value); }}
+              placeholder="Buscar por nombre…" className={selectCls} />
+            {resultadosEstudiante.length > 0 && !estudianteSel && (
+              <ul className="absolute z-10 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {resultadosEstudiante.map(r => (
+                  <li key={r.id}>
+                    <button onClick={() => { setEstudianteSel(r); setResultadosEstudiante([]); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#EAF2FB]">{r.nombreCompleto}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Curso</label>
+            <select value={idParalelo} onChange={e => setIdParalelo(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
+              <option value="">Todos</option>
+              {paralelosOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Materia</label>
+            <select value={idMateria} onChange={e => setIdMateria(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
+              <option value="">Todas</option>
+              {materiasOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Período</label>
+            <select value={idPeriodo} onChange={e => setIdPeriodo(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
+              <option value="">Todos</option>
+              {periodosOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Docente</label>
+            <select value={idDocente} onChange={e => setIdDocente(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
+              <option value="">Todos</option>
+              {docentesOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </div>
+          <Btn onClick={buscar} disabled={buscando}>
+            {buscando ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            Buscar
+          </Btn>
+        </div>
+      </div>
+
+      {!buscando && buscado && filas.length === 0 && (
+        <EmptyState icon={Search} title="No existen calificaciones para los filtros seleccionados." />
+      )}
+      {!buscado && (
+        <EmptyState icon={Search} title="Defina al menos un filtro y presione Buscar." />
+      )}
+
+      {filas.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#F5F7FA] border-b border-gray-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => ordenarPor("estudiante")}>
+                  Estudiante {orden.campo === "estudiante" && (orden.asc ? "▲" : "▼")}
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Curso</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Materia</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Período</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Docente</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Parcial</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => ordenarPor("promedio")}>
+                  Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filasPagina.map((r, idx) => (
+                <tr key={r.idCalificacion} className={`border-b border-gray-100 ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"}`}>
+                  <td className="px-4 py-3 font-medium text-[#1A1A1A] whitespace-nowrap">{r.estudiante}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.curso}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.materia}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.periodo}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.docente}</td>
+                  <td className="px-4 py-3 text-center">{r.parcial}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex items-center justify-center w-14 h-7 rounded-lg text-sm font-bold
+                      ${r.enRiesgo ? "bg-red-100 text-[#C62828]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>{r.promedio}</span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => eliminar(r.idCalificacion)}
+                      className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors
+                        ${confirmandoId === r.idCalificacion ? "bg-[#C62828] text-white" : "text-[#C62828] hover:bg-red-50"}`}>
+                      {confirmandoId === r.idCalificacion ? "¿Confirmar?" : "Eliminar"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+          {totalPaginas > 1 && (
+            <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-end gap-2 text-xs text-gray-400">
+              <button disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
+                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">‹</button>
+              <span>Página {pagina} de {totalPaginas}</span>
+              <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
+                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">›</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -602,6 +883,7 @@ const ATT_STATUS_TO_API: Record<AttendanceStatus, EstadoAsistencia> = {
 };
 
 function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const toast = useToast();
   const [asignacionesOpciones, setAsignacionesOpciones] = useState<AsignacionOpcion[]>([]);
   const [idAsignacion, setIdAsignacion] = useState<number | "">("");
   const [roster, setRoster] = useState<EstudianteResumen[]>([]);
@@ -609,7 +891,6 @@ function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [consecutivas, setConsecutivas] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
 
   useEffect(() => {
@@ -625,7 +906,6 @@ function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
     if (!asignacion) { setRoster([]); return; }
     setLoading(true);
     setErrorApi(null);
-    setSaved(false);
     Promise.all([
       estudiantesApi.porParalelo(asignacion.idParalelo),
       asistenciaApi.consecutivasPorParalelo(asignacion.idParalelo),
@@ -639,7 +919,6 @@ function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
 
   const update = (id: number, s: AttendanceStatus) => {
     setEstado(p => ({ ...p, [id]: s }));
-    setSaved(false);
   };
 
   const counts = {
@@ -651,15 +930,14 @@ function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const guardar = async () => {
     if (!asignacion || roster.length === 0) return;
     setSaving(true);
-    setErrorApi(null);
     try {
       await asistenciaApi.registrar(asignacion.idParalelo, roster.map(e => ({
         idEstudiante: e.id,
         estado: ATT_STATUS_TO_API[estado[e.id] ?? "present"],
       })));
-      setSaved(true);
+      toast.success("Asistencia guardada correctamente");
     } catch (e) {
-      setErrorApi(e instanceof ApiError ? e.message : "No se pudo guardar la asistencia.");
+      toast.error(e instanceof ApiError ? e.message : "No se pudo guardar la asistencia.");
     } finally {
       setSaving(false);
     }
@@ -690,7 +968,6 @@ function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
             </div>
           )}
           <div className="ml-auto flex items-center gap-3">
-            {saved && <span className="text-sm text-[#2E7D32] font-medium flex items-center gap-1.5"><CheckCircle size={15} />Guardado</span>}
             <Btn onClick={guardar} disabled={saving || roster.length === 0}>
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {saving ? "Guardando…" : "Guardar asistencia"}
@@ -912,14 +1189,49 @@ function FormField({ label, error, hint, required = true, children }: {
   );
 }
 
+/** Selector de fecha con calendario (react-day-picker) sobre un input de solo lectura. */
+function DateField({ value, onChange, className, maxDate }: {
+  value: string; onChange: (v: string) => void; className: string; maxDate?: Date;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClickFuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickFuera);
+    return () => document.removeEventListener("mousedown", onClickFuera);
+  }, []);
+
+  const seleccionada = value ? new Date(`${value}T00:00:00`) : undefined;
+  const formateada = seleccionada ? seleccionada.toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+
+  return (
+    <div className="position-relative" ref={ref}>
+      <input readOnly value={formateada} onClick={() => setOpen(o => !o)}
+        placeholder="Seleccione una fecha" className={className + " bg-white"} style={{ cursor: "pointer" }} />
+      {open && (
+        <div className="position-absolute bg-white border rounded shadow-sm p-2" style={{ zIndex: 30, top: "100%" }}>
+          <DayPicker mode="single" selected={seleccionada} captionLayout="dropdown"
+            startMonth={new Date(1990, 0)} endMonth={maxDate ?? new Date()}
+            disabled={maxDate ? { after: maxDate } : undefined}
+            onSelect={d => { if (d) { onChange(d.toISOString().slice(0, 10)); setOpen(false); } }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MatriculaView() {
+  const toast = useToast();
   const [form, setForm] = useState<MatriculaData>(MATRICULA_EMPTY);
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<{ codigo: string; claveTemporal: string | null } | null>(null);
-  const [errorApi, setErrorApi] = useState<string | null>(null);
+  const [saved, setSaved] = useState<{ codigo: string; usuarioEstudiante: string; usuarioRepresentante: string; representanteNuevo: boolean; claveTemporal: string | null } | null>(null);
   const [paralelosOpciones, setParalelosOpciones] = useState<ParaleloOpcion[]>([]);
+  const [paraleloTexto, setParaleloTexto] = useState("");
 
   useEffect(() => {
     paralelosApi.listar().then(setParalelosOpciones).catch(() => setParalelosOpciones([]));
@@ -962,7 +1274,6 @@ function MatriculaView() {
     if (!allOk || !paraleloSeleccionado) return;
 
     setSaving(true);
-    setErrorApi(null);
     const req: MatriculaRequest = {
       estudianteNombres: form.nombres.trim(),
       estudianteApellidos: form.apellidos.trim(),
@@ -988,12 +1299,19 @@ function MatriculaView() {
     };
     try {
       const resp = await matriculasApi.crear(req);
-      setSaved({ codigo: resp.codigo, claveTemporal: resp.claveTemporal });
+      setSaved({
+        codigo: resp.codigo, usuarioEstudiante: resp.usuarioEstudiante,
+        usuarioRepresentante: resp.usuarioRepresentante, representanteNuevo: resp.representanteNuevo,
+        claveTemporal: resp.claveTemporal,
+      });
+      toast.success(`Matrícula registrada correctamente · código ${resp.codigo}`);
+      toast.success(`Usuario creado correctamente: ${resp.usuarioEstudiante}`);
       setForm(MATRICULA_EMPTY);
       setTouchedFields({});
+      setParaleloTexto("");
       setAttempted(false);
     } catch (e) {
-      setErrorApi(e instanceof ApiError ? e.message : "No se pudo registrar la matrícula. Intente nuevamente.");
+      toast.error(e instanceof ApiError ? e.message : "No se pudo registrar la matrícula. Intente nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -1029,6 +1347,7 @@ function MatriculaView() {
         .matricula-form .card-header { font-weight: 600; color: #1A1A1A; }
         .matricula-form .docs-box.is-valid { border-color: #2E75B6 !important; background: #EAF2FB; }
         .matricula-form .docs-box.is-invalid { border-color: #C62828 !important; border-width: 2px; background: #FDECEC; }
+        .matricula-form .rdp { --rdp-accent-color: #2E75B6; --rdp-background-color: #EAF2FB; margin: 0; }
       `}</style>
 
       <TopBar title="Matrícula de Estudiante" subtitle="Formulario de inscripción · registra al estudiante y, si es nuevo, la cuenta de su representante" />
@@ -1063,7 +1382,8 @@ function MatriculaView() {
               <input className={cls("cedula", "form-control")} value={form.cedula} onChange={e => set("cedula", e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="1712345678" inputMode="numeric" maxLength={10} />
             </FormField>
             <FormField label="Fecha de nacimiento" error={err("fechaNacimiento")}>
-              <input type="date" className={cls("fechaNacimiento", "form-control")} value={form.fechaNacimiento} onChange={e => set("fechaNacimiento", e.target.value)} />
+              <DateField value={form.fechaNacimiento} onChange={v => set("fechaNacimiento", v)}
+                className={cls("fechaNacimiento", "form-control")} maxDate={new Date()} />
             </FormField>
             <FormField label="Género" error={err("genero")}>
               <select className={cls("genero", "form-select")} value={form.genero} onChange={e => set("genero", e.target.value)}>
@@ -1071,12 +1391,19 @@ function MatriculaView() {
                 {GENEROS.map(g => <option key={g.v} value={g.v}>{g.l}</option>)}
               </select>
             </FormField>
-            <FormField label="Paralelo a matricular" error={err("idParalelo")} hint={paralelosOpciones.length === 0 ? "Cargando paralelos…" : undefined}>
-              <select className={cls("idParalelo", "form-select")} value={form.idParalelo}
-                onChange={e => set("idParalelo", e.target.value ? Number(e.target.value) : "")}>
-                <option value="">Seleccione…</option>
-                {paralelosOpciones.map(p => <option key={p.id} value={p.id}>{p.etiqueta} · {p.anioLectivo}</option>)}
-              </select>
+            <FormField label="Paralelo a matricular" error={err("idParalelo")} hint={paralelosOpciones.length === 0 ? "Cargando paralelos…" : "Escriba para buscar (autocompletado)"}>
+              <input list="paralelos-datalist" className={cls("idParalelo", "form-control")}
+                value={paraleloSeleccionado ? `${paraleloSeleccionado.etiqueta} · ${paraleloSeleccionado.anioLectivo}` : paraleloTexto}
+                onChange={e => {
+                  const val = e.target.value;
+                  setParaleloTexto(val);
+                  const match = paralelosOpciones.find(p => `${p.etiqueta} · ${p.anioLectivo}` === val);
+                  set("idParalelo", match ? match.id : "");
+                }}
+                placeholder="Ej. 2° BGU · 2025-2026" autoComplete="off" />
+              <datalist id="paralelos-datalist">
+                {paralelosOpciones.map(p => <option key={p.id} value={`${p.etiqueta} · ${p.anioLectivo}`} />)}
+              </datalist>
             </FormField>
             <FormField label="Dirección domiciliaria" error={err("direccion")}>
               <input className={cls("direccion", "form-control")} value={form.direccion} onChange={e => set("direccion", e.target.value)} placeholder="Calle, número, sector" autoComplete="street-address" />
@@ -1167,20 +1494,15 @@ function MatriculaView() {
             <CheckCircle size={18} className="flex-shrink-0 mt-1" />
             <div>
               <p className="mb-1 fw-semibold">Matrícula registrada correctamente · código {saved.codigo}</p>
-              {saved.claveTemporal ? (
+              <p className="mb-1 small">Usuario del estudiante (Portal Familiar): <strong>{saved.usuarioEstudiante}</strong> · contraseña inicial: su número de cédula (deberá cambiarla al ingresar por primera vez).</p>
+              {saved.representanteNuevo ? (
                 <p className="mb-0 small">
-                  Se creó una cuenta nueva para el representante. Contraseña temporal: <strong>{saved.claveTemporal}</strong> (deberá cambiarla al ingresar por primera vez).
+                  Se creó una cuenta nueva para el representante. Usuario: <strong>{saved.usuarioRepresentante}</strong> · contraseña temporal: <strong>{saved.claveTemporal}</strong> (deberá cambiarla al ingresar por primera vez).
                 </p>
               ) : (
-                <p className="mb-0 small">El representante ya tenía una cuenta y fue vinculado a este estudiante.</p>
+                <p className="mb-0 small">El representante ya tenía una cuenta (usuario <strong>{saved.usuarioRepresentante}</strong>) y fue vinculado a este estudiante.</p>
               )}
             </div>
-          </div>
-        )}
-        {errorApi && (
-          <div className="alert alert-danger d-flex align-items-start gap-2 mb-3">
-            <AlertTriangle size={16} className="flex-shrink-0 mt-1" />
-            <span className="small">{errorApi}</span>
           </div>
         )}
         <div className="d-flex align-items-center justify-content-end gap-3 pb-4">
@@ -1208,6 +1530,7 @@ const ESTADO_TO_STATUS: Record<ObligacionResponse["estado"], PaymentStatus> = {
 };
 
 function FinancialView() {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState<EstudianteConParalelo[]>([]);
   const [estudiante, setEstudiante] = useState<EstudianteConParalelo | null>(null);
@@ -1242,12 +1565,12 @@ function FinancialView() {
 
   const registrarPago = async (o: ObligacionResponse) => {
     setPagando(o.idObligacion);
-    setErrorApi(null);
     try {
       await finanzasApi.registrarPago(o.idObligacion, o.valor);
+      toast.success("Pago registrado correctamente");
       if (estudiante) cargarObligaciones(estudiante.id);
     } catch (e) {
-      setErrorApi(e instanceof ApiError ? e.message : "No se pudo registrar el pago.");
+      toast.error(e instanceof ApiError ? e.message : "No se pudo registrar el pago.");
     } finally {
       setPagando(null);
     }
@@ -1659,138 +1982,6 @@ function ParentPortal({ onLogout, embed = false, nombre = "" }: { onLogout: () =
   );
 }
 
-// ── Validation / Components Showcase ──────────────────────────────────────
-function ValidationView() {
-  return (
-    <div>
-      <TopBar title="Guía de Componentes UI" subtitle="Sistema de diseño SAGAB · Variantes y estados" />
-      <div className="p-6 space-y-6">
-
-        {/* Buttons */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">Botones · Variantes y tamaños</h2>
-          <div className="flex flex-wrap gap-3 items-center mb-4">
-            <Btn>Ingresar al sistema</Btn>
-            <Btn variant="secondary">Cancelar</Btn>
-            <Btn variant="danger">Eliminar registro</Btn>
-            <Btn variant="ghost">Ver más</Btn>
-            <Btn disabled>Guardar (deshabilitado)</Btn>
-          </div>
-          <div className="flex gap-3 items-center">
-            <Btn size="sm">Pequeño</Btn>
-            <Btn size="md">Mediano</Btn>
-            <Btn size="lg">Grande</Btn>
-          </div>
-        </section>
-
-        {/* Form inputs */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-[#1A1A1A] mb-5">Campos de formulario · Estados</h2>
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Default</p>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre del estudiante</label>
-              <input type="text" placeholder="Ej. Alejandra Morales"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm bg-white outline-none hover:border-gray-400 transition-colors" />
-              <p className="text-xs text-gray-400 mt-1.5">Ingrese el nombre completo</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-[#2E75B6] uppercase tracking-widest mb-3">Focused (activo)</p>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Correo institucional</label>
-              <input type="email" defaultValue="ana.morales@bellini"
-                className="w-full px-3 py-2.5 rounded-lg border text-sm bg-white outline-none border-[#2E75B6] ring-2 ring-[#2E75B6]/20" />
-              <p className="text-xs text-[#2E75B6] mt-1.5">Borde azul + ring de enfoque (2px)</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-[#C62828] uppercase tracking-widest mb-3">Error (validación)</p>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Calificación</label>
-              <div className="relative">
-                <input type="number" defaultValue="11"
-                  className="w-full px-3 py-2.5 pr-9 rounded-lg border border-[#C62828] ring-1 ring-[#C62828]/25 bg-red-50 text-[#C62828] text-sm outline-none" />
-                <AlertCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#C62828]" />
-              </div>
-              <p className="text-xs text-[#C62828] mt-1.5 flex items-center gap-1">
-                <AlertCircle size={11} />El valor debe estar entre 1.0 y 10.0
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Badges */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">Badges de estado</h2>
-          <div className="flex flex-wrap gap-2.5">
-            <Badge v="success"><CheckCircle size={11} />Pagado</Badge>
-            <Badge v="success"><CheckCircle size={11} />Aprobado</Badge>
-            <Badge v="warning"><Clock size={11} />Pendiente</Badge>
-            <Badge v="warning"><Clock size={11} />Ausencia justificada</Badge>
-            <Badge v="error"><AlertTriangle size={11} />Vencido</Badge>
-            <Badge v="error"><AlertTriangle size={11} />En riesgo académico</Badge>
-            <Badge v="info"><MessageSquare size={11} />Sin revisar</Badge>
-          </div>
-        </section>
-
-        {/* Student cards */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">Tarjetas de estudiante · Default y En riesgo</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { name:"Alejandra Morales Vega", avg:8.4, att:96, risk:false },
-              { name:"Diego Hernández Ruiz",   avg:5.2, att:78, risk:true },
-            ].map((s, i) => (
-              <div key={i}
-                className={`rounded-xl border p-4 shadow-sm transition-all ${s.risk ? "border-red-200 bg-red-50/20" : "border-gray-200 bg-white hover:shadow-md"}`}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
-                    ${s.risk ? "bg-red-100 text-[#C62828]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>
-                    {initials(s.name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#1A1A1A] truncate">{s.name}</p>
-                    <p className="text-xs text-gray-400">2°A · 2025</p>
-                  </div>
-                  {s.risk && <Badge v="error"><AlertTriangle size={10} />En riesgo</Badge>}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className={`rounded-lg p-3 ${s.risk ? "bg-red-100" : "bg-[#EAF2FB]"}`}>
-                    <p className="text-[10px] text-gray-400">Promedio</p>
-                    <p className={`text-xl font-bold ${s.risk ? "text-[#C62828]" : "text-[#1F4E79]"}`}>{s.avg}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] text-gray-400">Asistencia</p>
-                    <p className="text-xl font-bold text-gray-700">{s.att}%</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Nav items */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">Ítems de menú lateral · Activo e Inactivo</h2>
-          <div className="bg-[#1F4E79] rounded-xl p-2.5 w-48 space-y-0.5">
-            {[
-              { icon: Home,      label:"Inicio",     active:true },
-              { icon: BookOpen,  label:"Académico",  active:false },
-              { icon: Users,     label:"Asistencia", active:false },
-              { icon: DollarSign,label:"Financiero", active:false },
-            ].map(({ icon: Icon, label, active }, i) => (
-              <div key={i}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-default
-                  ${active ? "bg-white/15 text-white" : "text-white/60"}`}>
-                <Icon size={16} />
-                {label}
-                {active && <ChevronRight size={13} className="ml-auto opacity-50" />}
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
 // ── Root ───────────────────────────────────────────────────────────────────
 export default function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null);
@@ -1834,7 +2025,6 @@ export default function App() {
         {screen === "attendance" && permitido("attendance") && <AttendanceView onNavigate={setScreen} />}
         {screen === "financial"  && permitido("financial")  && <FinancialView />}
         {screen === "parent"     && permitido("parent")     && <ParentPortal onLogout={logout} embed nombre={sesion.nombre} />}
-        {screen === "validation" && permitido("validation") && <ValidationView />}
       </main>
     </div>
   );

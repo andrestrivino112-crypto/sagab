@@ -1,0 +1,57 @@
+/* Toasts Bootstrap (contenedor position-fixed + toast + toast-body + btn-close):
+   estilos propios porque Bootstrap solo está cargado de forma scoped a .matricula-form. */
+.toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 360px;
+}
+
+.toast {
+  display: flex;
+  align-items: stretch;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+  color: #fff;
+  font-size: 0.875rem;
+  overflow: hidden;
+  animation: toast-in 0.15s ease-out;
+}
+
+.toast-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  line-height: 1.35;
+}
+
+.toast--success { background: #2E7D32; }
+.toast--error   { background: #C62828; }
+.toast--info    { background: #1F4E79; }
+
+.toast .btn-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.85rem;
+  flex-shrink: 0;
+}
+.toast .btn-close:hover { color: #fff; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .toast-container { left: 1rem; right: 1rem; max-width: none; }
+}

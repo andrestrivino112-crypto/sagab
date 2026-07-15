@@ -34,6 +34,31 @@ export interface NotaEstudianteResponse {
   enRiesgo: boolean;
 }
 
+export interface NotaBusquedaResponse {
+  idCalificacion: number;
+  idEstudiante: number;
+  estudiante: string;
+  curso: string;
+  materia: string;
+  periodo: string;
+  docente: string;
+  parcial: number;
+  notaTarea: number;
+  notaClase: number;
+  notaExamen: number;
+  promedio: number;
+  enRiesgo: boolean;
+}
+
+export interface BusquedaCalificacionesFiltros {
+  idEstudiante?: number;
+  idParalelo?: number;
+  idMateria?: number;
+  idPeriodo?: number;
+  idDocente?: number;
+  parcial?: number;
+}
+
 export const calificaciones = {
   registrarMasivo: (idAsignacion: number, parcial: number, notas: NotaRequest[]) =>
     api<NotaResponse[]>("/api/calificaciones", {
@@ -44,6 +69,13 @@ export const calificaciones = {
     api<NotaResponse[]>(`/api/calificaciones/asignacion/${idAsignacion}/parcial/${parcial}`),
   porEstudiante: (idEstudiante: number) =>
     api<NotaEstudianteResponse[]>(`/api/calificaciones/estudiante/${idEstudiante}`),
+  buscar: (filtros: BusquedaCalificacionesFiltros) => {
+    const q = new URLSearchParams();
+    Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== null) q.set(k, String(v)); });
+    return api<NotaBusquedaResponse[]>(`/api/calificaciones/buscar?${q}`);
+  },
+  eliminar: (idCalificacion: number) =>
+    api<void>(`/api/calificaciones/${idCalificacion}`, { method: "DELETE" }),
 };
 
 // ── Asistencia ─────────────────────────────────────────────────────────
@@ -94,9 +126,12 @@ export interface AsignacionOpcion {
   idAsignacion: number;
   idParalelo: number;
   paralelo: string;
+  idMateria: number;
   materia: string;
+  idPeriodo: number;
   periodo: string;
   periodoActivo: boolean;
+  idDocente: number;
   docente: string;
 }
 
@@ -149,7 +184,9 @@ export interface MatriculaRequest {
 export interface MatriculaResponse {
   idEstudiante: number;
   codigo: string;
+  usuarioEstudiante: string;
   representanteNuevo: boolean;
+  usuarioRepresentante: string;
   claveTemporal: string | null;
 }
 
