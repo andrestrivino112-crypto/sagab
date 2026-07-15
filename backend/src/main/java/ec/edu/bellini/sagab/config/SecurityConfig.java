@@ -1,0 +1,72 @@
+package ec.edu.bellini.sagab.config;
+
+import ec.edu.bellini.sagab.security.JwtAuthFilter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+/**
+ * Configuración de seguridad SAGAB (RNF-03, LOPDP):
+ *  - API stateless con JWT (sin sesiones de servidor)
+ *  - BCrypt fuerza 12
+ *  - CORS restringido al frontend institucional
+ *  - Autorización por rol y por método (@PreAuthorize)
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Value("${sagab.cors.origenes}")
+    private List<String> origenesPermitidos;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+        http.csrf(csrf -> csrf.disable())               // API stateless con JWT: CSRF no aplica
+            .cors(cors -> cors.configurationSource(corsSource()))
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(h -> h
+                .contentTypeOptions(o -> {})
+                .frameOptions(f -> f.deny())
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
+                .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE")
+                .requestMatchers("/api/finanzas/**").hasRole("ADMIN")
+                .anyRequest().authenticated())
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    private CorsConfigurationSource corsSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(origenesPermitidos);
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        cfg.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
+        src.registerCorsConfiguration("/api/**", cfg);
+        return src;
+    }
+}
