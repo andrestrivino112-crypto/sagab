@@ -5,8 +5,11 @@ public class AsignacionDocenteDtos {
             Long idAsignacion,
             Integer idParalelo,
             String paralelo,
+            Integer idMateria,
             String materia,
+            Integer idPeriodo,
             String periodo,
             boolean periodoActivo,
+            Long idDocente,
             String docente) {}
 }

@@ -46,6 +46,11 @@ public class Estudiante {
     @JoinColumn(name = "id_representante")
     private Representante representante;
 
+    /** Cuenta de acceso del estudiante (Portal Familiar), creada automáticamente al matricularlo. */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_usuario")
+    private Usuario usuario;
+
     @Column(length = 15)
     private String telefono;
 

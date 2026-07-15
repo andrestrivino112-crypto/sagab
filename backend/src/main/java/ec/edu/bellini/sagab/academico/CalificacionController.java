@@ -1,6 +1,7 @@
 package ec.edu.bellini.sagab.academico;
 
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -38,5 +39,27 @@ public class CalificacionController {
     public List<CalificacionDtos.NotaEstudianteResponse> porEstudiante(
             @PathVariable Long idEstudiante, Authentication auth) {
         return service.porEstudiante(idEstudiante, auth);
+    }
+
+    /** Búsqueda avanzada por estudiante, curso, materia, período y/o docente. */
+    @GetMapping("/buscar")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    public List<CalificacionDtos.NotaBusquedaResponse> buscar(
+            @RequestParam(required = false) Long idEstudiante,
+            @RequestParam(required = false) Integer idParalelo,
+            @RequestParam(required = false) Integer idMateria,
+            @RequestParam(required = false) Integer idPeriodo,
+            @RequestParam(required = false) Long idDocente,
+            @RequestParam(required = false) Short parcial,
+            Authentication auth) {
+        return service.buscar(idEstudiante, idParalelo, idMateria, idPeriodo, idDocente, parcial, auth);
+    }
+
+    /** Elimina una calificación — DOCENTE solo las propias, ADMIN cualquiera. */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, Authentication auth) {
+        service.eliminar(id, auth);
+        return ResponseEntity.noContent().build();
     }
 }

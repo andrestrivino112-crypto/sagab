@@ -35,6 +35,8 @@ public class MatriculaDtos {
     public record MatriculaResponse(
             Long idEstudiante,
             String codigo,
+            String usuarioEstudiante,
             boolean representanteNuevo,
+            String usuarioRepresentante,
             String claveTemporal) {}
 }

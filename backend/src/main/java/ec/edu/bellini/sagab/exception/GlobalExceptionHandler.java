@@ -1,5 +1,6 @@
 package ec.edu.bellini.sagab.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * Respuestas de error uniformes y sin fuga de información interna
@@ -45,6 +47,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> argumento(IllegalArgumentException e) {
         return error(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Map<String, Object>> noEncontrado(NoSuchElementException e) {
+        return error(HttpStatus.NOT_FOUND, e.getMessage() != null ? e.getMessage() : "El registro solicitado no existe");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> integridad(DataIntegrityViolationException e) {
+        return error(HttpStatus.CONFLICT, "La operación viola una restricción de datos (registro duplicado o referenciado)");
     }
 
     @ExceptionHandler(Exception.class)

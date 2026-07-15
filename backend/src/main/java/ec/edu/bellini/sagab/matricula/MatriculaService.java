@@ -19,8 +19,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Alta de matrícula (RF de admisión): crea al estudiante y, si el correo del
- * representante no existe todavía, también su cuenta de acceso (rol
+ * Alta de matrícula (RF de admisión): crea al estudiante y su cuenta de acceso
+ * (rol ESTUDIANTE, clave inicial = cédula cifrada con BCrypt) y, si el correo
+ * del representante no existe todavía, también la cuenta de este (rol
  * REPRESENTANTE, contraseña temporal). Nunca otorga un rol nuevo a una cuenta
  * ajena existente — si el correo pertenece a otro usuario sin rol
  * REPRESENTANTE, se rechaza explícitamente (evita escalamiento de privilegios
@@ -71,6 +72,8 @@ public class MatriculaService {
         String emailRep = req.representanteEmail().toLowerCase().trim();
         Rol rolRepresentante = roles.findByCodigo("REPRESENTANTE")
                 .orElseThrow(() -> new IllegalStateException("Falta el rol REPRESENTANTE en la base de datos"));
+        Rol rolEstudiante = roles.findByCodigo("ESTUDIANTE")
+                .orElseThrow(() -> new IllegalStateException("Falta el rol ESTUDIANTE en la base de datos"));
 
         boolean representanteNuevo = false;
         String claveTemporal = null;
@@ -79,6 +82,9 @@ public class MatriculaService {
         if (usuarioRep == null) {
             usuarioRep = new Usuario();
             usuarioRep.setEmail(emailRep);
+            usuarioRep.setUsername(UsernameGenerator.generar(
+                    req.representanteNombres(), req.representanteApellidos(),
+                    u -> usuarios.findByUsername(u).isPresent()));
             usuarioRep.setNombres(req.representanteNombres().trim());
             usuarioRep.setApellidos(req.representanteApellidos().trim());
             usuarioRep.setCedula(req.representanteCedula());
@@ -98,6 +104,13 @@ public class MatriculaService {
                 throw new IllegalArgumentException(
                         "El correo del representante ya pertenece a otro usuario del sistema con un rol distinto");
             }
+            if (usuarioRep.getUsername() == null) {
+                // Cuentas creadas antes de esta corrección se completan al vuelo (nunca podían iniciar sesión).
+                usuarioRep.setUsername(UsernameGenerator.generar(
+                        usuarioRep.getNombres(), usuarioRep.getApellidos(),
+                        u -> usuarios.findByUsername(u).isPresent()));
+                usuarioRep = usuarios.save(usuarioRep);
+            }
         }
 
         final Long idUsuarioRep = usuarioRep.getId();
@@ -108,6 +121,26 @@ public class MatriculaService {
             r.setDireccion(req.direccion());
             return representantes.save(r);
         });
+
+        // Cuenta de acceso del estudiante (Portal Familiar): usuario = primerNombre.primerApellido,
+        // clave inicial = cédula cifrada con BCrypt, forzando el cambio en el primer ingreso.
+        String usernameEstudiante = UsernameGenerator.generar(
+                req.estudianteNombres(), req.estudianteApellidos(),
+                u -> usuarios.findByUsername(u).isPresent());
+
+        Usuario usuarioEst = new Usuario();
+        usuarioEst.setUsername(usernameEstudiante);
+        usuarioEst.setEmail(usernameEstudiante + "@estudiante.bellini.edu.ec");
+        usuarioEst.setNombres(req.estudianteNombres().trim());
+        usuarioEst.setApellidos(req.estudianteApellidos().trim());
+        usuarioEst.setCedula(req.estudianteCedula());
+        usuarioEst.setTelefono(req.telefonoEstudiante());
+        usuarioEst.setHashPassword(encoder.encode(req.estudianteCedula()));
+        usuarioEst.setDebeCambiarClave(true);
+        Set<Rol> rolesEstudiante = new HashSet<>();
+        rolesEstudiante.add(rolEstudiante);
+        usuarioEst.setRoles(rolesEstudiante);
+        usuarioEst = usuarios.save(usuarioEst);
 
         String codigo = "EST-" + String.format("%04d", estudiantes.siguienteCodigoSecuencial());
 
@@ -120,6 +153,7 @@ public class MatriculaService {
         est.setGenero(req.genero());
         est.setParalelo(paralelo);
         est.setRepresentante(representante);
+        est.setUsuario(usuarioEst);
         est.setTelefono(req.telefonoEstudiante());
         est.setTipoSangre(req.tipoSangre());
         est.setCondicionMedica(req.condicionMedica());
@@ -129,7 +163,8 @@ public class MatriculaService {
         est.setActivo(true);
         est = estudiantes.save(est);
 
-        return new MatriculaDtos.MatriculaResponse(est.getId(), est.getCodigo(), representanteNuevo, claveTemporal);
+        return new MatriculaDtos.MatriculaResponse(est.getId(), est.getCodigo(), usernameEstudiante,
+                representanteNuevo, usuarioRep.getUsername(), claveTemporal);
     }
 
     private String generarClaveTemporal() {

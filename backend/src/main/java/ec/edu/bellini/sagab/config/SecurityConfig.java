@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .frameOptions(f -> f.deny())
                 .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE")

@@ -9,9 +9,9 @@ public class CalificacionDtos {
 
     public record NotaRequest(
             @NotNull Long idEstudiante,
-            @NotNull @DecimalMin("1.0") @DecimalMax("10.0") BigDecimal notaTarea,
-            @NotNull @DecimalMin("1.0") @DecimalMax("10.0") BigDecimal notaClase,
-            @NotNull @DecimalMin("1.0") @DecimalMax("10.0") BigDecimal notaExamen,
+            @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal notaTarea,
+            @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal notaClase,
+            @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal notaExamen,
             @Size(max = 250) String observacion) {}
 
     public record RegistroMasivoRequest(
@@ -27,6 +27,13 @@ public class CalificacionDtos {
     /** Notas de un estudiante a través de todas sus materias/parciales — Portal Familiar. */
     public record NotaEstudianteResponse(
             Long idCalificacion, String materia, short parcial,
+            BigDecimal notaTarea, BigDecimal notaClase, BigDecimal notaExamen,
+            BigDecimal promedio, boolean enRiesgo) {}
+
+    /** Fila de la búsqueda avanzada (ADMIN/DOCENTE): cruza estudiante, curso, materia, período y docente. */
+    public record NotaBusquedaResponse(
+            Long idCalificacion, Long idEstudiante, String estudiante, String curso,
+            String materia, String periodo, String docente, short parcial,
             BigDecimal notaTarea, BigDecimal notaClase, BigDecimal notaExamen,
             BigDecimal promedio, boolean enRiesgo) {}
 }

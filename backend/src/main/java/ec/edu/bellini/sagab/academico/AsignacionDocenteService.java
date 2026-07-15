@@ -30,9 +30,12 @@ public class AsignacionDocenteService {
                 a.getId(),
                 a.getParalelo().getId(),
                 a.getParalelo().etiqueta(),
+                a.getMateria().getId(),
                 a.getMateria().getNombre(),
+                a.getPeriodo().getId(),
                 a.getPeriodo().etiqueta(),
                 a.getPeriodo().isActivo(),
+                a.getDocente().getId(),
                 a.getDocente().getUsuario().nombreCompleto()
         )).toList();
     }
