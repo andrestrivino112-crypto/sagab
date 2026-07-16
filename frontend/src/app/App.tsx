@@ -1213,8 +1213,8 @@ function DateField({ value, onChange, className, maxDate }: {
         placeholder="Seleccione una fecha" className={className + " bg-white"} style={{ cursor: "pointer" }} />
       {open && (
         <div className="position-absolute bg-white border rounded shadow-sm p-2" style={{ zIndex: 30, top: "100%" }}>
-          <DayPicker mode="single" selected={seleccionada} captionLayout="dropdown"
-            startMonth={new Date(1990, 0)} endMonth={maxDate ?? new Date()}
+          <DayPicker mode="single" selected={seleccionada} captionLayout="dropdown-buttons"
+            defaultMonth={seleccionada ?? maxDate} fromYear={1990} toYear={(maxDate ?? new Date()).getFullYear()}
             disabled={maxDate ? { after: maxDate } : undefined}
             onSelect={d => { if (d) { onChange(d.toISOString().slice(0, 10)); setOpen(false); } }} />
         </div>
