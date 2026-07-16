@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.repository;
 
-import ec.edu.bellini.sagab.entity.Estudiante;
+import ec.edu.bellini.sagab.model.Estudiante;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

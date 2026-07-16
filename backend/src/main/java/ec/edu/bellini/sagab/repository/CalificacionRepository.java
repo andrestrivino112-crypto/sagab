@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.repository;
 
-import ec.edu.bellini.sagab.entity.Calificacion;
+import ec.edu.bellini.sagab.model.Calificacion;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

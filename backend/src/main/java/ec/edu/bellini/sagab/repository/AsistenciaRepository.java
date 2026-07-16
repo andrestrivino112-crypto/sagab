@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.repository;
 
-import ec.edu.bellini.sagab.entity.Asistencia;
+import ec.edu.bellini.sagab.model.Asistencia;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

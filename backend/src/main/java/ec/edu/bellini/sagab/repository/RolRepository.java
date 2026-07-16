@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.repository;
 
-import ec.edu.bellini.sagab.entity.Rol;
+import ec.edu.bellini.sagab.model.Rol;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

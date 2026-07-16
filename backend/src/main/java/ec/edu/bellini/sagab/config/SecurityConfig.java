@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.config;
 
-import ec.edu.bellini.sagab.security.JwtAuthFilter;
+import ec.edu.bellini.sagab.middleware.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

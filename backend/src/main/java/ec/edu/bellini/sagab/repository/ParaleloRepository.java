@@ -1,6 +1,6 @@
 package ec.edu.bellini.sagab.repository;
 
-import ec.edu.bellini.sagab.entity.Paralelo;
+import ec.edu.bellini.sagab.model.Paralelo;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
