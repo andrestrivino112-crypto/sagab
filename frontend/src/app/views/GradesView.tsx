@@ -104,10 +104,11 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
       <TopBar title="Calificaciones" subtitle="Escala 0.0–10.0 · Aprobación ≥ 7.0" />
       <div className="p-6">
         {/* Modo */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 w-fit mb-4">
+        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 w-fit mb-4" role="tablist" aria-label="Modo de calificaciones">
           {(["ingreso", "consulta"] as const).map(m => (
-            <button key={m} onClick={() => setModo(m)}
+            <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => setModo(m)}
               className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40
                 ${modo === m ? "bg-[#1F4E79] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
               {m === "ingreso" ? "Ingreso de notas" : "Búsqueda avanzada"}
             </button>
@@ -118,7 +119,7 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
         {/* Controls */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-end gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Asignación</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
             <select value={idAsignacion} onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
               {asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
@@ -130,14 +131,14 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Parcial</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Parcial</label>
             <select value={parcial} onChange={e => setParcial(Number(e.target.value))}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
               {[1,2,3].map(p => <option key={p} value={p}>Parcial {p}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1 min-w-[220px]">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Buscar estudiante</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Buscar estudiante</label>
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Nombre…"
@@ -146,15 +147,15 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
           </div>
           <div className="ml-auto flex items-center gap-3">
             <Btn onClick={guardar} disabled={!allOk || saving || completas.length === 0}>
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
               {saving ? "Guardando…" : allOk ? "Guardar calificaciones" : "Completar todos los campos"}
             </Btn>
           </div>
         </div>
 
         {errorApi && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />{errorApi}
+          <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
           </div>
         )}
 
@@ -167,28 +168,35 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Calificaciones de {asignacion.paralelo} · {asignacion.materia}, parcial {parcial}</caption>
             <thead>
               <tr className="bg-[#F5F7FA] border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
-                  onClick={() => ordenarPor("nombre")}>
-                  Estudiante {orden.campo === "nombre" && (orden.asc ? "▲" : "▼")}
+                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
+                <th scope="col" aria-sort={orden.campo === "nombre" ? (orden.asc ? "ascending" : "descending") : "none"}
+                  className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <button type="button" onClick={() => ordenarPor("nombre")}
+                    className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 rounded">
+                    Estudiante {orden.campo === "nombre" && (orden.asc ? "▲" : "▼")}
+                  </button>
                 </th>
                 {(["Tarea","Clase","Examen"] as const).map((h, i) => (
-                  <th key={h} className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                    {h} <span className="font-normal text-gray-400 normal-case">{["(20%)","(20%)","(60%)"][i]}</span>
+                  <th key={h} scope="col" className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    {h} <span className="font-normal text-gray-600 normal-case">{["(20%)","(20%)","(60%)"][i]}</span>
                   </th>
                 ))}
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
-                  onClick={() => ordenarPor("promedio")}>
-                  Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                <th scope="col" aria-sort={orden.campo === "promedio" ? (orden.asc ? "ascending" : "descending") : "none"}
+                  className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <button type="button" onClick={() => ordenarPor("promedio")}
+                    className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 rounded">
+                    Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                  </button>
                 </th>
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  <Loader2 size={16} className="animate-spin inline-block mr-2" />Cargando…
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-600">
+                  <Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…
                 </td></tr>
               )}
               {!loading && rows.length === 0 && (
@@ -208,24 +216,29 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
                 return (
                   <tr key={row.idEstudiante}
                     className={`border-b border-gray-100 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"} hover:bg-[#EAF2FB]/25`}>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{idx+1}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{idx+1}</td>
                     <td className="px-4 py-3 font-medium text-[#1A1A1A] text-sm whitespace-nowrap">{row.nombre}</td>
                     {(["tarea","clase","examen"] as const).map(f => {
                       const val = row[f];
                       const invalid = val !== "" && !isValid(val);
+                      const errId = `nota-error-${row.idEstudiante}-${f}`;
+                      const campoLabel = { tarea: "Tarea", clase: "Clase", examen: "Examen" }[f];
                       return (
                         <td key={f} className="px-4 py-2">
                           <div className="flex flex-col items-center gap-0.5">
                             <div className="flex items-center gap-1">
                               <input type="number" min="0" max="10" step="0.5" value={val}
+                                aria-label={`${campoLabel} de ${row.nombre}`}
+                                aria-invalid={invalid || undefined}
+                                aria-describedby={invalid ? errId : undefined}
                                 onChange={e => update(row.idEstudiante, f, e.target.value)}
                                 className={`w-20 text-center px-2 py-1.5 rounded-lg border text-sm font-mono outline-none transition-all
                                   ${invalid
                                     ? "border-[#C62828] bg-red-50 text-[#C62828] ring-1 ring-[#C62828]/25"
                                     : "border-gray-300 focus:border-[#2E75B6] focus:ring-2 focus:ring-[#2E75B6]/20"}`} />
-                              {invalid && <AlertCircle size={14} className="text-[#C62828] flex-shrink-0" />}
+                              {invalid && <AlertCircle size={14} className="text-[#C62828] flex-shrink-0" aria-hidden="true" />}
                             </div>
-                            {invalid && <p className="text-[10px] text-[#C62828]">Valor: 0–10</p>}
+                            {invalid && <p id={errId} role="alert" className="text-[10px] text-[#C62828]">Valor: 0–10</p>}
                           </div>
                         </td>
                       );
@@ -236,7 +249,7 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
                             ${avg < 7 ? "bg-red-100 text-[#C62828]" : avg >= 9 ? "bg-green-100 text-[#2E7D32]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>
                             {avg}
                           </span>
-                        : <span className="text-gray-300">—</span>
+                        : <span className="text-gray-600">—</span>
                       }
                     </td>
                   </tr>
@@ -245,15 +258,15 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
             </tbody>
           </table>
           </div>
-          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-between text-xs text-gray-400 flex-wrap gap-2">
+          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-between text-xs text-gray-600 flex-wrap gap-2">
             <span>{filas.length} de {rows.length} estudiantes · {asignacion.paralelo} · {asignacion.materia} · {asignacion.periodo}</span>
             {totalPaginas > 1 && (
               <div className="flex items-center gap-2">
-                <button disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
-                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">‹</button>
-                <span>Página {pagina} de {totalPaginas}</span>
-                <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
-                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">›</button>
+                <button type="button" aria-label="Página anterior" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
+                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40"><span aria-hidden="true">‹</span></button>
+                <span aria-live="polite">Página {pagina} de {totalPaginas}</span>
+                <button type="button" aria-label="Página siguiente" disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
+                  className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40"><span aria-hidden="true">›</span></button>
               </div>
             )}
             <span>Promedio = Tarea×0.2 + Clase×0.2 + Examen×0.6</span>
@@ -363,7 +376,7 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
           <div className="flex flex-col gap-1 relative">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Estudiante</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Estudiante</label>
             <input value={estudianteSel ? estudianteSel.nombreCompleto : queryEstudiante}
               onChange={e => { setEstudianteSel(null); setQueryEstudiante(e.target.value); }}
               placeholder="Buscar por nombre…" className={selectCls} />
@@ -379,42 +392,42 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Curso</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Curso</label>
             <select value={idParalelo} onChange={e => setIdParalelo(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todos</option>
               {paralelosOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Materia</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Materia</label>
             <select value={idMateria} onChange={e => setIdMateria(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todas</option>
               {materiasOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Período</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Período</label>
             <select value={idPeriodo} onChange={e => setIdPeriodo(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todos</option>
               {periodosOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Docente</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Docente</label>
             <select value={idDocente} onChange={e => setIdDocente(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todos</option>
               {docentesOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Parcial</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Parcial</label>
             <select value={parcial} onChange={e => setParcial(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todos</option>
               {[1,2,3].map(p => <option key={p} value={p}>Parcial {p}</option>)}
             </select>
           </div>
           <Btn onClick={buscar} disabled={buscando}>
-            {buscando ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            {buscando ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Search size={14} aria-hidden="true" />}
             Buscar
           </Btn>
         </div>
@@ -431,22 +444,29 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Resultados de búsqueda avanzada de calificaciones</caption>
             <thead>
               <tr className="bg-[#F5F7FA] border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
-                  onClick={() => ordenarPor("estudiante")}>
-                  Estudiante {orden.campo === "estudiante" && (orden.asc ? "▲" : "▼")}
+                <th scope="col" aria-sort={orden.campo === "estudiante" ? (orden.asc ? "ascending" : "descending") : "none"}
+                  className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <button type="button" onClick={() => ordenarPor("estudiante")}
+                    className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 rounded">
+                    Estudiante {orden.campo === "estudiante" && (orden.asc ? "▲" : "▼")}
+                  </button>
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Curso</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Materia</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Período</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Docente</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Parcial</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap"
-                  onClick={() => ordenarPor("promedio")}>
-                  Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Curso</th>
+                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Materia</th>
+                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Período</th>
+                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Docente</th>
+                <th scope="col" className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Parcial</th>
+                <th scope="col" aria-sort={orden.campo === "promedio" ? (orden.asc ? "ascending" : "descending") : "none"}
+                  className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <button type="button" onClick={() => ordenarPor("promedio")}
+                    className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 rounded">
+                    Promedio {orden.campo === "promedio" && (orden.asc ? "▲" : "▼")}
+                  </button>
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Acción</th>
+                <th scope="col" className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -463,8 +483,10 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
                       ${r.enRiesgo ? "bg-red-100 text-[#C62828]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>{r.promedio}</span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => eliminar(r.idCalificacion)}
-                      className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors
+                    <button type="button" onClick={() => eliminar(r.idCalificacion)}
+                      aria-label={confirmandoId === r.idCalificacion ? `Confirmar eliminación de la calificación de ${r.estudiante}` : `Eliminar calificación de ${r.estudiante}`}
+                      aria-live="polite"
+                      className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C62828]/40
                         ${confirmandoId === r.idCalificacion ? "bg-[#C62828] text-white" : "text-[#C62828] hover:bg-red-50"}`}>
                       {confirmandoId === r.idCalificacion ? "¿Confirmar?" : "Eliminar"}
                     </button>
@@ -475,12 +497,12 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
           </table>
           </div>
           {totalPaginas > 1 && (
-            <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-end gap-2 text-xs text-gray-400">
-              <button disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
-                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">‹</button>
-              <span>Página {pagina} de {totalPaginas}</span>
-              <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
-                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40">›</button>
+            <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 flex items-center justify-end gap-2 text-xs text-gray-600">
+              <button type="button" aria-label="Página anterior" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}
+                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40"><span aria-hidden="true">‹</span></button>
+              <span aria-live="polite">Página {pagina} de {totalPaginas}</span>
+              <button type="button" aria-label="Página siguiente" disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}
+                className="px-2 py-1 rounded border border-gray-300 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40"><span aria-hidden="true">›</span></button>
             </div>
           )}
         </div>

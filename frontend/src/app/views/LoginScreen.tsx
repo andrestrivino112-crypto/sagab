@@ -29,12 +29,12 @@ export function LoginScreen({ onLogin }: { onLogin: (s: Sesion) => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4" style={{ fontFamily:"'Inter', sans-serif" }}>
+    <main className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4" style={{ fontFamily:"'Inter', sans-serif" }}>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1F4E79] rounded-2xl mb-4 shadow-lg">
-            <GraduationCap size={32} className="text-white" />
+            <GraduationCap size={32} className="text-white" aria-hidden="true" />
           </div>
           <h1 className="text-[28px] font-bold text-[#1A1A1A] tracking-tight">SAGAB</h1>
           <p className="text-sm text-gray-500 mt-1">Sistema Avanzado de Gestión Académica Bellini</p>
@@ -44,16 +44,16 @@ export function LoginScreen({ onLogin }: { onLogin: (s: Sesion) => void }) {
           <h2 className="text-[20px] font-semibold text-[#1A1A1A] mb-6">Iniciar sesión</h2>
 
           {error && (
-            <div className="mb-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-              <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+            <div role="alert" className="mb-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+              <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
               {error}
             </div>
           )}
 
           {/* User */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Usuario</label>
-            <input type="text" value={usuario} onChange={e => setUsuario(e.target.value)}
+            <label htmlFor="login-usuario" className="block text-sm font-medium text-gray-700 mb-1.5">Usuario</label>
+            <input id="login-usuario" type="text" value={usuario} onChange={e => setUsuario(e.target.value)}
               onFocus={() => setUFocus(true)} onBlur={() => setUFocus(false)}
               placeholder="Ingrese su usuario" autoComplete="username"
               className={`w-full px-3 py-2.5 rounded-lg border text-sm bg-white transition-all outline-none
@@ -62,33 +62,35 @@ export function LoginScreen({ onLogin }: { onLogin: (s: Sesion) => void }) {
 
           {/* Password */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
+            <label htmlFor="login-pass" className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
             <div className="relative">
-              <input type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)}
+              <input id="login-pass" type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)}
                 onFocus={() => setPFocus(true)} onBlur={() => setPFocus(false)}
                 placeholder="Ingrese su contraseña" autoComplete="current-password"
                 className={`w-full px-3 py-2.5 pr-10 rounded-lg border text-sm bg-white transition-all outline-none
                   ${pFocus ? "border-[#2E75B6] ring-2 ring-[#2E75B6]/20" : "border-gray-300 hover:border-gray-400"}`} />
               <button type="button" onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-pressed={showPass}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/40 transition-colors">
+                {showPass ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </div>
           </div>
 
           <Btn size="lg" className="w-full" disabled={loading}>
-            {loading ? <><Loader2 size={16} className="animate-spin" />Ingresando…</> : "Ingresar al sistema"}
+            {loading ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" />Ingresando…</> : "Ingresar al sistema"}
           </Btn>
 
-          <p className="text-xs text-center text-gray-400 mt-4">
+          <p className="text-xs text-center text-gray-500 mt-4">
             ¿Problemas de acceso? Contacte al administrador del sistema
           </p>
         </form>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-gray-500 mt-6">
           © 2026 Unidad Educativa Bellini · SAGAB v2.1.0
         </p>
       </div>
-    </div>
+    </main>
   );
 }

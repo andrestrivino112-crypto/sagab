@@ -6,6 +6,9 @@ import { DateField } from "../components/DateField";
 import { FormField } from "../components/FormField";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
+// Bootstrap solo lo usa este formulario: se importa aquí (no en index.css global)
+// para que el code-splitting de MatriculaView lo cargue únicamente cuando se navega a esta vista.
+import "../../styles/bootstrap-scoped.css";
 
 // ── Datos y validación ──────────────────────────────────────────────────────
 interface MatriculaData {
@@ -276,9 +279,9 @@ export function MatriculaView() {
             {alerts.map((a, i) => (
               <div key={i} className={`alert d-flex align-items-start gap-2 py-2 mb-2 ${
                 a.tipo === "error" ? "alert-danger" : a.tipo === "warning" ? "alert-warning" : "alert-info"}`} role="alert">
-                {a.tipo === "error"   && <AlertTriangle size={16} className="flex-shrink-0 mt-1" />}
-                {a.tipo === "warning" && <Clock         size={16} className="flex-shrink-0 mt-1" />}
-                {a.tipo === "info"    && <Info          size={16} className="flex-shrink-0 mt-1" />}
+                {a.tipo === "error"   && <AlertTriangle size={16} className="flex-shrink-0 mt-1" aria-hidden="true" />}
+                {a.tipo === "warning" && <Clock         size={16} className="flex-shrink-0 mt-1" aria-hidden="true" />}
+                {a.tipo === "info"    && <Info          size={16} className="flex-shrink-0 mt-1" aria-hidden="true" />}
                 <span className="small mb-0">{a.msg}</span>
               </div>
             ))}
@@ -287,7 +290,7 @@ export function MatriculaView() {
 
         {/* 1. Datos del estudiante — un campo por fila */}
         <div className="card shadow-sm mb-3">
-          <div className="card-header bg-white">Datos del estudiante</div>
+          <h2 className="card-header bg-white h6 mb-0">Datos del estudiante</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Nombres" error={err("nombres")}>
               <input className={cls("nombres", "form-control")} value={form.nombres} onChange={e => set("nombres", e.target.value)} placeholder="Ej. Alejandra Nicole" autoComplete="given-name" />
@@ -333,7 +336,7 @@ export function MatriculaView() {
 
         {/* 2. Salud */}
         <div className="card shadow-sm mb-3">
-          <div className="card-header bg-white">Información de salud</div>
+          <h2 className="card-header bg-white h6 mb-0">Información de salud</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Tipo de sangre" required={false}>
               <select className={cls("tipoSangre", "form-select")} value={form.tipoSangre} onChange={e => set("tipoSangre", e.target.value)}>
@@ -349,7 +352,7 @@ export function MatriculaView() {
 
         {/* 3. Representante legal y contacto */}
         <div className="card shadow-sm mb-3">
-          <div className="card-header bg-white">Representante legal y contacto</div>
+          <h2 className="card-header bg-white h6 mb-0">Representante legal y contacto</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Nombres del representante" error={err("representanteNombres")}>
               <input className={cls("representanteNombres", "form-control")} value={form.representanteNombres} onChange={e => set("representanteNombres", e.target.value)} placeholder="Ej. Ana María" autoComplete="given-name" />
@@ -380,7 +383,7 @@ export function MatriculaView() {
 
         {/* 4. Procedencia y documentos */}
         <div className="card shadow-sm mb-3">
-          <div className="card-header bg-white">Procedencia y documentos</div>
+          <h2 className="card-header bg-white h6 mb-0">Procedencia y documentos</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Institución de procedencia" required={false}>
               <input className={cls("institucionProcedencia", "form-control")} value={form.institucionProcedencia} onChange={e => set("institucionProcedencia", e.target.value)} placeholder="Nombre de la institución anterior" />
@@ -399,7 +402,7 @@ export function MatriculaView() {
               {touchedFields.documentos && (
                 docsOk
                   ? <div className="form-text text-primary fw-semibold"><CheckCircle size={12} className="me-1" style={{ verticalAlign: "-1px" }} />Documentación completa</div>
-                  : <div className="invalid-feedback d-block"><AlertCircle size={12} className="me-1" style={{ verticalAlign: "-1px" }} />{errors.documentos}</div>
+                  : <div role="alert" className="invalid-feedback d-block"><AlertCircle size={12} className="me-1" style={{ verticalAlign: "-1px" }} aria-hidden="true" />{errors.documentos}</div>
               )}
             </div>
           </div>
@@ -407,8 +410,8 @@ export function MatriculaView() {
 
         {/* Resultado y envío */}
         {saved && (
-          <div className="alert alert-success d-flex align-items-start gap-2 mb-3">
-            <CheckCircle size={18} className="flex-shrink-0 mt-1" />
+          <div role="status" className="alert alert-success d-flex align-items-start gap-2 mb-3">
+            <CheckCircle size={18} className="flex-shrink-0 mt-1" aria-hidden="true" />
             <div>
               <p className="mb-1 fw-semibold">Matrícula registrada correctamente · código {saved.codigo}</p>
               <p className="mb-1 small">Usuario del estudiante (Portal Familiar): <strong>{saved.usuarioEstudiante}</strong> · contraseña inicial: su número de cédula (deberá cambiarla al ingresar por primera vez).</p>
@@ -425,7 +428,7 @@ export function MatriculaView() {
         <div className="d-flex align-items-center justify-content-end gap-3 pb-4">
           <button type="button" disabled={saving}
             className={`btn ${attempted && !allOk ? "btn-danger" : "btn-primary"} d-flex align-items-center gap-2`} onClick={submit}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
             {saving ? "Registrando…" : attempted && !allOk ? "Corrija los campos marcados" : "Registrar matrícula"}
           </button>
         </div>

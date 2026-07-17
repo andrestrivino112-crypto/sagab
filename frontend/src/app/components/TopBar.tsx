@@ -7,9 +7,10 @@ export function TopBar({ title, subtitle }: { title: string; subtitle?: string }
         <h1 className="text-xl font-semibold text-[#1A1A1A] leading-tight">{title}</h1>
         {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
       </div>
-      <button className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
-        <Bell size={18} />
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#C62828] rounded-full ring-2 ring-white" />
+      <button type="button" aria-label="Notificaciones"
+        className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 transition-colors">
+        <Bell size={18} aria-hidden="true" />
+        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#C62828] rounded-full ring-2 ring-white" aria-hidden="true" />
       </button>
     </div>
   );

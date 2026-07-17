@@ -3,22 +3,8 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
-
-function figmaAssetResolver() {
-  return {
-    name: 'figma-asset-resolver',
-    resolveId(id) {
-      if (id.startsWith('figma:asset/')) {
-        const filename = id.replace('figma:asset/', '')
-        return path.resolve(__dirname, 'src/assets', filename)
-      }
-    },
-  }
-}
-
 export default defineConfig({
   plugins: [
-    figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
     // Tailwind is not being actively used – do not remove them
     react(),
@@ -33,4 +19,23 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-charts': ['recharts'],
+          'vendor-daypicker': ['react-day-picker'],
+        },
+      },
+    },
+    modulePreload: {
+      // vendor-charts / vendor-daypicker solo se usan detrás de React.lazy() (Dashboard/Matrícula):
+      // no deben precargarse en el <head> de cada página (p. ej. login), o compiten por ancho de
+      // banda con el chunk crítico inicial bajo redes lentas.
+      resolveDependencies: (_filename, deps) =>
+        deps.filter(d => !d.includes('vendor-charts') && !d.includes('vendor-daypicker')),
+    },
+  },
 })

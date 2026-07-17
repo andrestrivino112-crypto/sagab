@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(SAGAB_DB_USER=sagab_app SAGAB_DB_PASSWORD=CAMBIAR_EN_PRODUCCION_app nohup mvn -o spring-boot:run)",
+      "Bash(kill 114090)",
+      "Bash(pkill -9 -f \"mvn -o spring-boot:run\")",
+      "Bash(ps -p 101625 -o pid,cmd)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8080/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"usuario\":\"ANDRESHD\",\"password\":\"***REDACTED***\"}')",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -s -X POST http://localhost:8080/api/auth/login -H \"Content-Type: application/json\" -d '{\"usuario\":\"ANDRESHD\",\"password\":\"***REDACTED***\"}' -o /dev/null -w \"backend responde: %{http_code}\\\\n\")",
+      "Bash(curl -s -o /dev/null -w \"frontend responde: %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(python3)",
+      "Bash(npx --yes typescript@5.7 tsc --noEmit --jsx react-jsx --target es2020 --module esnext --moduleResolution bundler --esModuleInterop --skipLibCheck --strict false src/app/**/*.tsx src/app/**/*.ts src/api/**/*.ts src/main.tsx)",
+      "Bash(npx --yes -p typescript tsc --version)",
+      "Bash(npx --yes -p typescript tsc --noEmit -p tsconfig.check.json)",
+      "Bash(npx tsc *)",
+      "Bash(npm audit *)",
+      "Bash(curl -s -o /dev/null -w \"backend: %{http_code}\\\\n\" http://localhost:8080/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"usuario\":\"x\",\"password\":\"x\"}')",
+      "Bash(curl -s -o /dev/null -w \"frontend: %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(kill 101625)",
+      "Bash(kill 101974)",
+      "Bash(echo \"backend PID: $!\")",
+      "Bash(nohup npm run dev)",
+      "Bash(echo \"frontend PID: $!\")",
+      "Bash(node check5.js)",
+      "Bash(mvn package *)",
+      "Bash(grep -i '\\\\.java$')",
+      "Bash(timeout 40 mvn spring-boot:run)",
+      "Bash(ps -p 150688 -o pid,ppid,etime,cmd --no-headers)",
+      "Bash(nohup mvn spring-boot:run)",
+      "Bash(disown)",
+      "Bash(npx --yes lighthouse --version)",
+      "Bash(npx --yes serve -s dist -l 4173)",
+      "Bash(curl -sI http://localhost:4173)",
+      "Bash(npx --yes lighthouse http://localhost:4173 --output=json --output-path=/tmp/claude-1000/-home-andres-Downloads-SAGAB-FullStack-sagab/daf4e329-1b24-40e1-9f1a-a8aeb1e4e431/scratchpad/baseline.json '--chrome-flags=--headless=new --no-sandbox' --preset=desktop --quiet)",
+      "Bash(node -e ' *)",
+      "Bash(npx --yes lighthouse http://localhost:4173 --output=json --output-path=/tmp/claude-1000/-home-andres-Downloads-SAGAB-FullStack-sagab/daf4e329-1b24-40e1-9f1a-a8aeb1e4e431/scratchpad/baseline-mobile.json '--chrome-flags=--headless=new --no-sandbox' --quiet)",
+      "Bash(nohup npx --yes serve -s dist -l 4173)"
+    ]
+  }
+}

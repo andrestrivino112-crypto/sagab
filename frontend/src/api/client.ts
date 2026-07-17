@@ -33,7 +33,8 @@ export async function api<T>(
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && token) {
+    // Había una sesión activa (se envió token) y el backend la rechazó: sí expiró/es inválida.
     tokenStore.clear();
     window.dispatchEvent(new Event("sagab:sesion-expirada"));
     throw new ApiError(401, "Sesión expirada. Inicie sesión nuevamente.");

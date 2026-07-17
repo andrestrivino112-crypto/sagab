@@ -1,14 +1,25 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { logout as apiLogout, type Sesion, type RolSistema } from "../api/auth";
 import { NAV, NAV_POR_ROL, ROL_LABEL, Sidebar } from "./components/Sidebar";
 import { LoginScreen } from "./views/LoginScreen";
-import { DashboardView } from "./views/DashboardView";
-import { GradesView } from "./views/GradesView";
-import { AttendanceView } from "./views/AttendanceView";
-import { MatriculaView } from "./views/MatriculaView";
-import { FinancialView } from "./views/FinancialView";
-import { ParentPortal } from "./views/ParentPortal";
 import type { Screen } from "./types";
+
+// Cada vista es su propio chunk: solo se descarga la que el usuario visita.
+const DashboardView = lazy(() => import("./views/DashboardView").then(m => ({ default: m.DashboardView })));
+const GradesView = lazy(() => import("./views/GradesView").then(m => ({ default: m.GradesView })));
+const AttendanceView = lazy(() => import("./views/AttendanceView").then(m => ({ default: m.AttendanceView })));
+const MatriculaView = lazy(() => import("./views/MatriculaView").then(m => ({ default: m.MatriculaView })));
+const FinancialView = lazy(() => import("./views/FinancialView").then(m => ({ default: m.FinancialView })));
+const ParentPortal = lazy(() => import("./views/ParentPortal").then(m => ({ default: m.ParentPortal })));
+
+function ViewFallback() {
+  return (
+    <div className="flex h-full w-full items-center justify-center p-12" role="status" aria-live="polite">
+      <span className="sr-only">Cargando…</span>
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#2E75B6] border-t-transparent" aria-hidden="true" />
+    </div>
+  );
+}
 
 export default function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null);
@@ -35,7 +46,11 @@ export default function App() {
   const rolPrincipal: RolSistema = sesion.roles[0];
 
   if (rolPrincipal === "REPRESENTANTE") {
-    return <ParentPortal onLogout={logout} nombre={sesion.nombre} />;
+    return (
+      <Suspense fallback={<ViewFallback />}>
+        <ParentPortal onLogout={logout} nombre={sesion.nombre} />
+      </Suspense>
+    );
   }
 
   const nav = NAV.filter(item => NAV_POR_ROL[rolPrincipal].includes(item.id));
@@ -46,12 +61,14 @@ export default function App() {
       <Sidebar active={screen} onNav={setScreen} onLogout={logout}
         nav={nav} nombre={sesion.nombre} rolLabel={ROL_LABEL[rolPrincipal]} />
       <main className="flex-1 overflow-y-auto bg-[#F5F7FA]">
-        {screen === "dashboard"  && <DashboardView />}
-        {screen === "matricula"  && permitido("matricula")  && <MatriculaView />}
-        {screen === "grades"     && permitido("grades")     && <GradesView onNavigate={setScreen} />}
-        {screen === "attendance" && permitido("attendance") && <AttendanceView onNavigate={setScreen} />}
-        {screen === "financial"  && permitido("financial")  && <FinancialView />}
-        {screen === "parent"     && permitido("parent")     && <ParentPortal onLogout={logout} embed nombre={sesion.nombre} />}
+        <Suspense fallback={<ViewFallback />}>
+          {screen === "dashboard"  && <DashboardView />}
+          {screen === "matricula"  && permitido("matricula")  && <MatriculaView />}
+          {screen === "grades"     && permitido("grades")     && <GradesView onNavigate={setScreen} />}
+          {screen === "attendance" && permitido("attendance") && <AttendanceView onNavigate={setScreen} />}
+          {screen === "financial"  && permitido("financial")  && <FinancialView />}
+          {screen === "parent"     && permitido("parent")     && <ParentPortal onLogout={logout} embed nombre={sesion.nombre} />}
+        </Suspense>
       </main>
     </div>
   );

@@ -13,14 +13,14 @@ export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert 
   return (
     <div className={`bg-white rounded-xl border-l-4 ${styles.border} shadow-sm p-5 flex items-start gap-4`}>
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${styles.bg}`}>
-        <Icon size={20} className={styles.icon} />
+        <Icon size={20} className={styles.icon} aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
         <p className={`text-2xl font-bold ${alert ? "text-[#C62828]" : "text-[#1A1A1A]"}`}>{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
       </div>
-      {alert && <AlertTriangle size={15} className="text-[#C62828] flex-shrink-0 mt-1" />}
+      {alert && <AlertTriangle size={15} className="text-[#C62828] flex-shrink-0 mt-1" aria-hidden="true" />}
     </div>
   );
 }

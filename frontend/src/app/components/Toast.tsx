@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div key={t.id} className={`toast toast--${t.variant}`} role="alert">
               <div className="toast-body">
-                <Icon size={16} className="flex-shrink-0" />
+                <Icon size={16} className="flex-shrink-0" aria-hidden="true" />
                 <span>{t.message}</span>
               </div>
               <button type="button" className="btn-close" aria-label="Cerrar" onClick={() => dismiss(t.id)}>×</button>

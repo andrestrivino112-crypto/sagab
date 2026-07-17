@@ -72,7 +72,7 @@ export function FinancialView() {
       <div className="p-6 space-y-5">
         {/* Búsqueda */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Buscar estudiante</label>
+          <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Buscar estudiante</label>
           <div className="relative mt-1 max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={query} onChange={e => setQuery(e.target.value)}
@@ -85,7 +85,7 @@ export function FinancialView() {
                     <button onClick={() => seleccionar(r)}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-[#EAF2FB] flex items-center justify-between">
                       <span className="font-medium text-[#1A1A1A]">{r.nombreCompleto}</span>
-                      {r.paralelo && <span className="text-xs text-gray-400">{r.paralelo}</span>}
+                      {r.paralelo && <span className="text-xs text-gray-600">{r.paralelo}</span>}
                     </button>
                   </li>
                 ))}
@@ -95,16 +95,16 @@ export function FinancialView() {
         </div>
 
         {errorApi && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />{errorApi}
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
           </div>
         )}
 
         {!estudiante && <EmptyState icon={Search} title="Busque un estudiante para ver su estado de cuenta." />}
 
         {estudiante && loading && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center text-sm text-gray-400">
-            <Loader2 size={16} className="animate-spin inline-block mr-2" />Cargando…
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center text-sm text-gray-600">
+            <Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…
           </div>
         )}
 
@@ -117,17 +117,17 @@ export function FinancialView() {
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border-l-4 border-l-[#2E7D32] p-4 shadow-sm">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Total pagado</p>
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Total pagado</p>
             <p className="text-[28px] font-bold text-[#2E7D32] leading-none">${totals.paid.toFixed(2)}</p>
-            <p className="text-xs text-gray-400 mt-1">{obligaciones.filter(o => o.estado === "PAGADO").length} obligaciones al día</p>
+            <p className="text-xs text-gray-600 mt-1">{obligaciones.filter(o => o.estado === "PAGADO").length} obligaciones al día</p>
           </div>
           <div className="bg-white rounded-xl border-l-4 border-l-amber-500 p-4 shadow-sm">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Saldo pendiente</p>
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Saldo pendiente</p>
             <p className="text-[28px] font-bold text-amber-600 leading-none">${totals.pending.toFixed(2)}</p>
-            <p className="text-xs text-gray-400 mt-1">{obligaciones.filter(o => o.estado === "PENDIENTE").length} obligaciones pendientes</p>
+            <p className="text-xs text-gray-600 mt-1">{obligaciones.filter(o => o.estado === "PENDIENTE").length} obligaciones pendientes</p>
           </div>
           <div className="bg-white rounded-xl border-l-4 border-l-[#C62828] p-4 shadow-sm">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Monto vencido</p>
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Monto vencido</p>
             <p className="text-[28px] font-bold text-[#C62828] leading-none">${totals.overdue.toFixed(2)}</p>
             <p className="text-xs text-[#C62828] mt-1">{totals.overdue > 0 ? "Requiere atención inmediata" : "Sin vencidos"}</p>
           </div>
@@ -140,10 +140,11 @@ export function FinancialView() {
           </div>
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Detalle de obligaciones de pago de {estudiante.nombreCompleto}</caption>
             <thead>
               <tr className="bg-[#F5F7FA]">
-                {["Rubro","Monto","Vencimiento","Fecha de pago","Estado",""].map(h => (
-                  <th key={h} className={`px-5 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Monto" ? "text-right" : h === "" ? "" : "text-center"}`}>{h}</th>
+                {["Rubro","Monto","Vencimiento","Fecha de pago","Estado","Acción"].map(h => (
+                  <th key={h} scope="col" className={`px-5 py-3 text-[10px] font-semibold text-gray-600 uppercase tracking-widest whitespace-nowrap ${h === "Monto" ? "text-right" : h === "Acción" ? "sr-only" : "text-center"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -161,12 +162,12 @@ export function FinancialView() {
                       {o.pago ? new Date(o.pago.fechaPago).toLocaleDateString("es-EC") : "—"}
                     </td>
                     <td className="px-5 py-3.5 text-center">
-                      <Badge v={cfg.badge}><Icon size={11} />{cfg.label}</Badge>
+                      <Badge v={cfg.badge}><Icon size={11} aria-hidden="true" />{cfg.label}</Badge>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       {(o.estado === "PENDIENTE" || o.estado === "VENCIDO") && (
                         <Btn variant="secondary" size="sm" disabled={pagando === o.idObligacion} onClick={() => registrarPago(o)}>
-                          {pagando === o.idObligacion ? <Loader2 size={12} className="animate-spin" /> : "Registrar pago"}
+                          {pagando === o.idObligacion ? <><Loader2 size={12} className="animate-spin" aria-hidden="true" />Registrando…</> : "Registrar pago"}
                         </Btn>
                       )}
                     </td>

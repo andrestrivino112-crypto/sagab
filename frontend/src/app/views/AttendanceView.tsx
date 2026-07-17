@@ -13,17 +13,17 @@ import { useToast } from "../components/Toast";
 import { initials } from "../helpers";
 import type { AttendanceStatus, Screen } from "../types";
 
-function AttToggle({ status, onChange }: { status: AttendanceStatus; onChange: (s: AttendanceStatus) => void }) {
+function AttToggle({ status, onChange, studentName }: { status: AttendanceStatus; onChange: (s: AttendanceStatus) => void; studentName: string }) {
   const opts: { id: AttendanceStatus; short: string; title: string }[] = [
     { id:"present",     short:"P",  title:"Presente" },
     { id:"justified",   short:"AJ", title:"Ausente justificada" },
     { id:"unjustified", short:"AI", title:"Ausente injustificada" },
   ];
   return (
-    <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
+    <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5" role="group" aria-label={`Estado de asistencia de ${studentName}`}>
       {opts.map(o => (
-        <button key={o.id} title={o.title} onClick={() => onChange(o.id)}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all
+        <button key={o.id} type="button" title={o.title} aria-label={o.title} aria-pressed={status === o.id} onClick={() => onChange(o.id)}
+          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/50
             ${status === o.id
               ? o.id === "present"     ? "bg-[#2E7D32] text-white shadow-sm"
               : o.id === "justified"   ? "bg-amber-500 text-white shadow-sm"
@@ -109,7 +109,7 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
       <div className="p-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-center gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Asignación</label>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
             <select value={idAsignacion} onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
               {asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
@@ -120,22 +120,22 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
           </div>
           {roster.length > 0 && (
             <div className="flex items-center gap-2.5 ml-4">
-              <Badge v="success"><CheckCircle size={11} />{counts.present} Presentes</Badge>
-              <Badge v="warning"><Clock size={11} />{counts.justified} A. Justificada</Badge>
-              <Badge v="error"><AlertTriangle size={11} />{counts.unjustified} A. Injustificada</Badge>
+              <Badge v="success"><CheckCircle size={11} aria-hidden="true" />{counts.present} Presentes</Badge>
+              <Badge v="warning"><Clock size={11} aria-hidden="true" />{counts.justified} A. Justificada</Badge>
+              <Badge v="error"><AlertTriangle size={11} aria-hidden="true" />{counts.unjustified} A. Injustificada</Badge>
             </div>
           )}
           <div className="ml-auto flex items-center gap-3">
             <Btn onClick={guardar} disabled={saving || roster.length === 0}>
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
               {saving ? "Guardando…" : "Guardar asistencia"}
             </Btn>
           </div>
         </div>
 
         {errorApi && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />{errorApi}
+          <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
           </div>
         )}
 
@@ -146,8 +146,8 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
         {asignacion && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           {loading && (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
-              <Loader2 size={16} className="animate-spin inline-block mr-2" />Cargando…
+            <div className="px-4 py-8 text-center text-sm text-gray-600">
+              <Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…
             </div>
           )}
           {!loading && roster.length === 0 && (
@@ -159,7 +159,7 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
           {!loading && roster.length > 0 && (
           <>
           <div className="overflow-x-auto">
-          <div className="grid grid-cols-[40px_1fr_200px_180px] gap-4 px-4 py-3 bg-[#F5F7FA] border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-widest items-center min-w-[600px]">
+          <div className="grid grid-cols-[40px_1fr_200px_180px] gap-4 px-4 py-3 bg-[#F5F7FA] border-b border-gray-200 text-[10px] font-semibold text-gray-600 uppercase tracking-widest items-center min-w-[600px]">
             <span>#</span><span>Estudiante</span><span>Ausencias acum.</span><span>Estado hoy</span>
           </div>
           <ul className="divide-y divide-gray-100 min-w-[600px]">
@@ -171,9 +171,9 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
                 <li key={e.id}
                   className={`grid grid-cols-[40px_1fr_200px_180px] gap-4 items-center px-4 py-3.5 transition-colors
                     ${alert ? "bg-red-50/40" : idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"} hover:bg-[#EAF2FB]/20`}>
-                  <span className="text-gray-400 text-xs">{idx+1}</span>
+                  <span className="text-gray-600 text-xs">{idx+1}</span>
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                    <div aria-hidden="true" className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
                       ${alert ? "bg-red-100 text-[#C62828]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>
                       {initials(e.nombreCompleto)}
                     </div>
@@ -183,15 +183,15 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
                     <span className={`text-sm font-mono ${alert ? "text-[#C62828] font-bold" : "text-gray-500"}`}>
                       {cons} {cons === 1 ? "día" : "días"}
                     </span>
-                    {alert && <Badge v="error"><AlertTriangle size={11} />{cons}+ consecutivas</Badge>}
+                    {alert && <Badge v="error"><AlertTriangle size={11} aria-hidden="true" />{cons}+ consecutivas</Badge>}
                   </div>
-                  <AttToggle status={s} onChange={v => update(e.id, v)} />
+                  <AttToggle status={s} onChange={v => update(e.id, v)} studentName={e.nombreCompleto} />
                 </li>
               );
             })}
           </ul>
           </div>
-          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 text-xs text-gray-400">
+          <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 text-xs text-gray-600">
             {roster.length} estudiantes · {asignacion.paralelo} · P = Presente · AJ = Ausente justificada · AI = Ausente injustificada
           </div>
           </>

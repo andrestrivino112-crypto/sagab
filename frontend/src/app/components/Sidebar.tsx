@@ -39,7 +39,7 @@ export function Sidebar({ active, onNav, onLogout, nav, nombre, rolLabel }: {
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
-            <GraduationCap size={20} className="text-white" />
+            <GraduationCap size={20} className="text-white" aria-hidden="true" />
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-none">SAGAB</p>
@@ -49,17 +49,18 @@ export function Sidebar({ active, onNav, onLogout, nav, nombre, rolLabel }: {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4">
+      <nav className="flex-1 px-2 py-4" aria-label="Navegación principal">
         <p className="text-white/40 text-[10px] font-semibold uppercase tracking-[0.12em] px-3 mb-2">Módulos</p>
         <ul className="space-y-0.5">
           {nav.map(({ id, label, icon: Icon }) => (
             <li key={id}>
-              <button onClick={() => onNav(id)}
+              <button onClick={() => onNav(id)} aria-current={active === id ? "page" : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1F4E79]
                   ${active === id ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/8 hover:text-white"}`}>
-                <Icon size={17} className="flex-shrink-0" />
+                <Icon size={17} className="flex-shrink-0" aria-hidden="true" />
                 {label}
-                {active === id && <ChevronRight size={13} className="ml-auto opacity-50" />}
+                {active === id && <ChevronRight size={13} className="ml-auto opacity-50" aria-hidden="true" />}
               </button>
             </li>
           ))}
@@ -69,7 +70,7 @@ export function Sidebar({ active, onNav, onLogout, nav, nombre, rolLabel }: {
       {/* User */}
       <div className="px-2 py-3 border-t border-white/10">
         <div className="flex items-center gap-3 px-3 py-2 mb-1">
-          <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+          <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" aria-hidden="true">
             {initials(nombre)}
           </div>
           <div className="flex-1 min-w-0">
@@ -78,8 +79,9 @@ export function Sidebar({ active, onNav, onLogout, nav, nombre, rolLabel }: {
           </div>
         </div>
         <button onClick={onLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/60 hover:bg-white/10 hover:text-white text-sm transition-all">
-          <LogOut size={15} />
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/60 hover:bg-white/10 hover:text-white text-sm transition-all
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1F4E79]">
+          <LogOut size={15} aria-hidden="true" />
           Cerrar sesión
         </button>
       </div>
