@@ -2,7 +2,7 @@ spring:
   application:
     name: sagab-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/sagab?currentSchema=sagab
+    url: jdbc:postgresql://${SAGAB_DB_HOST:localhost}:${SAGAB_DB_PORT:5432}/${SAGAB_DB_NAME:sagab}?currentSchema=sagab
     username: ${SAGAB_DB_USER:sagab_app}
     password: ${SAGAB_DB_PASSWORD:CAMBIAR_EN_PRODUCCION_app}
     hikari:
@@ -26,7 +26,7 @@ spring:
       mail.smtp.starttls.enable: true
 
 server:
-  port: 8080
+  port: ${PORT:8080}
   error:
     include-stacktrace: never   # no filtrar detalles internos al cliente
   # En producción: habilitar HTTPS (RNF-03) con certificado y forzar redirección

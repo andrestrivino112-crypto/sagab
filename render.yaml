@@ -1,0 +1,38 @@
+databases:
+  - name: sagab-db
+    plan: free
+    databaseName: sagab
+    user: sagab_app
+
+services:
+  - type: web
+    name: sagab-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: SAGAB_DB_HOST
+        fromDatabase:
+          name: sagab-db
+          property: host
+      - key: SAGAB_DB_PORT
+        fromDatabase:
+          name: sagab-db
+          property: port
+      - key: SAGAB_DB_NAME
+        fromDatabase:
+          name: sagab-db
+          property: database
+      - key: SAGAB_DB_USER
+        fromDatabase:
+          name: sagab-db
+          property: user
+      - key: SAGAB_DB_PASSWORD
+        fromDatabase:
+          name: sagab-db
+          property: password
+      - key: SAGAB_JWT_SECRET
+        generateValue: true
+      - key: SAGAB_CORS
+        value: https://CAMBIAR-por-tu-dominio-de-vercel.vercel.app
