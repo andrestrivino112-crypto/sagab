@@ -1,34 +1,56 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, Receipt, Search } from "lucide-react";
+import { AlertCircle, Check, Eye, Loader2, Receipt, Search, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
   estudiantes as estudiantesApi, finanzas as finanzasApi,
-  type EstudianteConParalelo, type ObligacionResponse,
+  type EstudianteConParalelo, type ObligacionResponse, type PagoRevisionResponse,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Badge } from "../components/Badge";
 import { Btn } from "../components/Btn";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
+import { useDebouncedSearch } from "../hooks/useDebouncedSearch";
 import { PAYMENT_CFG, ESTADO_TO_STATUS } from "../paymentConfig";
 
 export function FinancialView() {
   const toast = useToast();
   const [query, setQuery] = useState("");
-  const [resultados, setResultados] = useState<EstudianteConParalelo[]>([]);
+  const resultados = useDebouncedSearch(query, estudiantesApi.buscar);
   const [estudiante, setEstudiante] = useState<EstudianteConParalelo | null>(null);
   const [obligaciones, setObligaciones] = useState<ObligacionResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagando, setPagando] = useState<number | null>(null);
   const [errorApi, setErrorApi] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (query.trim().length < 2) { setResultados([]); return; }
-    const t = setTimeout(() => {
-      estudiantesApi.buscar(query.trim()).then(setResultados).catch(() => setResultados([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
+  const [cola, setCola] = useState<PagoRevisionResponse[]>([]);
+  const [procesando, setProcesando] = useState<number | null>(null);
+
+  const cargarCola = () => { finanzasApi.colaRevision().then(setCola).catch(() => {}); };
+  useEffect(cargarCola, []);
+
+  const verComprobante = async (idPago: number) => {
+    try {
+      const { url } = await finanzasApi.urlComprobante(idPago);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo abrir el comprobante.");
+    }
+  };
+
+  const revisar = async (idPago: number, accion: "aprobar" | "rechazar") => {
+    setProcesando(idPago);
+    try {
+      await (accion === "aprobar" ? finanzasApi.aprobar(idPago) : finanzasApi.rechazar(idPago));
+      toast.success(accion === "aprobar" ? "Pago aprobado" : "Pago rechazado");
+      setCola(prev => prev.filter(p => p.idPago !== idPago));
+      if (estudiante) cargarObligaciones(estudiante.id);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo procesar la revisión.");
+    } finally {
+      setProcesando(null);
+    }
+  };
 
   const cargarObligaciones = (idEstudiante: number) => {
     setLoading(true);
@@ -41,7 +63,6 @@ export function FinancialView() {
 
   const seleccionar = (e: EstudianteConParalelo) => {
     setEstudiante(e);
-    setResultados([]);
     setQuery("");
     cargarObligaciones(e.id);
   };
@@ -70,6 +91,60 @@ export function FinancialView() {
       <TopBar title="Estado de Cuenta"
         subtitle={estudiante ? `${estudiante.nombreCompleto}${estudiante.paralelo ? ` · ${estudiante.paralelo}` : ""}` : "Busque un estudiante"} />
       <div className="p-6 space-y-5">
+        {/* Comprobantes de transferencia pendientes de revisión */}
+        {cola.length > 0 && (
+          <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-amber-100 bg-amber-50">
+              <h3 className="text-sm font-semibold text-amber-800">Comprobantes por revisar ({cola.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Pagos por transferencia pendientes de aprobar o rechazar</caption>
+                <thead>
+                  <tr className="bg-[#F5F7FA]">
+                    {["Estudiante","Rubro","Monto","Nombre de la cuenta","Asunto","N° transacción","Fecha","Comprobante","Acción"].map(h => (
+                      <th key={h} scope="col" className="px-4 py-2.5 text-[10px] font-semibold text-gray-600 uppercase tracking-widest whitespace-nowrap text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cola.map(p => (
+                    <tr key={p.idPago} className="border-t border-gray-100">
+                      <td className="px-4 py-3 font-medium text-[#1A1A1A] whitespace-nowrap">{p.estudiante}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.rubro}</td>
+                      <td className="px-4 py-3 font-mono font-semibold whitespace-nowrap">${p.valorPagado.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.bancoOrigen}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.asunto}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-mono text-xs">{p.numeroReferencia}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(p.fechaPago).toLocaleDateString("es-EC")}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button type="button" onClick={() => verComprobante(p.idPago)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline focus:outline-none">
+                          <Eye size={12} aria-hidden="true" />Ver
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button type="button" disabled={procesando === p.idPago} onClick={() => revisar(p.idPago, "aprobar")}
+                            aria-label={`Aprobar pago de ${p.estudiante}`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-[#2E7D32] hover:bg-[#256428] px-2 py-1 rounded-md disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]/40">
+                            <Check size={12} aria-hidden="true" />Aprobar
+                          </button>
+                          <button type="button" disabled={procesando === p.idPago} onClick={() => revisar(p.idPago, "rechazar")}
+                            aria-label={`Rechazar pago de ${p.estudiante}`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-[#C62828] hover:bg-red-50 px-2 py-1 rounded-md disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C62828]/40">
+                            <X size={12} aria-hidden="true" />Rechazar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Búsqueda */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Buscar estudiante</label>

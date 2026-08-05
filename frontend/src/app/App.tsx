@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { logout as apiLogout, type Sesion, type RolSistema } from "../api/auth";
 import { NAV, NAV_POR_ROL, ROL_LABEL, Sidebar } from "./components/Sidebar";
 import { LoginScreen } from "./views/LoginScreen";
+import { CambiarClaveScreen } from "./views/CambiarClaveScreen";
 import type { Screen } from "./types";
 
 // Cada vista es su propio chunk: solo se descarga la que el usuario visita.
@@ -11,6 +12,7 @@ const AttendanceView = lazy(() => import("./views/AttendanceView").then(m => ({ 
 const MatriculaView = lazy(() => import("./views/MatriculaView").then(m => ({ default: m.MatriculaView })));
 const FinancialView = lazy(() => import("./views/FinancialView").then(m => ({ default: m.FinancialView })));
 const ParentPortal = lazy(() => import("./views/ParentPortal").then(m => ({ default: m.ParentPortal })));
+const TareasView = lazy(() => import("./views/TareasView").then(m => ({ default: m.TareasView })));
 
 function ViewFallback() {
   return (
@@ -38,17 +40,27 @@ export default function App() {
     return (
       <LoginScreen onLogin={s => {
         setSesion(s);
-        setScreen(s.roles[0] === "REPRESENTANTE" ? "parent" : "dashboard");
+        setScreen(s.roles[0] === "REPRESENTANTE" || s.roles[0] === "ESTUDIANTE" ? "parent" : "dashboard");
       }} />
+    );
+  }
+
+  if (sesion.debeCambiarClave) {
+    return (
+      <CambiarClaveScreen
+        nombre={sesion.nombre}
+        onLogout={logout}
+        onCompletado={() => setSesion({ ...sesion, debeCambiarClave: false })}
+      />
     );
   }
 
   const rolPrincipal: RolSistema = sesion.roles[0];
 
-  if (rolPrincipal === "REPRESENTANTE") {
+  if (rolPrincipal === "REPRESENTANTE" || rolPrincipal === "ESTUDIANTE") {
     return (
       <Suspense fallback={<ViewFallback />}>
-        <ParentPortal onLogout={logout} nombre={sesion.nombre} />
+        <ParentPortal onLogout={logout} nombre={sesion.nombre} rol={rolPrincipal} />
       </Suspense>
     );
   }
@@ -66,6 +78,7 @@ export default function App() {
           {screen === "matricula"  && permitido("matricula")  && <MatriculaView />}
           {screen === "grades"     && permitido("grades")     && <GradesView onNavigate={setScreen} />}
           {screen === "attendance" && permitido("attendance") && <AttendanceView onNavigate={setScreen} />}
+          {screen === "tareas"     && permitido("tareas")     && <TareasView soloLectura={rolPrincipal !== "DOCENTE"} />}
           {screen === "financial"  && permitido("financial")  && <FinancialView />}
           {screen === "parent"     && permitido("parent")     && <ParentPortal onLogout={logout} embed nombre={sesion.nombre} />}
         </Suspense>

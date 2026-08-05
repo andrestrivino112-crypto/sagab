@@ -1,5 +1,7 @@
 package ec.edu.bellini.sagab.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +18,13 @@ import java.util.NoSuchElementException;
 
 /**
  * Respuestas de error uniformes y sin fuga de información interna
- * (nunca stacktraces ni SQL al cliente).
+ * (nunca stacktraces ni SQL al cliente). Todo error queda además en el log del
+ * servidor (nunca en la respuesta) para poder investigar incidentes.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> credenciales(BadCredentialsException e) {
@@ -33,6 +38,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> denegado(AccessDeniedException e) {
+        log.warn("Acceso denegado: {}", e.getMessage());
         return error(HttpStatus.FORBIDDEN, "No tiene permisos para esta operación");
     }
 
@@ -56,11 +62,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> integridad(DataIntegrityViolationException e) {
+        log.warn("Violación de integridad de datos: {}", e.getMostSpecificCause().getMessage());
         return error(HttpStatus.CONFLICT, "La operación viola una restricción de datos (registro duplicado o referenciado)");
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> general(Exception e) {
+        log.error("Error no controlado procesando la solicitud", e);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno. Contacte al administrador.");
     }
 

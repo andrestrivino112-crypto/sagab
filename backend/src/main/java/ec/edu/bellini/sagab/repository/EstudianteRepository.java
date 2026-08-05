@@ -8,12 +8,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface EstudianteRepository extends JpaRepository<Estudiante, Long> {
 
     List<Estudiante> findByParaleloIdAndActivoTrueOrderByApellidosAscNombresAsc(Integer idParalelo);
 
     List<Estudiante> findByRepresentanteIdAndActivoTrue(Long idRepresentante);
+
+    /** El estudiante viendo sus propios datos (Portal Familiar) — cuenta 1:1 creada en la matrícula. */
+    Optional<Estudiante> findByUsuarioId(Long idUsuario);
 
     boolean existsByCedula(String cedula);
 

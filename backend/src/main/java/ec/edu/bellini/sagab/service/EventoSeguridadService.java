@@ -23,10 +23,6 @@ public class EventoSeguridadService {
         registrar("LOGIN_FALLIDO", email, motivo, ip, userAgent);
     }
 
-    public void exportacion(String email, String detalle, String ip) {
-        registrar("EXPORTACION", email, detalle, ip, null);
-    }
-
     private void registrar(String operacion, String usuario, String detalle, String ip, String userAgent) {
         jdbc.update("""
                 INSERT INTO auditoria.evento_seguridad

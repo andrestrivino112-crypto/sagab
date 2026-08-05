@@ -18,4 +18,8 @@ public class AsistenciaDtos {
                                         @NotEmpty List<MarcaRequest> marcas) {}
 
     public record RegistroResponse(LocalDate fecha, Asistencia.EstadoAsistencia estado, String justificacion) {}
+
+    /** Fila del registro de un paralelo — a diferencia de RegistroResponse, incluye al estudiante. */
+    public record RegistroParaleloResponse(Long idEstudiante, String estudiante,
+                                           Asistencia.EstadoAsistencia estado, String justificacion) {}
 }

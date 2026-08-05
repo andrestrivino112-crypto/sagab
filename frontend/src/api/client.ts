@@ -33,6 +33,24 @@ export async function api<T>(
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
+  return manejarRespuesta<T>(res, token);
+}
+
+/**
+ * Igual que api(), pero para subir archivos: envía FormData (multipart/form-data) en vez de
+ * JSON. No se fija el header Content-Type a propósito — el navegador lo genera solo con el
+ * boundary correcto; fijarlo a mano rompe el parseo del multipart en el servidor.
+ */
+export async function apiForm<T>(path: string, formData: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = tokenStore.get();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: formData });
+  return manejarRespuesta<T>(res, token);
+}
+
+async function manejarRespuesta<T>(res: Response, token: string | null): Promise<T> {
   if (res.status === 401 && token) {
     // Había una sesión activa (se envió token) y el backend la rechazó: sí expiró/es inválida.
     tokenStore.clear();

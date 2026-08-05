@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle, Clock, Loader2, Save, UserPlus, Users } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
-  asignaciones as asignacionesApi, estudiantes as estudiantesApi, asistencia as asistenciaApi,
-  type AsignacionOpcion, type EstudianteResumen, type EstadoAsistencia,
+  estudiantes as estudiantesApi, asistencia as asistenciaApi,
+  type EstudianteResumen, type EstadoAsistencia,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Badge } from "../components/Badge";
 import { Btn } from "../components/Btn";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
+import { useAsignaciones } from "../hooks/useAsignaciones";
 import { initials } from "../helpers";
 import type { AttendanceStatus, Screen } from "../types";
 
@@ -42,23 +43,13 @@ const ATT_STATUS_TO_API: Record<AttendanceStatus, EstadoAsistencia> = {
 
 export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
-  const [asignacionesOpciones, setAsignacionesOpciones] = useState<AsignacionOpcion[]>([]);
-  const [idAsignacion, setIdAsignacion] = useState<number | "">("");
+  const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
   const [roster, setRoster] = useState<EstudianteResumen[]>([]);
   const [estado, setEstado] = useState<Record<number, AttendanceStatus>>({});
   const [consecutivas, setConsecutivas] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
-
-  useEffect(() => {
-    asignacionesApi.mias().then(lista => {
-      setAsignacionesOpciones(lista);
-      if (lista.length > 0) setIdAsignacion(lista[0].idAsignacion);
-    }).catch(() => setErrorApi("No se pudieron cargar sus asignaciones."));
-  }, []);
-
-  const asignacion = asignacionesOpciones.find(a => a.idAsignacion === idAsignacion);
 
   useEffect(() => {
     if (!asignacion) { setRoster([]); return; }
@@ -133,13 +124,13 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
           </div>
         </div>
 
-        {errorApi && (
+        {(errorApi || errorAsignaciones) && (
           <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi ?? errorAsignaciones}
           </div>
         )}
 
-        {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && (
+        {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && !errorAsignaciones && (
           <EmptyState icon={Users} title="No tiene asignaciones de materias registradas todavía." />
         )}
 

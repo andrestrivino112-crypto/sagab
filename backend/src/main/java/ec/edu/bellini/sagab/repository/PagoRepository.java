@@ -7,4 +7,13 @@ import java.util.List;
 
 public interface PagoRepository extends JpaRepository<Pago, Long> {
     List<Pago> findByObligacionIdOrderByFechaPagoDesc(Long idObligacion);
+
+    /** Trae de una sola consulta los pagos de un lote de obligaciones (evita N+1 al listar el estado de cuenta). */
+    List<Pago> findByObligacionIdInOrderByFechaPagoDesc(List<Long> idsObligacion);
+
+    /** Cola de revisión del admin: transferencias pendientes de aprobar/rechazar. */
+    List<Pago> findByEstadoRevisionOrderByFechaPagoAsc(Pago.EstadoRevision estadoRevision);
+
+    /** Detección de comprobante duplicado: la misma imagen/PDF ya se subió para esta obligación. */
+    boolean existsByObligacionIdAndComprobanteHash(Long idObligacion, String comprobanteHash);
 }

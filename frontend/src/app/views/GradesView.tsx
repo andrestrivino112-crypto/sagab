@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { AlertCircle, BookOpen, Loader2, Save, Search, UserPlus } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
-  asignaciones as asignacionesApi, estudiantes as estudiantesApi, calificaciones as calificacionesApi,
+  estudiantes as estudiantesApi, calificaciones as calificacionesApi,
   type AsignacionOpcion, type EstudianteConParalelo, type NotaBusquedaResponse,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Btn } from "../components/Btn";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
+import { useAsignaciones } from "../hooks/useAsignaciones";
+import { useDebouncedSearch } from "../hooks/useDebouncedSearch";
 import { calcAvg, isComplete, isValid } from "../helpers";
 import type { Screen } from "../types";
 
@@ -19,8 +21,7 @@ const FILAS_POR_PAGINA = 15;
 export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
   const [modo, setModo] = useState<"ingreso" | "consulta">("ingreso");
-  const [asignacionesOpciones, setAsignacionesOpciones] = useState<AsignacionOpcion[]>([]);
-  const [idAsignacion, setIdAsignacion] = useState<number | "">("");
+  const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
   const [parcial, setParcial] = useState(1);
   const [rows, setRows] = useState<NotaRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,15 +31,6 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState<{ campo: NotaSortKey; asc: boolean }>({ campo: "nombre", asc: true });
   const [pagina, setPagina] = useState(1);
-
-  useEffect(() => {
-    asignacionesApi.mias().then(lista => {
-      setAsignacionesOpciones(lista);
-      if (lista.length > 0) setIdAsignacion(lista[0].idAsignacion);
-    }).catch(() => setErrorApi("No se pudieron cargar sus asignaciones."));
-  }, []);
-
-  const asignacion = asignacionesOpciones.find(a => a.idAsignacion === idAsignacion);
 
   useEffect(() => {
     if (!asignacion) { setRows([]); return; }
@@ -153,13 +145,13 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
           </div>
         </div>
 
-        {errorApi && (
+        {(errorApi || errorAsignaciones) && (
           <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi ?? errorAsignaciones}
           </div>
         )}
 
-        {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && (
+        {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && !errorAsignaciones && (
           <EmptyState icon={BookOpen} title="No tiene asignaciones de materias registradas todavía." />
         )}
 
@@ -304,7 +296,8 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
   const [parcial, setParcial] = useState<number | "">("");
   const [queryEstudiante, setQueryEstudiante] = useState("");
   const [estudianteSel, setEstudianteSel] = useState<EstudianteConParalelo | null>(null);
-  const [resultadosEstudiante, setResultadosEstudiante] = useState<EstudianteConParalelo[]>([]);
+  const resultadosEstudianteApi = useDebouncedSearch(queryEstudiante, estudiantesApi.buscar);
+  const resultadosEstudiante = estudianteSel ? [] : resultadosEstudianteApi;
 
   const [resultados, setResultados] = useState<NotaBusquedaResponse[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -312,14 +305,6 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [orden, setOrden] = useState<{ campo: "estudiante" | "promedio"; asc: boolean }>({ campo: "estudiante", asc: true });
   const [pagina, setPagina] = useState(1);
-
-  useEffect(() => {
-    if (queryEstudiante.trim().length < 2) { setResultadosEstudiante([]); return; }
-    const t = setTimeout(() => {
-      estudiantesApi.buscar(queryEstudiante.trim()).then(setResultadosEstudiante).catch(() => setResultadosEstudiante([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [queryEstudiante]);
 
   const buscar = async () => {
     setBuscando(true);
@@ -384,7 +369,7 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
               <ul className="absolute z-10 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {resultadosEstudiante.map(r => (
                   <li key={r.id}>
-                    <button onClick={() => { setEstudianteSel(r); setResultadosEstudiante([]); }}
+                    <button onClick={() => setEstudianteSel(r)}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-[#EAF2FB]">{r.nombreCompleto}</button>
                   </li>
                 ))}

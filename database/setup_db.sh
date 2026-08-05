@@ -24,9 +24,11 @@ done
 
 echo "Si necesitas datos de desarrollo, ejecuta:"
 echo "  psql -d $DB_NAME -f $SCRIPT_DIR/05_datos_prueba.sql"
+echo "  psql -d $DB_NAME -f $SCRIPT_DIR/11_fix_usernames_demo.sql   # repara username de las cuentas de 05"
 echo "Cuentas de personal iniciales (usuario/contraseña reales, ejecutar manualmente una sola vez):"
 echo "  psql -d $DB_NAME -f $SCRIPT_DIR/07_usuario_username.sql"
 echo "  psql -d $DB_NAME -f $SCRIPT_DIR/08_usuario_aaron.sql"
+echo "  psql -d $DB_NAME -f $SCRIPT_DIR/10_asignacion_saida_historia.sql"
 
 echo "Base de datos inicializada. Asegúrate de definir las variables de entorno:" 
 

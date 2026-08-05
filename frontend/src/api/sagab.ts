@@ -1,7 +1,7 @@
 // ============================================================================
 // SAGAB — Servicios de dominio (calificaciones, asistencia, auditoría)
 // ============================================================================
-import { api } from "./client";
+import { api, apiForm } from "./client";
 
 // ── Calificaciones ─────────────────────────────────────────────────────
 export interface NotaRequest {
@@ -214,12 +214,15 @@ export const dashboard = {
 };
 
 // ── Finanzas (pagos/obligaciones de un estudiante) ──────────────────────
+export type EstadoRevisionPago = "EN_REVISION" | "APROBADO" | "RECHAZADO";
+
 export interface PagoResponse {
   idPago: number;
   valorPagado: number;
   metodo: string;
   numeroRecibo: string;
   fechaPago: string;
+  estadoRevision: EstadoRevisionPago;
 }
 
 export interface ObligacionResponse {
@@ -233,6 +236,21 @@ export interface ObligacionResponse {
   pago: PagoResponse | null;
 }
 
+export interface PagoRevisionResponse {
+  idPago: number;
+  idObligacion: number;
+  estudiante: string;
+  rubro: string;
+  valorPagado: number;
+  bancoOrigen: string | null;
+  asunto: string | null;
+  numeroReferencia: string | null;
+  fechaPago: string;
+  comprobanteNombreOriginal: string | null;
+  estadoRevision: EstadoRevisionPago;
+  observacionesAdmin: string | null;
+}
+
 export const finanzas = {
   porEstudiante: (idEstudiante: number) =>
     api<ObligacionResponse[]>(`/api/finanzas/estudiante/${idEstudiante}`),
@@ -241,6 +259,27 @@ export const finanzas = {
       method: "POST",
       body: { idObligacion, valorPagado, metodo },
     }),
+  /** Sube el comprobante de una transferencia; el pago queda EN_REVISION hasta que un admin lo apruebe. */
+  subirComprobante: (params: {
+    idObligacion: number; valorPagado: number; banco: string; asunto: string; numeroReferencia: string;
+    fechaPago: string; comprobante: File;
+  }) => {
+    const fd = new FormData();
+    fd.append("idObligacion", String(params.idObligacion));
+    fd.append("valorPagado", String(params.valorPagado));
+    fd.append("banco", params.banco);
+    fd.append("asunto", params.asunto);
+    fd.append("numeroReferencia", params.numeroReferencia);
+    fd.append("fechaPago", params.fechaPago);
+    fd.append("comprobante", params.comprobante);
+    return apiForm<PagoRevisionResponse>("/api/finanzas/pagos/transferencia", fd);
+  },
+  colaRevision: () => api<PagoRevisionResponse[]>("/api/finanzas/pagos/revision"),
+  aprobar: (idPago: number, observaciones?: string) =>
+    api<PagoRevisionResponse>(`/api/finanzas/pagos/${idPago}/aprobar`, { method: "POST", body: { observaciones } }),
+  rechazar: (idPago: number, observaciones?: string) =>
+    api<PagoRevisionResponse>(`/api/finanzas/pagos/${idPago}/rechazar`, { method: "POST", body: { observaciones } }),
+  urlComprobante: (idPago: number) => api<{ url: string }>(`/api/finanzas/pagos/${idPago}/comprobante`),
 };
 
 // ── Mensajería (bandeja de entrada) ──────────────────────────────────────
@@ -258,6 +297,66 @@ export const mensajes = {
   mias: () => api<MensajeResponse[]>("/api/mensajes/mias"),
   marcarLeido: (idMensaje: number) =>
     api<void>(`/api/mensajes/${idMensaje}/leido`, { method: "POST" }),
+};
+
+// ── Notificaciones automáticas (hoy: calificación < 7) ───────────────────
+export interface NotificacionResponse {
+  idNotificacion: number;
+  materia: string;
+  calificacion: number;
+  mensaje: string;
+  creadoEn: string;
+  leida: boolean;
+}
+
+export const notificaciones = {
+  mias: () => api<NotificacionResponse[]>("/api/notificaciones/mias"),
+  marcarLeida: (idNotificacion: number) =>
+    api<void>(`/api/notificaciones/${idNotificacion}/leida`, { method: "POST" }),
+};
+
+// ── Deberes (tareas y entregas con archivo adjunto) ──────────────────────
+export type EstadoEntrega = "PENDIENTE" | "ENTREGADO" | "REVISADO";
+
+export interface TareaResponse {
+  idTarea: number;
+  titulo: string;
+  descripcion: string | null;
+  fechaLimite: string;
+  materia: string;
+  curso: string;
+  creadoEn: string;
+}
+
+export interface EntregaResponse {
+  idEntrega: number;
+  idTarea: number;
+  tituloTarea: string;
+  materia: string;
+  curso: string;
+  fechaLimite: string;
+  idEstudiante: number;
+  estudiante: string;
+  estado: EstadoEntrega;
+  archivoNombreOriginal: string | null;
+  fechaEntrega: string | null;
+  observacionDocente: string | null;
+}
+
+export const tareas = {
+  crear: (idAsignacion: number, titulo: string, descripcion: string | undefined, fechaLimite: string) =>
+    api<TareaResponse>("/api/tareas", { method: "POST", body: { idAsignacion, titulo, descripcion, fechaLimite } }),
+  porAsignacion: (idAsignacion: number) => api<TareaResponse[]>(`/api/tareas/asignacion/${idAsignacion}`),
+  entregasDeTarea: (idTarea: number) => api<EntregaResponse[]>(`/api/tareas/${idTarea}/entregas`),
+  misEntregas: (idEstudiante: number) => api<EntregaResponse[]>(`/api/tareas/estudiante/${idEstudiante}`),
+  subirEntrega: (idTarea: number, idEstudiante: number, archivo: File) => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    return apiForm<EntregaResponse>(`/api/tareas/${idTarea}/estudiante/${idEstudiante}/entrega`, fd);
+  },
+  revisar: (idEntrega: number, observacionDocente?: string) =>
+    api<EntregaResponse>(`/api/tareas/entregas/${idEntrega}/revisar`, { method: "POST", body: { observacionDocente } }),
+  urlDescarga: (idEntrega: number) => api<{ url: string }>(`/api/tareas/entregas/${idEntrega}/descarga`),
 };
 
 // ── Auditoría (solo roles AUDITOR / ADMIN) ─────────────────────────────

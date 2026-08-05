@@ -1,6 +1,6 @@
 import {
   BookOpen, Users, DollarSign, Home, LogOut,
-  GraduationCap, ChevronRight, Smartphone, UserPlus,
+  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp,
 } from "lucide-react";
 import type { RolSistema } from "../../api/auth";
 import type { Screen } from "../types";
@@ -11,22 +11,26 @@ export const NAV = [
   { id:"matricula"  as Screen, label:"Matrícula",       icon: UserPlus },
   { id:"grades"     as Screen, label:"Académico",        icon: BookOpen },
   { id:"attendance" as Screen, label:"Asistencia",       icon: Users },
+  { id:"tareas"     as Screen, label:"Deberes",          icon: FileUp },
   { id:"financial"  as Screen, label:"Financiero",       icon: DollarSign },
   { id:"parent"     as Screen, label:"Portal Familiar",  icon: Smartphone },
 ];
 
 /** Qué módulos ve cada rol — el docente no debe ver Matrícula ni Financiero. */
 export const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
-  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "financial", "parent"],
-  DOCENTE:       ["dashboard", "grades", "attendance"],
+  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "tareas", "financial", "parent"],
+  DOCENTE:       ["dashboard", "grades", "attendance", "tareas"],
   DECE:          ["dashboard", "attendance"],
   AUDITOR:       ["dashboard"],
   REPRESENTANTE: [],
+  // El estudiante usa el Portal Familiar (mismo componente que el representante, viendo sus
+  // propios datos) en vez del layout con Sidebar — ver App.tsx.
+  ESTUDIANTE:    [],
 };
 
 export const ROL_LABEL: Record<RolSistema, string> = {
   ADMIN: "Administrador", DOCENTE: "Docente", REPRESENTANTE: "Representante",
-  AUDITOR: "Auditor", DECE: "Consejería DECE",
+  AUDITOR: "Auditor", DECE: "Consejería DECE", ESTUDIANTE: "Estudiante",
 };
 
 export function Sidebar({ active, onNav, onLogout, nav, nombre, rolLabel }: {

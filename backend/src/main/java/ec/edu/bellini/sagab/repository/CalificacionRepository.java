@@ -14,6 +14,9 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
     List<Calificacion> findByEstudianteIdOrderByParcialAsc(Long idEstudiante);
     Optional<Calificacion> findByEstudianteIdAndIdAsignacionAndParcial(Long idEstudiante, Long idAsignacion, short parcial);
 
+    /** Trae de una sola consulta las calificaciones ya existentes de un lote de estudiantes (evita N+1 en registrarMasivo). */
+    List<Calificacion> findByIdAsignacionAndParcialAndEstudianteIdIn(Long idAsignacion, short parcial, List<Long> estudianteIds);
+
     /** Promedio institucional (null si todavía no hay ninguna calificación). */
     @Query("SELECT AVG(c.promedio) FROM Calificacion c WHERE c.promedio IS NOT NULL")
     BigDecimal promedioInstitucional();

@@ -11,7 +11,6 @@ import ec.edu.bellini.sagab.repository.CalificacionRepository;
 import ec.edu.bellini.sagab.repository.DocenteRepository;
 import ec.edu.bellini.sagab.repository.EstudianteRepository;
 import ec.edu.bellini.sagab.repository.UsuarioRepository;
-import jakarta.persistence.EntityManager;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -19,8 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CalificacionService {
@@ -33,14 +36,14 @@ public class CalificacionService {
     private final AsignacionDocenteRepository asignaciones;
     private final DocenteRepository docentes;
     private final EstudianteService estudianteService;
-    private final EntityManager entityManager;
+    private final NotificacionService notificacionService;
 
     public CalificacionService(CalificacionRepository c, EstudianteRepository e, UsuarioRepository u,
                                AsignacionDocenteRepository asignaciones, DocenteRepository docentes,
-                               EstudianteService estudianteService, EntityManager entityManager) {
+                               EstudianteService estudianteService, NotificacionService notificacionService) {
         this.calificaciones = c; this.estudiantes = e; this.usuarios = u;
         this.asignaciones = asignaciones; this.docentes = docentes; this.estudianteService = estudianteService;
-        this.entityManager = entityManager;
+        this.notificacionService = notificacionService;
     }
 
     /**
@@ -53,14 +56,22 @@ public class CalificacionService {
                                                                String emailDocente) {
         Long idUsuario = usuarios.findByEmail(emailDocente).orElseThrow().getId();
 
-        return req.notas().stream().map(n -> {
-            Estudiante est = estudiantes.findById(n.idEstudiante())
-                    .orElseThrow(() -> new IllegalArgumentException("Estudiante no existe: " + n.idEstudiante()));
+        List<Long> idsEstudiantes = req.notas().stream().map(CalificacionDtos.NotaRequest::idEstudiante).toList();
 
-            Calificacion cal = calificaciones
-                    .findByEstudianteIdAndIdAsignacionAndParcial(n.idEstudiante(), req.idAsignacion(), req.parcial())
-                    .orElseGet(Calificacion::new);
+        Map<Long, Estudiante> estudiantesPorId = estudiantes.findAllById(idsEstudiantes).stream()
+                .collect(Collectors.toMap(Estudiante::getId, Function.identity()));
 
+        Map<Long, Calificacion> existentesPorEstudiante = calificaciones
+                .findByIdAsignacionAndParcialAndEstudianteIdIn(req.idAsignacion(), req.parcial(), idsEstudiantes)
+                .stream()
+                .collect(Collectors.toMap(c -> c.getEstudiante().getId(), Function.identity()));
+
+        List<Calificacion> paraGuardar = req.notas().stream().map(n -> {
+            Estudiante est = estudiantesPorId.get(n.idEstudiante());
+            if (est == null) {
+                throw new IllegalArgumentException("Estudiante no existe: " + n.idEstudiante());
+            }
+            Calificacion cal = existentesPorEstudiante.getOrDefault(n.idEstudiante(), new Calificacion());
             cal.setEstudiante(est);
             cal.setIdAsignacion(req.idAsignacion());
             cal.setParcial(req.parcial());
@@ -69,18 +80,41 @@ public class CalificacionService {
             cal.setNotaExamen(n.notaExamen());
             cal.setObservacion(n.observacion());
             cal.setRegistradoPor(idUsuario);
-            cal = calificaciones.saveAndFlush(cal);
-            // saveAndFlush no relee columnas GENERATED de la BD hacia la entidad en memoria, y
-            // un findById() dentro de la misma transacción devuelve la misma instancia cacheada
-            // en el contexto de persistencia (no vuelve a consultar la BD): hay que refrescarla.
-            entityManager.refresh(cal);
+            // La columna promedio es GENERATED en PostgreSQL (Calificacion.promedio es insertable=false/
+            // updatable=false); la calculamos aquí con la misma fórmula para construir la respuesta sin
+            // tener que volver a consultar la BD fila por fila.
+            cal.setPromedio(calcularPromedio(n.notaTarea(), n.notaClase(), n.notaExamen()));
+            return cal;
+        }).toList();
 
+        calificaciones.saveAll(paraGuardar);
+
+        // Notificaciones automáticas por nota < 7 (una sola consulta para el nombre de la
+        // materia, compartida por todo el lote: todas las notas del request son de la misma
+        // asignación).
+        String materia = asignaciones.findById(req.idAsignacion())
+                .map(a -> a.getMateria().getNombre()).orElse("—");
+        paraGuardar.forEach(cal -> notificacionService.notificarSiEnRiesgo(
+                cal.getEstudiante(), materia, cal.getPromedio(), cal.getId()));
+
+        return paraGuardar.stream().map(cal -> {
             BigDecimal prom = cal.getPromedio();
             return new CalificacionDtos.NotaResponse(
-                    cal.getId(), est.getId(), est.nombreCompleto(),
+                    cal.getId(), cal.getEstudiante().getId(), cal.getEstudiante().nombreCompleto(),
                     cal.getNotaTarea(), cal.getNotaClase(), cal.getNotaExamen(),
                     prom, prom != null && prom.compareTo(NOTA_MINIMA_APROBACION) < 0);
         }).toList();
+    }
+
+    /** Replica en Java la fórmula GENERATED de sagab.calificacion.promedio (tarea 20% + clase 20% + examen 60%). */
+    private static BigDecimal calcularPromedio(BigDecimal tarea, BigDecimal clase, BigDecimal examen) {
+        if (tarea == null || clase == null || examen == null) {
+            return null;
+        }
+        return tarea.multiply(new BigDecimal("0.20"))
+                .add(clase.multiply(new BigDecimal("0.20")))
+                .add(examen.multiply(new BigDecimal("0.60")))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     @Transactional(readOnly = true)
@@ -141,9 +175,14 @@ public class CalificacionService {
         if (!estudianteService.esPropio(idEstudiante, auth)) {
             throw new AccessDeniedException("No autorizado para consultar este estudiante");
         }
-        return calificaciones.findByEstudianteIdOrderByParcialAsc(idEstudiante).stream()
+        List<Calificacion> notas = calificaciones.findByEstudianteIdOrderByParcialAsc(idEstudiante);
+        List<Long> idsAsignacion = notas.stream().map(Calificacion::getIdAsignacion).distinct().toList();
+        Map<Long, AsignacionDocente> asignacionesPorId = asignaciones.findAllById(idsAsignacion).stream()
+                .collect(Collectors.toMap(AsignacionDocente::getId, Function.identity()));
+
+        return notas.stream()
                 .map(c -> {
-                    AsignacionDocente a = asignaciones.findById(c.getIdAsignacion()).orElse(null);
+                    AsignacionDocente a = asignacionesPorId.get(c.getIdAsignacion());
                     String materia = a != null ? a.getMateria().getNombre() : "—";
                     return new CalificacionDtos.NotaEstudianteResponse(
                             c.getId(), materia, c.getParcial(),

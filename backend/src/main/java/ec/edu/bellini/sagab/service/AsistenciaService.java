@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,23 +41,36 @@ public class AsistenciaService {
         Long idUsuario = usuarios.findByEmail(emailDocente).orElseThrow().getId();
         LocalDate fecha = req.fecha() != null ? req.fecha() : LocalDate.now();
 
+        List<Long> idsEstudiantes = req.marcas().stream().map(AsistenciaDtos.MarcaRequest::idEstudiante).toList();
+        Map<Long, Estudiante> estudiantesPorId = estudiantes.findAllById(idsEstudiantes).stream()
+                .collect(Collectors.toMap(Estudiante::getId, e -> e));
+        Map<Long, Asistencia> existentesPorEstudiante = asistencias.findByIdParaleloAndFecha(req.idParalelo(), fecha)
+                .stream()
+                .collect(Collectors.toMap(x -> x.getEstudiante().getId(), x -> x));
+
         var alertas = new ArrayList<Map<String, Object>>();
+        List<Asistencia> paraGuardar = new ArrayList<>();
         for (AsistenciaDtos.MarcaRequest m : req.marcas()) {
-            var est = estudiantes.findById(m.idEstudiante()).orElseThrow();
-            Asistencia a = asistencias.findByIdParaleloAndFecha(req.idParalelo(), fecha).stream()
-                    .filter(x -> x.getEstudiante().getId().equals(m.idEstudiante()))
-                    .findFirst().orElseGet(Asistencia::new);
+            Estudiante est = estudiantesPorId.get(m.idEstudiante());
+            if (est == null) {
+                throw new NoSuchElementException("Estudiante no existe: " + m.idEstudiante());
+            }
+            Asistencia a = existentesPorEstudiante.getOrDefault(m.idEstudiante(), new Asistencia());
             a.setEstudiante(est);
             a.setIdParalelo(req.idParalelo());
             a.setFecha(fecha);
             a.setEstado(m.estado());
             a.setJustificacion(m.justificacion());
             a.setRegistradoPor(idUsuario);
-            asistencias.save(a);
+            paraGuardar.add(a);
+        }
+        asistencias.saveAll(paraGuardar);
 
+        for (AsistenciaDtos.MarcaRequest m : req.marcas()) {
             if (m.estado() == Asistencia.EstadoAsistencia.AUSENCIA_INJUSTIFICADA) {
                 long consecutivas = asistencias.contarAusenciasConsecutivas(m.idEstudiante());
                 if (consecutivas >= 3) {
+                    Estudiante est = estudiantesPorId.get(m.idEstudiante());
                     alertas.add(Map.of("idEstudiante", est.getId(),
                                        "estudiante", est.nombreCompleto(),
                                        "ausenciasConsecutivas", consecutivas));
@@ -66,16 +80,28 @@ public class AsistenciaService {
         return Map.of("fecha", fecha, "registrados", req.marcas().size(), "alertasDece", alertas);
     }
 
+    /** Registro de un paralelo en una fecha, con el nombre del estudiante ya resuelto (evita entidades lazy en la respuesta). */
     @Transactional(readOnly = true)
-    public List<Asistencia> porParalelo(Integer idParalelo, LocalDate fecha) {
-        return asistencias.findByIdParaleloAndFecha(idParalelo, fecha != null ? fecha : LocalDate.now());
+    public List<AsistenciaDtos.RegistroParaleloResponse> porParalelo(Integer idParalelo, LocalDate fecha) {
+        List<Asistencia> registros = asistencias.findByIdParaleloAndFecha(idParalelo, fecha != null ? fecha : LocalDate.now());
+        List<Long> idsEstudiantes = registros.stream().map(a -> a.getEstudiante().getId()).distinct().toList();
+        Map<Long, Estudiante> estudiantesPorId = estudiantes.findAllById(idsEstudiantes).stream()
+                .collect(Collectors.toMap(Estudiante::getId, e -> e));
+
+        return registros.stream()
+                .map(a -> new AsistenciaDtos.RegistroParaleloResponse(
+                        a.getEstudiante().getId(), estudiantesPorId.get(a.getEstudiante().getId()).nombreCompleto(),
+                        a.getEstado(), a.getJustificacion()))
+                .toList();
     }
 
     /** Ausencias injustificadas consecutivas de cada estudiante del paralelo (alerta DECE en la tabla de registro). */
     @Transactional(readOnly = true)
     public Map<Long, Long> consecutivasPorParalelo(Integer idParalelo) {
-        return estudiantes.findByParaleloIdAndActivoTrueOrderByApellidosAscNombresAsc(idParalelo).stream()
-                .collect(Collectors.toMap(Estudiante::getId, e -> asistencias.contarAusenciasConsecutivas(e.getId())));
+        return asistencias.contarAusenciasConsecutivasPorParalelo(idParalelo).stream()
+                .collect(Collectors.toMap(
+                        AsistenciaRepository.AusenciasConsecutivasProjection::getIdEstudiante,
+                        AsistenciaRepository.AusenciasConsecutivasProjection::getConsecutivas));
     }
 
     /** Historial de asistencia de un estudiante (últimos 6 meses por defecto) — Portal Familiar. */

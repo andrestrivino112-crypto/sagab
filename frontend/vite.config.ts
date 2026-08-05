@@ -21,7 +21,9 @@ export default defineConfig({
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
   build: {
-    sourcemap: true,
+    // Desactivado: un sourcemap en el build de producción expone el código fuente legible
+    // del bundle público e infla el tamaño del despliegue (ver INFORME_AUDITORIA.md, hallazgo #11).
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {

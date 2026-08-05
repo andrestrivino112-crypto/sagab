@@ -52,7 +52,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE", "ESTUDIANTE")
+                // Solo el representante sube comprobantes de su propia transferencia (verificado
+                // además por FinanzasService.esPropio); el admin únicamente revisa (aprobar/rechazar),
+                // nunca sube. El resto de /api/finanzas/** sigue siendo solo ADMIN.
+                .requestMatchers(HttpMethod.POST, "/api/finanzas/pagos/transferencia").hasRole("REPRESENTANTE")
                 .requestMatchers("/api/finanzas/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

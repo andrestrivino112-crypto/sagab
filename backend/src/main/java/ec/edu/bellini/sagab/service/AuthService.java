@@ -1,7 +1,6 @@
 package ec.edu.bellini.sagab.service;
 
 import ec.edu.bellini.sagab.dto.AuthDtos;
-import ec.edu.bellini.sagab.model.Mensaje;
 
 import ec.edu.bellini.sagab.model.Rol;
 import ec.edu.bellini.sagab.model.Usuario;
@@ -29,17 +28,20 @@ public class AuthService {
     private final EventoSeguridadService eventos;
     private final int maxIntentos;
     private final int minutosBloqueo;
+    private final long minutosAcceso;
 
     public AuthService(UsuarioRepository usuarios, PasswordEncoder encoder, JwtService jwt,
                        EventoSeguridadService eventos,
                        @Value("${sagab.seguridad.max-intentos-fallidos}") int maxIntentos,
-                       @Value("${sagab.seguridad.minutos-bloqueo}") int minutosBloqueo) {
+                       @Value("${sagab.seguridad.minutos-bloqueo}") int minutosBloqueo,
+                       @Value("${sagab.jwt.access-minutes}") long minutosAcceso) {
         this.usuarios = usuarios;
         this.encoder = encoder;
         this.jwt = jwt;
         this.eventos = eventos;
         this.maxIntentos = maxIntentos;
         this.minutosBloqueo = minutosBloqueo;
+        this.minutosAcceso = minutosAcceso;
     }
 
     @Transactional
@@ -78,9 +80,21 @@ public class AuthService {
         eventos.loginExitoso(u.getEmail(), ip, userAgent);
 
         return new AuthDtos.TokenResponse(
-                jwt.generarAccessToken(u), "Bearer", 30,
+                jwt.generarAccessToken(u), "Bearer", minutosAcceso,
                 u.nombreCompleto(),
                 u.getRoles().stream().map(Rol::getCodigo).toList(),
                 u.isDebeCambiarClave());
+    }
+
+    /** Cambio de contraseña por el propio usuario (incluye el cambio obligatorio en el primer login). */
+    @Transactional
+    public void cambiarClave(String email, String claveActual, String claveNueva) {
+        Usuario u = usuarios.findByEmail(email).orElseThrow();
+        if (!encoder.matches(claveActual, u.getHashPassword())) {
+            throw new BadCredentialsException("La contraseña actual no es correcta");
+        }
+        u.setHashPassword(encoder.encode(claveNueva));
+        u.setDebeCambiarClave(false);
+        usuarios.save(u);
     }
 }

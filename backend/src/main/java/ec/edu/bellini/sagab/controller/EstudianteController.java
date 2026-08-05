@@ -27,9 +27,9 @@ public class EstudianteController {
         return service.porParalelo(idParalelo);
     }
 
-    /** Estudiantes a cargo del representante autenticado — Portal Familiar. */
+    /** Estudiantes a los que el usuario tiene acceso propio (representados, o el propio estudiante) — Portal Familiar. */
     @GetMapping("/mios")
-    @PreAuthorize("hasRole('REPRESENTANTE')")
+    @PreAuthorize("hasAnyRole('REPRESENTANTE','ESTUDIANTE')")
     public List<EstudianteDtos.EstudianteConParalelo> mios(Authentication auth) {
         return service.mios(auth);
     }

@@ -38,7 +38,7 @@ public class CalificacionController {
 
     /** Notas de un estudiante en todas sus materias — Portal Familiar. */
     @GetMapping("/estudiante/{idEstudiante}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public List<CalificacionDtos.NotaEstudianteResponse> porEstudiante(
             @PathVariable Long idEstudiante, Authentication auth) {
         return service.porEstudiante(idEstudiante, auth);

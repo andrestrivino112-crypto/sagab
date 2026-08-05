@@ -6,6 +6,7 @@ import ec.edu.bellini.sagab.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,5 +23,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(
                 req.usuario(), req.password(),
                 http.getRemoteAddr(), http.getHeader("User-Agent")));
+    }
+
+    @PostMapping("/cambiar-clave")
+    public ResponseEntity<Void> cambiarClave(@Valid @RequestBody AuthDtos.CambiarClaveRequest req,
+                                             Authentication auth) {
+        authService.cambiarClave(auth.getName(), req.claveActual(), req.claveNueva());
+        return ResponseEntity.noContent().build();
     }
 }

@@ -24,6 +24,10 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
+  servlet:
+    multipart:
+      max-file-size: ${SAGAB_UPLOAD_MAX_MB:20}MB
+      max-request-size: ${SAGAB_UPLOAD_MAX_MB:20}MB
 
 server:
   port: ${PORT:8080}
@@ -36,13 +40,25 @@ sagab:
     # Clave HMAC-SHA256 de al menos 32 bytes. Definir por variable de entorno en producción.
     secret: ${SAGAB_JWT_SECRET:CAMBIAR-ESTA-CLAVE-POR-UNA-DE-32+-BYTES-ALEATORIA}
     access-minutes: 30
-    refresh-days: 7
   seguridad:
     max-intentos-fallidos: 5
     minutos-bloqueo: 15
   cors:
     origenes: ${SAGAB_CORS:http://localhost:5173}
+  storage:
+    # Bucket S3-compatible para deberes y comprobantes de pago (AWS S3, Cloudflare R2, etc.).
+    # Si quedan vacíos, la app arranca igual pero los endpoints de subida de archivos
+    # devuelven un error claro en vez de un 500 genérico (ver StorageService.isConfigured()).
+    endpoint: ${SAGAB_S3_ENDPOINT:}
+    region: ${SAGAB_S3_REGION:auto}
+    bucket: ${SAGAB_S3_BUCKET:}
+    access-key: ${SAGAB_S3_ACCESS_KEY:}
+    secret-key: ${SAGAB_S3_SECRET_KEY:}
+  uploads:
+    max-mb-deberes: ${SAGAB_UPLOAD_MAX_MB_DEBERES:15}
+    max-mb-comprobante: ${SAGAB_UPLOAD_MAX_MB_COMPROBANTE:8}
 
 logging:
   level:
     org.springframework.security: INFO
+    ec.edu.bellini.sagab: INFO

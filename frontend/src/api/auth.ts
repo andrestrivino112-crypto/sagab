@@ -1,6 +1,6 @@
 import { api, tokenStore } from "./client";
 
-export type RolSistema = "ADMIN" | "DOCENTE" | "REPRESENTANTE" | "AUDITOR" | "DECE";
+export type RolSistema = "ADMIN" | "DOCENTE" | "REPRESENTANTE" | "AUDITOR" | "DECE" | "ESTUDIANTE";
 
 export interface Sesion {
   accessToken: string;
@@ -20,4 +20,11 @@ export async function login(usuario: string, password: string): Promise<Sesion> 
 
 export function logout() {
   tokenStore.clear();
+}
+
+export async function cambiarClave(claveActual: string, claveNueva: string): Promise<void> {
+  await api<void>("/api/auth/cambiar-clave", {
+    method: "POST",
+    body: { claveActual, claveNueva },
+  });
 }

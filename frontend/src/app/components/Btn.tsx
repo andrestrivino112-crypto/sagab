@@ -1,9 +1,9 @@
 export type BtnVariant = "primary" | "secondary" | "danger" | "ghost";
 export type BtnSize = "sm" | "md" | "lg";
 
-export function Btn({ children, onClick, disabled = false, variant = "primary", size = "md", className = "" }: {
+export function Btn({ children, onClick, disabled = false, variant = "primary", size = "md", className = "", type = "submit" }: {
   children: React.ReactNode; onClick?: () => void; disabled?: boolean;
-  variant?: BtnVariant; size?: BtnSize; className?: string;
+  variant?: BtnVariant; size?: BtnSize; className?: string; type?: "submit" | "button";
 }) {
   const base = "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer";
   const sizes: Record<BtnSize, string> = { sm:"px-3 py-1.5 text-xs", md:"px-4 py-2 text-sm", lg:"px-6 py-2.5 text-base" };
@@ -14,7 +14,7 @@ export function Btn({ children, onClick, disabled = false, variant = "primary", 
     ghost:     "bg-transparent text-[#1F4E79] hover:bg-[#EAF2FB] focus:ring-[#2E75B6]",
   };
   return (
-    <button onClick={onClick} disabled={disabled} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}>
       {children}
     </button>
   );

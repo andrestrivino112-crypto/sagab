@@ -1,7 +1,6 @@
 package ec.edu.bellini.sagab.controller;
 
 import ec.edu.bellini.sagab.dto.AsistenciaDtos;
-import ec.edu.bellini.sagab.model.Asistencia;
 import ec.edu.bellini.sagab.service.AsistenciaService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,7 +27,7 @@ public class AsistenciaController {
 
     @GetMapping("/paralelo/{idParalelo}")
     @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
-    public List<Asistencia> porParalelo(@PathVariable Integer idParalelo,
+    public List<AsistenciaDtos.RegistroParaleloResponse> porParalelo(@PathVariable Integer idParalelo,
                                         @RequestParam(required = false) LocalDate fecha) {
         return service.porParalelo(idParalelo, fecha);
     }
@@ -42,7 +41,7 @@ public class AsistenciaController {
 
     /** Historial de asistencia de un estudiante (últimos 6 meses por defecto) — Portal Familiar. */
     @GetMapping("/estudiante/{idEstudiante}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public List<AsistenciaDtos.RegistroResponse> porEstudiante(@PathVariable Long idEstudiante,
                                                 @RequestParam(required = false) LocalDate desde,
                                                 @RequestParam(required = false) LocalDate hasta,
