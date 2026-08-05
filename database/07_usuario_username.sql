@@ -13,9 +13,8 @@ COMMENT ON COLUMN usuario.username IS 'Nombre de usuario para inicio de sesión 
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Usuarios iniciales: ANDRESHD (ADMIN) y Saida (DOCENTE)
--- Hash BCrypt(12) real, generado con BCryptPasswordEncoder(12):
---   ANDRESHD → ***REDACTED***
---   Saida    → ***REDACTED***
+-- Hash BCrypt(12) real, generado con BCryptPasswordEncoder(12).
+-- Contraseñas reales: pedir al equipo (no se documentan en el repo).
 -- ─────────────────────────────────────────────────────────────────────────
 -- Se usa ON CONFLICT (email) — no (username) — porque el email es la clave
 -- única siempre poblada; si el usuario ya existía (p. ej. de una prueba

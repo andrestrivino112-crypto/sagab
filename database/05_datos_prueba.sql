@@ -1,7 +1,7 @@
 -- ============================================================================
 -- SAGAB — 05_datos_prueba.sql : Datos de desarrollo (NO ejecutar en producción)
--- Contraseña de todos los usuarios demo: ***REDACTED***
--- Hash BCrypt(12) de '***REDACTED***':
+-- Contraseña de todos los usuarios demo: pedir al equipo (no se documenta en el repo).
+-- Hash BCrypt(12) correspondiente:
 --   $2a$12$LJ3m4ySfPr5vX0IhFqGdBuQeQnhPZWD3Uy0o5rF8mHnZbXhVzTfKa   ← regenerar con la app
 -- ============================================================================
 SET search_path TO sagab;

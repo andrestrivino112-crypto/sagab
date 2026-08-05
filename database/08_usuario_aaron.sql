@@ -6,7 +6,7 @@
 -- ============================================================================
 SET search_path TO sagab;
 
--- Hash BCrypt(12) real de '***REDACTED***' (verificado con BCryptPasswordEncoder(12).matches).
+-- Hash BCrypt(12) real (verificado con BCryptPasswordEncoder(12).matches); contraseña: pedir al equipo.
 INSERT INTO usuario (username, email, hash_password, nombres, apellidos, estado, debe_cambiar_clave)
 VALUES ('Aaron', 'aaron@bellini.edu.ec',
         '$2a$12$hpIxt4lmRZEJPxc5ppJT8ehlVEx568OysFFCqDBQpAIZTpdZGSKoG',

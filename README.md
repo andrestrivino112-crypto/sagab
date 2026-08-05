@@ -76,7 +76,7 @@ mvn spring-boot:run                      # http://localhost:8080
 ### Generar el hash BCrypt para los usuarios semilla
 
 ```java
-System.out.println(new BCryptPasswordEncoder(12).encode("***REDACTED***"));
+System.out.println(new BCryptPasswordEncoder(12).encode("TuContraseñaSegura123"));
 ```
 Reemplazar los hashes de `database/05_datos_prueba.sql` con el resultado.
 
