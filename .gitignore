@@ -4,3 +4,8 @@ dist/
 .env
 *.log
 .vscode/
+
+# Configuración local de Claude Code: guarda el texto literal de comandos aprobados,
+# que a veces incluye credenciales pegadas al depurar (ej. cadenas de conexión). Nunca
+# debe subirse — es de la máquina/usuario, no del proyecto.
+.claude/settings.local.json
