@@ -76,6 +76,12 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
   }, []);
 
   const rendimiento = resumen?.rendimientoPorParalelo ?? [];
+  const mostrarMensajesPendientes = rol !== "ADMIN";
+  const hayAlertas = Boolean(resumen && (
+    resumen.estudiantesEnMora > 0
+    || resumen.ausenciasHoy > 0
+    || (mostrarMensajesPendientes && resumen.mensajesPendientes > 0)
+  ));
   const accionesRapidas = {
     ADMIN: [
       { label: "Matrícula", path: "/matricula", icon: UserPlus },
@@ -127,7 +133,7 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
         {/* KPIs */}
         <div>
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Indicadores del día</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite" aria-busy={loading}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${mostrarMensajesPendientes ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`} aria-live="polite" aria-busy={loading}>
             <KpiCard label="Estudiantes en mora" value={loading ? "…" : (resumen?.estudiantesEnMora ?? 0)}
               icon={AlertTriangle} accent="red" alert={!loading && (resumen?.estudiantesEnMora ?? 0) > 0}
               onClick={() => setMoraAbierta(true)} />
@@ -136,8 +142,10 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
               icon={TrendingUp} accent="blue" onClick={() => setPromedioAbierto(true)} />
             <KpiCard label="Ausencias hoy" value={loading ? "…" : (resumen?.ausenciasHoy ?? 0)} icon={Users} accent="amber"
               onClick={() => setAusenciasAbiertas(true)} />
-            <KpiCard label="Mensajes pendientes" value={loading ? "…" : (resumen?.mensajesPendientes ?? 0)} icon={MessageSquare} accent="blue"
-              onClick={() => setMensajesAbiertos(true)} />
+            {mostrarMensajesPendientes && (
+              <KpiCard label="Mensajes pendientes" value={loading ? "…" : (resumen?.mensajesPendientes ?? 0)} icon={MessageSquare} accent="blue"
+                onClick={() => setMensajesAbiertos(true)} />
+            )}
           </div>
         </div>
 
@@ -206,7 +214,7 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
               <h3 className="text-sm font-semibold text-[#1A1A1A]">Alertas recientes</h3>
               <span className="text-[11px] font-medium text-gray-500">Resumen del día</span>
             </div>
-            {resumen && (resumen.estudiantesEnMora > 0 || resumen.ausenciasHoy > 0 || resumen.mensajesPendientes > 0) ? (
+            {resumen && hayAlertas ? (
               <div className="space-y-3">
                 {resumen.estudiantesEnMora > 0 && (
                   <div className="rounded-lg border border-red-100 bg-red-50 p-3">
@@ -230,7 +238,7 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
                     </div>
                   </div>
                 )}
-                {resumen.mensajesPendientes > 0 && (
+                {mostrarMensajesPendientes && resumen.mensajesPendientes > 0 && (
                   <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
                     <div className="flex items-start gap-2">
                       <MessageSquare size={14} className="mt-0.5 text-[#2E75B6]" aria-hidden="true" />

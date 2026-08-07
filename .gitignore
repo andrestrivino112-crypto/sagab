@@ -5,6 +5,9 @@ dist/
 *.log
 .vscode/
 
+# Archivos cargados en tiempo de ejecución (documentos y datos institucionales)
+backend/data/
+
 # Configuración local de Claude Code: guarda el texto literal de comandos aprobados,
 # que a veces incluye credenciales pegadas al depurar (ej. cadenas de conexión). Nunca
 # debe subirse — es de la máquina/usuario, no del proyecto.

@@ -230,7 +230,7 @@ export function CalendarView({ rol, embed = false, onOpenRelated }: {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => move(-1)} aria-label="Período anterior" className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"><ChevronLeft size={18} /></button>
-            <button type="button" onClick={() => { const d = new Date(); setAnchor(d); setSelected(dateKey(d)); }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Hoy</button>
+            <button type="button" title="Volver al mes actual" onClick={() => { const d = new Date(); setAnchor(d); setSelected(dateKey(d)); setVista("month"); }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Mes</button>
             <button type="button" onClick={() => move(1)} aria-label="Período siguiente" className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"><ChevronRight size={18} /></button>
             <h2 className="ml-1 text-lg font-semibold capitalize text-[#1A1A1A]">{title}</h2>
           </div>
@@ -247,7 +247,9 @@ export function CalendarView({ rol, embed = false, onOpenRelated }: {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-600">
-          {[["#2E75B6","Institucional"],["#C62828","Feriados"],["#8A5A00","Fechas importantes"],["#7B1FA2","Tareas"],["#00838F","Recursos"]].map(([color,label]) => <span key={label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />{label}</span>)}
+          {[["#2E75B6","Institucional"],["#C62828","Feriados"],["#8A5A00","Fechas importantes"],["#7B1FA2","Tareas"],["#00838F","Recursos"]]
+            .filter(([, label]) => label !== "Tareas" || rol === "ESTUDIANTE")
+            .map(([color,label]) => <span key={label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />{label}</span>)}
           <span className="ml-auto text-gray-400">Sincronización automática cada 30 s</span>
         </div>
       </section>

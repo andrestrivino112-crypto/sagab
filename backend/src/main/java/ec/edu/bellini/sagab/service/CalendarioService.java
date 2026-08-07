@@ -211,10 +211,15 @@ public class CalendarioService {
     }
 
     private List<Tarea> tareasVisibles(OffsetDateTime desde, OffsetDateTime hasta, Authentication auth) {
-        if (tieneRol(auth, "ADMIN")) return tareas.calendarioAdmin(desde, hasta);
-        if (tieneRol(auth, "DOCENTE")) return tareas.calendarioDocente(auth.getName(), desde, hasta);
-        List<Integer> paralelos = paralelosFamilia(auth);
-        return paralelos.isEmpty() ? List.of() : tareas.calendarioParalelos(paralelos, desde, hasta);
+        if (!tieneRol(auth, "ESTUDIANTE")) return List.of();
+        Usuario usuario = usuarioActual(auth);
+        return estudiantes.findByUsuarioId(usuario.getId())
+                .filter(Estudiante::isActivo)
+                .filter(estudiante -> estudiante.getParalelo() != null)
+                .map(estudiante -> tareas.calendarioPendienteEstudiante(
+                        estudiante.getId(), estudiante.getParalelo().getId(),
+                        EntregaTarea.EstadoEntrega.PENDIENTE, desde, hasta))
+                .orElseGet(List::of);
     }
 
     private List<RecursoAcademico> recursosVisibles(OffsetDateTime desde, OffsetDateTime hasta, Authentication auth) {

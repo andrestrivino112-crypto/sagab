@@ -126,7 +126,7 @@ export default function App() {
             <Route path="/" element={<Navigate to={pantallaInicial(rolPrincipal)} replace />} />
             <Route path="/dashboard" element={conPermiso("dashboard", <DashboardView rol={rolPrincipal} />)} />
             <Route path="/matricula" element={conPermiso("matricula", <MatriculaView />)} />
-            <Route path="/grades" element={conPermiso("grades", <GradesView onNavigate={irA} />)} />
+            <Route path="/grades" element={conPermiso("grades", <GradesView onNavigate={irA} rol={rolPrincipal} />)} />
             <Route path="/attendance" element={conPermiso("attendance", <AttendanceView onNavigate={irA} />)} />
             <Route path="/calendar" element={conPermiso("calendar", <CalendarView rol={rolPrincipal} />)} />
             <Route path="/messages" element={conPermiso("messages", <MensajesInstitucionalesView />)} />

@@ -16,6 +16,7 @@ import { useAsignaciones } from "../hooks/useAsignaciones";
 import { useDebouncedSearch } from "../hooks/useDebouncedSearch";
 import { calcAvg, isComplete, isValid } from "../helpers";
 import type { Screen } from "../types";
+import type { RolSistema } from "../../api/auth";
 
 interface NotaRow { idEstudiante: number; nombre: string; tarea: string; clase: string; examen: string; }
 type NotaSortKey = "nombre" | "promedio";
@@ -29,9 +30,13 @@ function tamanoArchivo(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+export function GradesView({ onNavigate, rol }: { onNavigate: (s: Screen) => void; rol: RolSistema }) {
   const toast = useToast();
   const [modo, setModo] = useState<"ingreso" | "consulta" | "recursos">("ingreso");
+  const puedeVerRecursos = rol !== "ADMIN";
+  const modosDisponibles = puedeVerRecursos
+    ? (["ingreso", "consulta", "recursos"] as const)
+    : (["ingreso", "consulta"] as const);
   const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
   const [parcial, setParcial] = useState(1);
   const [rows, setRows] = useState<NotaRow[]>([]);
@@ -108,7 +113,7 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
       <div className="p-6">
         {/* Modo */}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 w-fit mb-4" role="tablist" aria-label="Modo de calificaciones">
-          {(["ingreso", "consulta", "recursos"] as const).map(m => (
+          {modosDisponibles.map(m => (
             <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => setModo(m)}
               className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40
@@ -288,7 +293,7 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
           <BusquedaCalificaciones asignaciones={asignacionesOpciones} toast={toast} />
         )}
 
-        {modo === "recursos" && <>
+        {puedeVerRecursos && modo === "recursos" && <>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-end gap-4 flex-wrap">
             <div className="flex flex-col gap-1 min-w-[280px]">
               <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
