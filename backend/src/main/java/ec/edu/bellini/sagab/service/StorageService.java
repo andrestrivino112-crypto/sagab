@@ -7,6 +7,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -75,6 +76,13 @@ public class StorageService {
         s3.putObject(
                 PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
                 RequestBody.fromBytes(contenido));
+    }
+
+    /** Borra el objeto del bucket (p. ej. al eliminar un recurso de clase) — nunca falla si la
+     * clave ya no existe, S3 trata delete de un objeto inexistente como éxito. */
+    public void eliminar(String key) {
+        exigirConfigurado();
+        s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
     /** URL de descarga válida por poco tiempo; nunca se expone el bucket como público. */

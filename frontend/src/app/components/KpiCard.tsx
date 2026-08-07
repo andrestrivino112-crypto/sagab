@@ -1,8 +1,9 @@
 import { AlertTriangle } from "lucide-react";
 
-export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert = false }: {
+export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert = false, onClick }: {
   label: string; value: string | number; sub?: string;
   icon: React.ElementType; accent?: "blue"|"green"|"red"|"amber"; alert?: boolean;
+  onClick?: () => void;
 }) {
   const styles = {
     blue:  { border:"border-l-[#2E75B6]", bg:"bg-[#EAF2FB]", icon:"text-[#2E75B6]" },
@@ -10,8 +11,8 @@ export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert 
     red:   { border:"border-l-[#C62828]", bg:"bg-red-50",    icon:"text-[#C62828]" },
     amber: { border:"border-l-amber-500", bg:"bg-amber-50",  icon:"text-amber-600" },
   }[accent];
-  return (
-    <div className={`bg-white rounded-xl border-l-4 ${styles.border} shadow-sm p-5 flex items-start gap-4`}>
+  const content = (
+    <>
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${styles.bg}`}>
         <Icon size={20} className={styles.icon} aria-hidden="true" />
       </div>
@@ -21,6 +22,17 @@ export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert 
         {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
       </div>
       {alert && <AlertTriangle size={15} className="text-[#C62828] flex-shrink-0 mt-1" aria-hidden="true" />}
-    </div>
+    </>
   );
+  const className = `bg-white rounded-xl border-l-4 ${styles.border} shadow-sm p-5 flex items-start gap-4 w-full`;
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-haspopup="dialog"
+        className={`${className} text-left cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40`}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={className}>{content}</div>;
 }

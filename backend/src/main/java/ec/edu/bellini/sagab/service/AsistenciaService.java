@@ -25,11 +25,13 @@ public class AsistenciaService {
     private final EstudianteRepository estudiantes;
     private final UsuarioRepository usuarios;
     private final EstudianteService estudianteService;
+    private final AsignacionDocenteService asignacionDocenteService;
 
     public AsistenciaService(AsistenciaRepository a, EstudianteRepository e, UsuarioRepository u,
-                             EstudianteService estudianteService) {
+                             EstudianteService estudianteService, AsignacionDocenteService asignacionDocenteService) {
         this.asistencias = a; this.estudiantes = e; this.usuarios = u;
         this.estudianteService = estudianteService;
+        this.asignacionDocenteService = asignacionDocenteService;
     }
 
     /**
@@ -37,8 +39,9 @@ public class AsistenciaService {
      * que acumulan 3+ ausencias injustificadas consecutivas (alerta DECE, RF-05).
      */
     @Transactional
-    public Map<String, Object> registrar(AsistenciaDtos.RegistroDiarioRequest req, String emailDocente) {
-        Long idUsuario = usuarios.findByEmail(emailDocente).orElseThrow().getId();
+    public Map<String, Object> registrar(AsistenciaDtos.RegistroDiarioRequest req, Authentication auth) {
+        asignacionDocenteService.exigirDocenteDelParalelo(req.idParalelo(), auth);
+        Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
         LocalDate fecha = req.fecha() != null ? req.fecha() : LocalDate.now();
 
         List<Long> idsEstudiantes = req.marcas().stream().map(AsistenciaDtos.MarcaRequest::idEstudiante).toList();
@@ -82,7 +85,8 @@ public class AsistenciaService {
 
     /** Registro de un paralelo en una fecha, con el nombre del estudiante ya resuelto (evita entidades lazy en la respuesta). */
     @Transactional(readOnly = true)
-    public List<AsistenciaDtos.RegistroParaleloResponse> porParalelo(Integer idParalelo, LocalDate fecha) {
+    public List<AsistenciaDtos.RegistroParaleloResponse> porParalelo(Integer idParalelo, LocalDate fecha, Authentication auth) {
+        asignacionDocenteService.exigirDocenteDelParalelo(idParalelo, auth);
         List<Asistencia> registros = asistencias.findByIdParaleloAndFecha(idParalelo, fecha != null ? fecha : LocalDate.now());
         List<Long> idsEstudiantes = registros.stream().map(a -> a.getEstudiante().getId()).distinct().toList();
         Map<Long, Estudiante> estudiantesPorId = estudiantes.findAllById(idsEstudiantes).stream()
@@ -97,7 +101,8 @@ public class AsistenciaService {
 
     /** Ausencias injustificadas consecutivas de cada estudiante del paralelo (alerta DECE en la tabla de registro). */
     @Transactional(readOnly = true)
-    public Map<Long, Long> consecutivasPorParalelo(Integer idParalelo) {
+    public Map<Long, Long> consecutivasPorParalelo(Integer idParalelo, Authentication auth) {
+        asignacionDocenteService.exigirDocenteDelParalelo(idParalelo, auth);
         return asistencias.contarAusenciasConsecutivasPorParalelo(idParalelo).stream()
                 .collect(Collectors.toMap(
                         AsistenciaRepository.AusenciasConsecutivasProjection::getIdEstudiante,
@@ -115,6 +120,18 @@ public class AsistenciaService {
         LocalDate h = hasta != null ? hasta : LocalDate.now();
         return asistencias.findByEstudianteIdAndFechaBetweenOrderByFechaDesc(idEstudiante, d, h).stream()
                 .map(a -> new AsistenciaDtos.RegistroResponse(a.getFecha(), a.getEstado(), a.getJustificacion()))
+                .toList();
+    }
+
+    /** Drill-down "Ausencias" del Dashboard — mismos roles que ya ven el KPI (institucional, no
+     * acotado al paralelo del docente que consulta, a diferencia de porParalelo()). */
+    @Transactional(readOnly = true)
+    public List<AsistenciaDtos.ReporteAusenciaResponse> reporteAusencias(LocalDate desde, LocalDate hasta,
+                                                                          Integer idParalelo, String curso) {
+        return asistencias.reporteAusencias(desde, hasta, idParalelo, curso).stream()
+                .map(p -> new AsistenciaDtos.ReporteAusenciaResponse(
+                        p.getIdAsistencia(), p.getIdEstudiante(), p.getEstudiante(), p.getCurso(), p.getParalelo(),
+                        p.getFecha(), p.getEstado(), p.getJustificacion(), p.getRegistradoPor()))
                 .toList();
     }
 }

@@ -18,8 +18,9 @@ public class ParaleloController {
 
     public ParaleloController(ParaleloService service) { this.service = service; }
 
+    /** ADMIN administra matrícula; DECE necesita la lista completa para monitorear ausentismo por paralelo. */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DECE')")
     public List<ParaleloDtos.ParaleloResponse> listar() {
         return service.delAnioLectivoVigente();
     }

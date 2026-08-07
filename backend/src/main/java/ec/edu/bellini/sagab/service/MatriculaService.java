@@ -1,6 +1,7 @@
 package ec.edu.bellini.sagab.service;
 
 import ec.edu.bellini.sagab.dto.MatriculaDtos;
+import ec.edu.bellini.sagab.utils.CedulaEcuatoriana;
 import ec.edu.bellini.sagab.utils.UsernameGenerator;
 
 import ec.edu.bellini.sagab.model.Estudiante;
@@ -56,10 +57,10 @@ public class MatriculaService {
 
     @Transactional
     public MatriculaDtos.MatriculaResponse crear(MatriculaDtos.MatriculaRequest req) {
-        if (!esCedulaEcuatorianaValida(req.estudianteCedula())) {
+        if (!CedulaEcuatoriana.esValida(req.estudianteCedula())) {
             throw new IllegalArgumentException("Cédula del estudiante inválida");
         }
-        if (!esCedulaEcuatorianaValida(req.representanteCedula())) {
+        if (!CedulaEcuatoriana.esValida(req.representanteCedula())) {
             throw new IllegalArgumentException("Cédula del representante inválida");
         }
         if (req.estudianteCedula().equals(req.representanteCedula())) {
@@ -176,23 +177,5 @@ public class MatriculaService {
             sb.append(ALFABETO_CLAVE.charAt(random.nextInt(ALFABETO_CLAVE.length())));
         }
         return sb.toString();
-    }
-
-    /** Algoritmo módulo 10 de cédula ecuatoriana — mismo cálculo que valida el frontend. */
-    private boolean esCedulaEcuatorianaValida(String cedula) {
-        if (cedula == null || !cedula.matches("\\d{10}")) return false;
-        int provincia = Integer.parseInt(cedula.substring(0, 2));
-        if (provincia < 1 || provincia > 24) return false;
-        int[] d = cedula.chars().map(c -> c - '0').toArray();
-        if (d[2] > 6) return false;
-        int[] coef = {2, 1, 2, 1, 2, 1, 2, 1, 2};
-        int suma = 0;
-        for (int i = 0; i < 9; i++) {
-            int v = d[i] * coef[i];
-            if (v >= 10) v -= 9;
-            suma += v;
-        }
-        int verificador = (10 - (suma % 10)) % 10;
-        return verificador == d[9];
     }
 }

@@ -42,7 +42,7 @@ const MATRICULA_EMPTY: MatriculaData = {
   documentos: [],
 };
 
-const GENEROS = [{ v: "M", l: "Masculino" }, { v: "F", l: "Femenino" }];
+const GENEROS = [{ v: "M", l: "Masculino" }, { v: "F", l: "Femenino" }, { v: "O", l: "Otro" }];
 const TIPOS_SANGRE = ["A+","A-","B+","B-","AB+","AB-","O+","O-","No registra"];
 const PARENTESCOS = ["Padre", "Madre", "Tutor legal", "Otro"];
 const NIVEL_EDAD: Record<string, [number, number]> = {
@@ -293,10 +293,10 @@ export function MatriculaView() {
           <h2 className="card-header bg-white h6 mb-0">Datos del estudiante</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Nombres" error={err("nombres")}>
-              <input className={cls("nombres", "form-control")} value={form.nombres} onChange={e => set("nombres", e.target.value)} placeholder="Ej. Alejandra Nicole" autoComplete="given-name" />
+              <input className={cls("nombres", "form-control")} value={form.nombres} onChange={e => set("nombres", e.target.value)} placeholder="Ej. Alejandra Nicole" autoComplete="given-name" maxLength={80} />
             </FormField>
             <FormField label="Apellidos" error={err("apellidos")}>
-              <input className={cls("apellidos", "form-control")} value={form.apellidos} onChange={e => set("apellidos", e.target.value)} placeholder="Ej. Morales Vega" autoComplete="family-name" />
+              <input className={cls("apellidos", "form-control")} value={form.apellidos} onChange={e => set("apellidos", e.target.value)} placeholder="Ej. Morales Vega" autoComplete="family-name" maxLength={80} />
             </FormField>
             <FormField label="Cédula de identidad" error={err("cedula")} hint={!touchedFields.cedula ? "10 dígitos, cédula ecuatoriana" : undefined}>
               <input className={cls("cedula", "form-control")} value={form.cedula} onChange={e => set("cedula", e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="1712345678" inputMode="numeric" maxLength={10} />
@@ -326,7 +326,7 @@ export function MatriculaView() {
               </datalist>
             </FormField>
             <FormField label="Dirección domiciliaria" error={err("direccion")}>
-              <input className={cls("direccion", "form-control")} value={form.direccion} onChange={e => set("direccion", e.target.value)} placeholder="Calle, número, sector" autoComplete="street-address" />
+              <input className={cls("direccion", "form-control")} value={form.direccion} onChange={e => set("direccion", e.target.value)} placeholder="Calle, número, sector" autoComplete="street-address" maxLength={150} />
             </FormField>
             <FormField label="Teléfono del estudiante" error={err("telefonoEstudiante")} required={false} hint={!touchedFields.telefonoEstudiante ? "Opcional · Ej. 0991234567" : undefined}>
               <input className={cls("telefonoEstudiante", "form-control")} value={form.telefonoEstudiante} onChange={e => set("telefonoEstudiante", e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="09XXXXXXXX" inputMode="numeric" maxLength={10} />
@@ -345,7 +345,7 @@ export function MatriculaView() {
               </select>
             </FormField>
             <FormField label="Alergias / condición médica" required={false}>
-              <textarea className={cls("condicionMedica", "form-control")} value={form.condicionMedica} onChange={e => set("condicionMedica", e.target.value)} placeholder="Ninguna, si no aplica" rows={2} />
+              <textarea className={cls("condicionMedica", "form-control")} value={form.condicionMedica} onChange={e => set("condicionMedica", e.target.value)} placeholder="Ninguna, si no aplica" rows={2} maxLength={500} />
             </FormField>
           </div>
         </div>
@@ -355,10 +355,10 @@ export function MatriculaView() {
           <h2 className="card-header bg-white h6 mb-0">Representante legal y contacto</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Nombres del representante" error={err("representanteNombres")}>
-              <input className={cls("representanteNombres", "form-control")} value={form.representanteNombres} onChange={e => set("representanteNombres", e.target.value)} placeholder="Ej. Ana María" autoComplete="given-name" />
+              <input className={cls("representanteNombres", "form-control")} value={form.representanteNombres} onChange={e => set("representanteNombres", e.target.value)} placeholder="Ej. Ana María" autoComplete="given-name" maxLength={80} />
             </FormField>
             <FormField label="Apellidos del representante" error={err("representanteApellidos")}>
-              <input className={cls("representanteApellidos", "form-control")} value={form.representanteApellidos} onChange={e => set("representanteApellidos", e.target.value)} placeholder="Ej. Morales Vega" autoComplete="family-name" />
+              <input className={cls("representanteApellidos", "form-control")} value={form.representanteApellidos} onChange={e => set("representanteApellidos", e.target.value)} placeholder="Ej. Morales Vega" autoComplete="family-name" maxLength={80} />
             </FormField>
             <FormField label="Cédula del representante" error={err("representanteCedula")} hint={!touchedFields.representanteCedula ? "10 dígitos, cédula ecuatoriana" : undefined}>
               <input className={cls("representanteCedula", "form-control")} value={form.representanteCedula} onChange={e => set("representanteCedula", e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="1712345678" inputMode="numeric" maxLength={10} />
@@ -376,7 +376,7 @@ export function MatriculaView() {
               <input className={cls("representanteTelefono", "form-control")} value={form.representanteTelefono} onChange={e => set("representanteTelefono", e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="09XXXXXXXX" inputMode="numeric" maxLength={10} />
             </FormField>
             <FormField label="Contacto de emergencia" error={err("contactoEmergencia")} hint={!touchedFields.contactoEmergencia ? "Nombre y teléfono de contacto" : undefined}>
-              <input className={cls("contactoEmergencia", "form-control")} value={form.contactoEmergencia} onChange={e => set("contactoEmergencia", e.target.value)} placeholder="Ej. María Pérez 0991234567" />
+              <input className={cls("contactoEmergencia", "form-control")} value={form.contactoEmergencia} onChange={e => set("contactoEmergencia", e.target.value)} placeholder="Ej. María Pérez 0991234567" maxLength={150} />
             </FormField>
           </div>
         </div>
@@ -386,7 +386,7 @@ export function MatriculaView() {
           <h2 className="card-header bg-white h6 mb-0">Procedencia y documentos</h2>
           <div className="card-body d-flex flex-column gap-3">
             <FormField label="Institución de procedencia" required={false}>
-              <input className={cls("institucionProcedencia", "form-control")} value={form.institucionProcedencia} onChange={e => set("institucionProcedencia", e.target.value)} placeholder="Nombre de la institución anterior" />
+              <input className={cls("institucionProcedencia", "form-control")} value={form.institucionProcedencia} onChange={e => set("institucionProcedencia", e.target.value)} placeholder="Nombre de la institución anterior" maxLength={150} />
             </FormField>
             <div>
               <label className="form-label">Documentos entregados <span className="text-danger">*</span></label>

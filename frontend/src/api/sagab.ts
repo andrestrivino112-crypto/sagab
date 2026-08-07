@@ -1,7 +1,7 @@
 // ============================================================================
 // SAGAB — Servicios de dominio (calificaciones, asistencia, auditoría)
 // ============================================================================
-import { api, apiForm } from "./client";
+import { api, apiBlob, apiForm } from "./client";
 
 // ── Calificaciones ─────────────────────────────────────────────────────
 export interface NotaRequest {
@@ -76,6 +76,9 @@ export const calificaciones = {
   },
   eliminar: (idCalificacion: number) =>
     api<void>(`/api/calificaciones/${idCalificacion}`, { method: "DELETE" }),
+  /** Papeleta de calificaciones en PDF — botón "Generar Papeleta" de la búsqueda avanzada. */
+  papeleta: (idEstudiante: number, idPeriodo?: number) =>
+    apiBlob(`/api/calificaciones/${idEstudiante}/papeleta${idPeriodo != null ? `?idPeriodo=${idPeriodo}` : ""}`),
 };
 
 // ── Asistencia ─────────────────────────────────────────────────────────
@@ -94,6 +97,25 @@ export interface AsistenciaRegistro {
   justificacion: string | null;
 }
 
+export interface RegistroParaleloItem {
+  idEstudiante: number;
+  estudiante: string;
+  estado: EstadoAsistencia;
+  justificacion: string | null;
+}
+
+export interface ReporteAusenciaResponse {
+  idAsistencia: number;
+  idEstudiante: number;
+  estudiante: string;
+  curso: string;
+  paralelo: string;
+  fecha: string;
+  estado: EstadoAsistencia;
+  justificacion: string | null;
+  registradoPor: string | null;
+}
+
 export const asistencia = {
   registrar: (idParalelo: number, marcas: MarcaAsistencia[], fecha?: string) =>
     api<{ fecha: string; registrados: number; alertasDece: unknown[] }>("/api/asistencia", {
@@ -101,11 +123,17 @@ export const asistencia = {
       body: { idParalelo, marcas, fecha },
     }),
   porParalelo: (idParalelo: number, fecha?: string) =>
-    api<unknown[]>(`/api/asistencia/paralelo/${idParalelo}${fecha ? `?fecha=${fecha}` : ""}`),
+    api<RegistroParaleloItem[]>(`/api/asistencia/paralelo/${idParalelo}${fecha ? `?fecha=${fecha}` : ""}`),
   consecutivasPorParalelo: (idParalelo: number) =>
     api<Record<number, number>>(`/api/asistencia/paralelo/${idParalelo}/consecutivas`),
   porEstudiante: (idEstudiante: number) =>
     api<AsistenciaRegistro[]>(`/api/asistencia/estudiante/${idEstudiante}`),
+  /** Drill-down "Ausencias" del Dashboard — faltas y atrasos institucionales, con filtros. */
+  reporte: (filtros: { desde?: string; hasta?: string; idParalelo?: number; curso?: string } = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") q.set(k, String(v)); });
+    return api<ReporteAusenciaResponse[]>(`/api/asistencia/reporte?${q}`);
+  },
 };
 
 // ── Paralelos (para el selector de Matrícula) ──────────────────────────
@@ -209,8 +237,34 @@ export interface ResumenDashboard {
   rendimientoPorParalelo: RendimientoParalelo[];
 }
 
+export interface PromedioAgrupado {
+  etiqueta: string;
+  promedio: number;
+  totalCalificaciones: number;
+}
+
+/** Fila de la pestaña "Tendencia por año": el promedio de un curso/paralelo puntual en un año
+ * lectivo puntual (no un número aislado sin contexto). */
+export interface TendenciaAnual {
+  anioLectivo: string;
+  curso: string;
+  paralelo: string;
+  promedio: number;
+  totalCalificaciones: number;
+}
+
+export interface PromedioDetalle {
+  promedioInstitucional: number | null;
+  porCurso: PromedioAgrupado[];
+  porParalelo: PromedioAgrupado[];
+  porMateria: PromedioAgrupado[];
+  porAnioLectivo: TendenciaAnual[];
+}
+
 export const dashboard = {
   resumen: () => api<ResumenDashboard>("/api/dashboard/resumen"),
+  /** Drill-down "Promedio institucional": desglose por curso/paralelo/materia/docente/año. */
+  promedio: () => api<PromedioDetalle>("/api/dashboard/promedio"),
 };
 
 // ── Finanzas (pagos/obligaciones de un estudiante) ──────────────────────
@@ -251,6 +305,14 @@ export interface PagoRevisionResponse {
   observacionesAdmin: string | null;
 }
 
+/** Motivo de pago disponible (rubro del año lectivo vigente) — selector del Portal Familiar. */
+export interface RubroResponse {
+  idRubro: number;
+  nombre: string;
+  tipo: string;
+  valor: number;
+}
+
 export const finanzas = {
   porEstudiante: (idEstudiante: number) =>
     api<ObligacionResponse[]>(`/api/finanzas/estudiante/${idEstudiante}`),
@@ -259,14 +321,26 @@ export const finanzas = {
       method: "POST",
       body: { idObligacion, valorPagado, metodo },
     }),
-  /** Sube el comprobante de una transferencia; el pago queda EN_REVISION hasta que un admin lo apruebe. */
+  crearObligacion: (idEstudiante: number, idRubro: number) =>
+    api<ObligacionResponse>("/api/finanzas/obligaciones", {
+      method: "POST",
+      body: { idEstudiante, idRubro },
+    }),
+  /**
+   * Sube el comprobante de una transferencia; el pago queda EN_REVISION hasta que un admin lo apruebe.
+   * Se indica `idObligacion` (una obligación ya generada) o, si el estudiante todavía no tiene
+   * ninguna, `idRubro` + `idEstudiante` (el motivo de pago) — el backend genera la obligación
+   * del mes automáticamente, así no hace falta que un admin la cree a mano de antemano.
+   */
   subirComprobante: (params: {
-    idObligacion: number; valorPagado: number; banco: string; asunto: string; numeroReferencia: string;
-    fechaPago: string; comprobante: File;
+    idObligacion?: number; idRubro?: number; idEstudiante?: number; valorPagado?: number;
+    banco: string; asunto: string; numeroReferencia: string; fechaPago: string; comprobante: File;
   }) => {
     const fd = new FormData();
-    fd.append("idObligacion", String(params.idObligacion));
-    fd.append("valorPagado", String(params.valorPagado));
+    if (params.idObligacion != null) fd.append("idObligacion", String(params.idObligacion));
+    if (params.idRubro != null) fd.append("idRubro", String(params.idRubro));
+    if (params.idEstudiante != null) fd.append("idEstudiante", String(params.idEstudiante));
+    if (params.valorPagado != null) fd.append("valorPagado", String(params.valorPagado));
     fd.append("banco", params.banco);
     fd.append("asunto", params.asunto);
     fd.append("numeroReferencia", params.numeroReferencia);
@@ -274,13 +348,43 @@ export const finanzas = {
     fd.append("comprobante", params.comprobante);
     return apiForm<PagoRevisionResponse>("/api/finanzas/pagos/transferencia", fd);
   },
+  rubros: () => api<RubroResponse[]>("/api/finanzas/rubros"),
   colaRevision: () => api<PagoRevisionResponse[]>("/api/finanzas/pagos/revision"),
   aprobar: (idPago: number, observaciones?: string) =>
     api<PagoRevisionResponse>(`/api/finanzas/pagos/${idPago}/aprobar`, { method: "POST", body: { observaciones } }),
   rechazar: (idPago: number, observaciones?: string) =>
     api<PagoRevisionResponse>(`/api/finanzas/pagos/${idPago}/rechazar`, { method: "POST", body: { observaciones } }),
   urlComprobante: (idPago: number) => api<{ url: string }>(`/api/finanzas/pagos/${idPago}/comprobante`),
+  /** Drill-down "Estudiantes en mora" del Dashboard. */
+  mora: () => api<EstudianteMoraResponse[]>("/api/finanzas/mora"),
+  enviarComunicacion: (idEstudiante: number, body: ComunicacionMoraRequest) =>
+    api<void>(`/api/finanzas/mora/${idEstudiante}/comunicacion`, { method: "POST", body }),
 };
+
+/** Fila del drill-down "Estudiantes en mora" — un registro por estudiante, con el total de
+ * sus obligaciones vencidas y los datos de contacto de su representante. */
+export interface EstudianteMoraResponse {
+  idEstudiante: number;
+  codigo: string;
+  nombreCompleto: string;
+  paralelo: string | null;
+  representante: string | null;
+  representanteTelefono: string | null;
+  representanteEmail: string | null;
+  valorPendiente: number;
+  fechaVencimientoMasAntigua: string;
+  obligacionesVencidas: number;
+}
+
+/** El backend admite además NOTIFICACION/EMAIL, pero el Dashboard solo ofrece estos dos canales
+ * (ver MoraDrilldown: "Enviar recordatorio de pago" y "Enviar mensaje privado"). */
+export type CanalComunicacionMora = "RECORDATORIO" | "MENSAJE_INTERNO";
+
+export interface ComunicacionMoraRequest {
+  canal: CanalComunicacionMora;
+  asunto?: string;
+  mensaje: string;
+}
 
 // ── Mensajería (bandeja de entrada) ──────────────────────────────────────
 export interface MensajeResponse {
@@ -297,13 +401,46 @@ export const mensajes = {
   mias: () => api<MensajeResponse[]>("/api/mensajes/mias"),
   marcarLeido: (idMensaje: number) =>
     api<void>(`/api/mensajes/${idMensaje}/leido`, { method: "POST" }),
+  /** Envío de un mensaje interno a uno o varios usuarios (solo ADMIN por ahora). */
+  enviar: (idsDestinatarios: number[], asunto: string, cuerpo: string) =>
+    api<MensajeResponse>("/api/mensajes", { method: "POST", body: { idsDestinatarios, asunto, cuerpo } }),
+  enviados: () => api<MensajeEnviadoResponse[]>("/api/mensajes/enviados"),
+  /** Envío masivo por grupo — el backend resuelve el grupo a destinatarios concretos. */
+  enviarBroadcast: (req: EnviarBroadcastRequest) =>
+    api<MensajeResponse>("/api/mensajes/broadcast", { method: "POST", body: req }),
 };
 
-// ── Notificaciones automáticas (hoy: calificación < 7) ───────────────────
+export type GrupoDestinatario =
+  | "ESTUDIANTES" | "TODO_CURSO" | "TODO_PARALELO" | "TODOS_REPRESENTANTES" | "TODOS_DOCENTES" | "TODO_COLEGIO";
+
+export interface EnviarBroadcastRequest {
+  grupo: GrupoDestinatario;
+  idsEstudiantes?: number[];
+  idParalelo?: number;
+  curso?: string;
+  asunto: string;
+  cuerpo: string;
+}
+
+/** Fila de la pestaña "Enviados" — incluye cuántos de los destinatarios ya lo leyeron. */
+export interface MensajeEnviadoResponse {
+  idMensaje: number;
+  asunto: string;
+  cuerpo: string;
+  esCircular: boolean;
+  enviadoEn: string;
+  totalDestinatarios: number;
+  leidos: number;
+}
+
+// ── Notificaciones (calificación < 7, pagos, y otras genéricas) ──────────
+export type TipoNotificacion = "CALIFICACION" | "PAGO" | "MENSAJE" | "SISTEMA";
+
 export interface NotificacionResponse {
   idNotificacion: number;
-  materia: string;
-  calificacion: number;
+  tipo: TipoNotificacion;
+  materia: string | null;
+  calificacion: number | null;
   mensaje: string;
   creadoEn: string;
   leida: boolean;
@@ -323,8 +460,20 @@ export interface TareaResponse {
   titulo: string;
   descripcion: string | null;
   fechaLimite: string;
+  parcial: 1 | 2 | 3;
+  puntaje: number;
   materia: string;
   curso: string;
+  creadoEn: string;
+}
+
+/** Material de apoyo adjunto a la tarea (no a la entrega del estudiante). */
+export interface AdjuntoTareaResponse {
+  idAdjunto: number;
+  nombre: string;
+  archivoNombreOriginal: string;
+  archivoMimeType: string;
+  archivoTamanoBytes: number;
   creadoEn: string;
 }
 
@@ -335,17 +484,24 @@ export interface EntregaResponse {
   materia: string;
   curso: string;
   fechaLimite: string;
+  parcial: 1 | 2 | 3;
+  puntaje: number;
   idEstudiante: number;
   estudiante: string;
   estado: EstadoEntrega;
   archivoNombreOriginal: string | null;
   fechaEntrega: string | null;
   observacionDocente: string | null;
+  nota: number | null;
 }
 
 export const tareas = {
-  crear: (idAsignacion: number, titulo: string, descripcion: string | undefined, fechaLimite: string) =>
-    api<TareaResponse>("/api/tareas", { method: "POST", body: { idAsignacion, titulo, descripcion, fechaLimite } }),
+  crear: (idAsignacion: number, titulo: string, descripcion: string | undefined, fechaLimite: string, parcial: 1 | 2 | 3, puntaje?: number) =>
+    api<TareaResponse>("/api/tareas", { method: "POST", body: { idAsignacion, titulo, descripcion, fechaLimite, parcial, puntaje } }),
+  editar: (idTarea: number, titulo: string, descripcion: string | undefined, fechaLimite: string, parcial: 1 | 2 | 3, puntaje: number) =>
+    api<TareaResponse>(`/api/tareas/${idTarea}`, { method: "PUT", body: { titulo, descripcion, fechaLimite, parcial, puntaje } }),
+  /** Solo se puede eliminar un deber sin entregas subidas ni calificadas. */
+  eliminar: (idTarea: number) => api<void>(`/api/tareas/${idTarea}`, { method: "DELETE" }),
   porAsignacion: (idAsignacion: number) => api<TareaResponse[]>(`/api/tareas/asignacion/${idAsignacion}`),
   entregasDeTarea: (idTarea: number) => api<EntregaResponse[]>(`/api/tareas/${idTarea}/entregas`),
   misEntregas: (idEstudiante: number) => api<EntregaResponse[]>(`/api/tareas/estudiante/${idEstudiante}`),
@@ -354,9 +510,85 @@ export const tareas = {
     fd.append("archivo", archivo);
     return apiForm<EntregaResponse>(`/api/tareas/${idTarea}/estudiante/${idEstudiante}/entrega`, fd);
   },
-  revisar: (idEntrega: number, observacionDocente?: string) =>
-    api<EntregaResponse>(`/api/tareas/entregas/${idEntrega}/revisar`, { method: "POST", body: { observacionDocente } }),
+  revisar: (idEntrega: number, observacionDocente?: string, nota?: number) =>
+    api<EntregaResponse>(`/api/tareas/entregas/${idEntrega}/revisar`, { method: "POST", body: { observacionDocente, nota } }),
   urlDescarga: (idEntrega: number) => api<{ url: string }>(`/api/tareas/entregas/${idEntrega}/descarga`),
+  /** Material de apoyo de la tarea (guías, imágenes de referencia, etc. — no la entrega del estudiante). */
+  adjuntosDeTarea: (idTarea: number, idEstudiante?: number) =>
+    api<AdjuntoTareaResponse[]>(`/api/tareas/${idTarea}/adjuntos${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
+  subirAdjunto: (idTarea: number, nombre: string, archivo: File) => {
+    const fd = new FormData();
+    fd.append("nombre", nombre);
+    fd.append("archivo", archivo);
+    return apiForm<AdjuntoTareaResponse>(`/api/tareas/${idTarea}/adjuntos`, fd);
+  },
+  urlDescargaAdjunto: (idAdjunto: number, idEstudiante?: number) =>
+    api<{ url: string }>(`/api/tareas/adjuntos/${idAdjunto}/descarga${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
+  eliminarAdjunto: (idAdjunto: number) => api<void>(`/api/tareas/adjuntos/${idAdjunto}`, { method: "DELETE" }),
+};
+
+// ── Materias del estudiante (Portal Familiar — "Mis materias") ─────────
+export interface MateriaEstudianteResponse {
+  idMateria: number;
+  codigo: string;
+  nombre: string;
+  area: string | null;
+  idAsignacion: number;
+  docente: string;
+  porcentajeAvance: number;
+}
+
+export const materias = {
+  porEstudiante: (idEstudiante: number) =>
+    api<MateriaEstudianteResponse[]>(`/api/materias/estudiante/${idEstudiante}`),
+};
+
+// ── Recursos académicos (sílabo, formatos, link de clase, material semanal) ─
+export type TipoRecursoAcademico = "SILABO" | "FORMATO" | "LINK_CLASE" | "MATERIAL";
+
+export interface RecursoAcademicoResponse {
+  idRecurso: number;
+  tipo: TipoRecursoAcademico;
+  nombre: string;
+  descripcion: string | null;
+  semana: number | null;
+  urlExterna: string | null;
+  archivoNombreOriginal: string | null;
+  archivoMimeType: string | null;
+  archivoTamanoBytes: number | null;
+  autor: string;
+  creadoEn: string;
+}
+
+export const recursosAcademicos = {
+  porAsignacion: (idAsignacion: number, idEstudiante?: number) =>
+    api<RecursoAcademicoResponse[]>(
+      `/api/recursos-academicos/asignacion/${idAsignacion}${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
+  subirArchivo: (idAsignacion: number, tipo: Exclude<TipoRecursoAcademico, "LINK_CLASE">, nombre: string, archivo: File,
+                 opciones: { descripcion?: string; semana?: number } = {}) => {
+    const fd = new FormData();
+    fd.append("idAsignacion", String(idAsignacion));
+    fd.append("tipo", tipo);
+    fd.append("nombre", nombre);
+    if (opciones.descripcion) fd.append("descripcion", opciones.descripcion);
+    if (opciones.semana != null) fd.append("semana", String(opciones.semana));
+    fd.append("archivo", archivo);
+    return apiForm<RecursoAcademicoResponse>("/api/recursos-academicos/archivo", fd);
+  },
+  crearLink: (idAsignacion: number, nombre: string, urlExterna: string,
+              opciones: { descripcion?: string; semana?: number } = {}) =>
+    api<RecursoAcademicoResponse>("/api/recursos-academicos/link", {
+      method: "POST", body: { idAsignacion, nombre, urlExterna, descripcion: opciones.descripcion, semana: opciones.semana },
+    }),
+  editar: (idRecurso: number, nombre: string, descripcion: string | undefined, semana: number | undefined) =>
+    api<RecursoAcademicoResponse>(`/api/recursos-academicos/${idRecurso}`, {
+      method: "PATCH", body: { nombre, descripcion, semana },
+    }),
+  eliminar: (idRecurso: number) =>
+    api<void>(`/api/recursos-academicos/${idRecurso}`, { method: "DELETE" }),
+  urlDescarga: (idRecurso: number, idEstudiante?: number) =>
+    api<{ url: string }>(
+      `/api/recursos-academicos/${idRecurso}/descarga${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
 };
 
 // ── Auditoría (solo roles AUDITOR / ADMIN) ─────────────────────────────
@@ -373,6 +605,25 @@ export interface RegistroCambio {
   ip_cliente: string | null;
 }
 
+export interface EventoSeguridad {
+  id_evento: number;
+  ejecutado_en: string;
+  operacion: string;
+  usuario_app: string | null;
+  detalle: string | null;
+  ip_cliente: string | null;
+  user_agent: string | null;
+}
+
+export interface HistorialFilaItem {
+  ejecutado_en: string;
+  usuario_app: string | null;
+  operacion: string;
+  columnas_modificadas: string[] | null;
+  datos_antes: string | null;
+  datos_despues: string | null;
+}
+
 export const auditoria = {
   cambios: (filtros: { tabla?: string; usuario?: string; pagina?: number } = {}) => {
     const q = new URLSearchParams();
@@ -382,7 +633,44 @@ export const auditoria = {
     return api<RegistroCambio[]>(`/api/auditoria/cambios?${q}`);
   },
   eventos: (pagina = 0) =>
-    api<unknown[]>(`/api/auditoria/eventos?pagina=${pagina}`),
+    api<EventoSeguridad[]>(`/api/auditoria/eventos?pagina=${pagina}`),
   historialFila: (tabla: string, idFila: string | number) =>
-    api<unknown[]>(`/api/auditoria/historial/${tabla}/${idFila}`),
+    api<HistorialFilaItem[]>(`/api/auditoria/historial/${tabla}/${idFila}`),
+};
+
+// ── Personal (alta de cuentas DOCENTE / DECE / AUDITOR — solo ADMIN) ───
+export type RolPersonal = "DOCENTE" | "DECE" | "AUDITOR";
+
+export interface PersonalRequest {
+  nombres: string;
+  apellidos: string;
+  cedula: string;
+  email: string;
+  telefono?: string;
+  rol: RolPersonal;
+  tituloDocente?: string;
+}
+
+export interface PersonalResponse {
+  idUsuario: number;
+  nombreCompleto: string;
+  username: string;
+  email: string;
+  rol: string;
+  claveTemporal: string;
+}
+
+export interface PersonalResumen {
+  idUsuario: number;
+  nombreCompleto: string;
+  username: string;
+  email: string;
+  rol: string;
+  estado: string;
+}
+
+export const personal = {
+  crear: (req: PersonalRequest) =>
+    api<PersonalResponse>("/api/personal", { method: "POST", body: req }),
+  listar: () => api<PersonalResumen[]>("/api/personal"),
 };

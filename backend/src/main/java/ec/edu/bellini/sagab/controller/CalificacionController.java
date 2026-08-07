@@ -4,6 +4,8 @@ import ec.edu.bellini.sagab.dto.CalificacionDtos;
 import ec.edu.bellini.sagab.service.CalificacionService;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -25,15 +27,15 @@ public class CalificacionController {
     public List<CalificacionDtos.NotaResponse> registrar(
             @Valid @RequestBody CalificacionDtos.RegistroMasivoRequest req,
             Authentication auth) {
-        return service.registrarMasivo(req, auth.getName());
+        return service.registrarMasivo(req, auth);
     }
 
-    /** Consulta por asignación y parcial (docentes, dirección). */
+    /** Consulta por asignación y parcial — DOCENTE solo la suya, ADMIN cualquiera. */
     @GetMapping("/asignacion/{idAsignacion}/parcial/{parcial}")
     @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
     public List<CalificacionDtos.NotaResponse> porAsignacion(
-            @PathVariable Long idAsignacion, @PathVariable short parcial) {
-        return service.porAsignacion(idAsignacion, parcial);
+            @PathVariable Long idAsignacion, @PathVariable short parcial, Authentication auth) {
+        return service.porAsignacion(idAsignacion, parcial, auth);
     }
 
     /** Notas de un estudiante en todas sus materias — Portal Familiar. */
@@ -56,6 +58,18 @@ public class CalificacionController {
             @RequestParam(required = false) Short parcial,
             Authentication auth) {
         return service.buscar(idEstudiante, idParalelo, idMateria, idPeriodo, idDocente, parcial, auth);
+    }
+
+    /** Papeleta de calificaciones en PDF de un estudiante — botón "Generar Papeleta" de la búsqueda avanzada. */
+    @GetMapping("/{idEstudiante}/papeleta")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    public ResponseEntity<byte[]> papeleta(@PathVariable Long idEstudiante,
+            @RequestParam(required = false) Integer idPeriodo) {
+        byte[] pdf = service.generarPapeleta(idEstudiante, idPeriodo);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"papeleta-" + idEstudiante + ".pdf\"")
+                .body(pdf);
     }
 
     /** Elimina una calificación — DOCENTE solo las propias, ADMIN cualquiera. */

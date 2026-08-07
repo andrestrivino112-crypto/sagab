@@ -23,4 +23,11 @@ public class DashboardController {
     public DashboardDtos.ResumenDashboard resumen(Authentication auth) {
         return service.resumen(auth);
     }
+
+    /** Drill-down de la tarjeta "Promedio institucional": desglose por curso/paralelo/materia/docente/año. */
+    @GetMapping("/promedio")
+    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','AUDITOR','DECE')")
+    public DashboardDtos.PromedioDetalle promedio() {
+        return service.promedioDetalle();
+    }
 }

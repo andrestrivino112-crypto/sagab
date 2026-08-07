@@ -7,6 +7,7 @@ public class NotificacionDtos {
 
     public record NotificacionResponse(
             Long idNotificacion,
+            String tipo,
             String materia,
             BigDecimal calificacion,
             String mensaje,

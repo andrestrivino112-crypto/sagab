@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle, AlertTriangle, BookOpen, CheckCircle2, Clock, DollarSign, FileUp as FileUpIcon,
-  Home, Loader2, LogOut, Send, Smartphone, Upload, Users,
+  GraduationCap, Home, Loader2, LogOut, Send, Smartphone, Upload, Users,
 } from "lucide-react";
 import { ApiError } from "../../api/client";
 import type { RolSistema } from "../../api/auth";
@@ -11,24 +11,35 @@ import {
   tareas as tareasApi,
   type EstudianteConParalelo, type NotaEstudianteResponse, type AsistenciaRegistro,
   type ObligacionResponse, type MensajeResponse, type NotificacionResponse, type EntregaResponse,
+  type RubroResponse, type TipoNotificacion,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Badge } from "../components/Badge";
 import { Btn } from "../components/Btn";
+import { DateField } from "../components/DateField";
 import { FileUpload } from "../components/FileUpload";
 import { useToast } from "../components/Toast";
 import { initials } from "../helpers";
 import { PAYMENT_CFG, ESTADO_TO_STATUS } from "../paymentConfig";
+import { MisMateriasView } from "./MisMateriasView";
 // Formulario de pago por transferencia en Bootstrap (a pedido explícito), escopado bajo
 // ".matricula-form" — mismo mecanismo que ya usa MatriculaView, ver scripts/scope-bootstrap.mjs.
 import "../../styles/bootstrap-scoped.css";
 
-type ParentTab = "home" | "grades" | "attendance" | "tareas" | "payments";
+type ParentTab = "home" | "grades" | "attendance" | "tareas" | "materias" | "payments";
 
 const ESTADO_ENTREGA_BADGE: Record<EntregaResponse["estado"], { v: "success" | "warning" | "error" | "info"; label: string }> = {
   PENDIENTE: { v: "info", label: "Pendiente" },
   ENTREGADO: { v: "warning", label: "Entregado" },
   REVISADO:  { v: "success", label: "Revisado" },
+};
+
+// Título de la notificación cuando no es de tipo CALIFICACION (esas usan n.materia directamente).
+const TITULO_NOTIFICACION: Record<TipoNotificacion, string> = {
+  CALIFICACION: "Calificación",
+  PAGO: "Pago pendiente",
+  MENSAJE: "Mensaje",
+  SISTEMA: "Aviso",
 };
 
 export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPRESENTANTE" }: {
@@ -53,6 +64,7 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
     { id:"grades",     label:"Notas",      icon: BookOpen },
     { id:"attendance", label:"Asistencia", icon: Users },
     { id:"tareas",     label:"Deberes",    icon: FileUpIcon },
+    { id:"materias",   label:"Mis materias", icon: GraduationCap },
     { id:"payments",   label:"Pagos",      icon: DollarSign },
   ];
 
@@ -237,10 +249,14 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
                     <p className="text-xs text-gray-600">No hay notificaciones por el momento.</p>
                   ) : (
                     <ul className="space-y-3">
-                      {notifs.map(n => (
+                      {notifs.map(n => {
+                        // materia/calificacion solo existen para tipo CALIFICACION; el resto
+                        // (PAGO, MENSAJE, SISTEMA) solo trae texto libre en n.mensaje.
+                        const titulo = n.tipo === "CALIFICACION" ? n.materia : TITULO_NOTIFICACION[n.tipo];
+                        return (
                         <li key={n.idNotificacion}>
                           <button type="button" onClick={() => !n.leida && marcarNotificacionLeida(n.idNotificacion)}
-                            aria-label={n.leida ? undefined : `Marcar como leída: ${n.materia}, calificación ${n.calificacion}`}
+                            aria-label={n.leida ? undefined : `Marcar como leída: ${titulo}`}
                             className={`w-full text-left rounded-xl border p-3 transition-colors
                               ${n.leida ? "border-gray-100 bg-white" : "border-red-200 bg-red-50 hover:bg-red-100/70 cursor-pointer"}`}>
                             <div className="flex items-start gap-2.5">
@@ -248,9 +264,11 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
                                   <p className={`text-xs font-semibold ${!n.leida ? "text-[#1A1A1A]" : "text-gray-500"}`}>
-                                    {!n.leida && <span className="sr-only">No leída: </span>}{n.materia}
+                                    {!n.leida && <span className="sr-only">No leída: </span>}{titulo}
                                   </p>
-                                  <span className={`text-xs font-bold font-mono flex-shrink-0 ${!n.leida ? "text-[#C62828]" : "text-gray-500"}`}>{n.calificacion}</span>
+                                  {n.tipo === "CALIFICACION" && n.calificacion != null && (
+                                    <span className={`text-xs font-bold font-mono flex-shrink-0 ${!n.leida ? "text-[#C62828]" : "text-gray-500"}`}>{n.calificacion}</span>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{n.mensaje}</p>
                                 <p className="text-[10px] text-gray-500 mt-1.5">
@@ -260,7 +278,8 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
                             </div>
                           </button>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
@@ -353,32 +372,39 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {entregas.map(en => (
                   <EntregaCard key={en.idEntrega} entrega={en} idEstudiante={idEstudiante!}
-                    onSubido={recargarEntregas} toast={toast} puedeSubir={esRepresentante} />
+                    onSubido={recargarEntregas} toast={toast} />
                 ))}
               </div>
             )}
           </>}
 
+          {!embed && !loading && hijoActivo && tab === "materias" && (
+            <MisMateriasView idEstudiante={idEstudiante!} />
+          )}
+
           {!embed && !loading && hijoActivo && tab === "payments" && <>
-            {obligaciones.length === 0 ? (
-              <EmptyState icon={DollarSign} title="Sin obligaciones de pago registradas." />
-            ) : (
-              <div className="space-y-4">
-                {vencidas.length > 0 && (
-                  <div className="bg-red-50 rounded-2xl border border-red-200 p-3.5 flex gap-2.5">
-                    <AlertTriangle size={15} className="text-[#C62828] flex-shrink-0 mt-0.5" aria-hidden="true" />
-                    <p className="text-xs text-red-700 leading-relaxed">
-                      Tiene <strong>{vencidas.length} {vencidas.length === 1 ? "obligación vencida" : "obligaciones vencidas"} (${vencidas.reduce((s, o) => s + o.valor, 0).toFixed(2)})</strong>. Por favor regularice su pago.
-                    </p>
-                  </div>
-                )}
+            <div className="space-y-4">
+              {vencidas.length > 0 && (
+                <div className="bg-red-50 rounded-2xl border border-red-200 p-3.5 flex gap-2.5">
+                  <AlertTriangle size={15} className="text-[#C62828] flex-shrink-0 mt-0.5" aria-hidden="true" />
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    Tiene <strong>{vencidas.length} {vencidas.length === 1 ? "obligación vencida" : "obligaciones vencidas"} (${vencidas.reduce((s, o) => s + o.valor, 0).toFixed(2)})</strong>. Por favor regularice su pago.
+                  </p>
+                </div>
+              )}
+
+              <NuevoPagoForm idEstudiante={idEstudiante!} onPagado={recargarObligaciones} toast={toast} />
+
+              {obligaciones.length === 0 ? (
+                <EmptyState icon={DollarSign} title="Aún no tiene otras obligaciones de pago registradas." />
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {obligaciones.map(o => (
-                    <ObligacionCard key={o.idObligacion} obligacion={o} onPagado={recargarObligaciones} toast={toast} puedePagar={esRepresentante} />
+                    <ObligacionCard key={o.idObligacion} obligacion={o} onPagado={recargarObligaciones} toast={toast} />
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>}
         </div>
       </div>
@@ -386,10 +412,10 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
   );
 }
 
-// ── Tarjeta de entrega de deber (con subida de archivo si está pendiente y el usuario puede subir) ───
-function EntregaCard({ entrega, idEstudiante, onSubido, toast, puedeSubir }: {
+// ── Tarjeta de entrega de deber (con subida de archivo si está pendiente) ───
+// El estudiante y su representante comparten el mismo acceso — ambos pueden entregar.
+function EntregaCard({ entrega, idEstudiante, onSubido, toast }: {
   entrega: EntregaResponse; idEstudiante: number; onSubido: () => void; toast: ReturnType<typeof useToast>;
-  puedeSubir: boolean;
 }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -421,7 +447,7 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast, puedeSubir }: {
         Vence {new Date(entrega.fechaLimite).toLocaleString("es-EC", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" })}
       </p>
 
-      {entrega.estado === "PENDIENTE" && puedeSubir && (
+      {entrega.estado === "PENDIENTE" && (
         <div className="mt-3 space-y-2">
           <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15}
             onFileSelected={setArchivo} disabled={enviando} label="Adjuntar tarea (PDF, Word, imagen o ZIP)" />
@@ -430,10 +456,6 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast, puedeSubir }: {
             Entregar
           </Btn>
         </div>
-      )}
-
-      {entrega.estado === "PENDIENTE" && !puedeSubir && (
-        <p className="mt-3 text-xs text-gray-500">Pídale a su representante que suba el archivo.</p>
       )}
 
       {entrega.estado !== "PENDIENTE" && (
@@ -448,15 +470,244 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast, puedeSubir }: {
   );
 }
 
-// ── Tarjeta de obligación de pago (con subida de comprobante por transferencia) ─
-function ObligacionCard({ obligacion: o, onPagado, toast, puedePagar: puedeSubirComprobante }: {
-  obligacion: ObligacionResponse; onPagado: () => void; toast: ReturnType<typeof useToast>;
-  puedePagar: boolean;
+// ── Registrar un pago nuevo eligiendo el motivo (rubro) directamente — no depende de que un ─
+// admin haya generado antes la obligación de este estudiante; se genera sola con el valor del rubro.
+const OTRO_MOTIVO_NOMBRE = "Otro (especifique)";
+
+interface NuevoPagoData {
+  idRubro: number | "";
+  motivoLibre: string;
+  montoLibre: string;
+  nombreCuenta: string;
+  asunto: string;
+  numeroTransaccion: string;
+  fechaTransferencia: string;
+}
+
+function nuevoPagoErrors(f: NuevoPagoData, esOtro: boolean): Partial<Record<keyof NuevoPagoData, string>> {
+  const e: Partial<Record<keyof NuevoPagoData, string>> = {};
+  if (!f.idRubro) e.idRubro = "Seleccione un motivo de pago";
+  if (esOtro) {
+    if (f.motivoLibre.trim().length < 4) e.motivoLibre = "Describa el motivo (mín. 4 caracteres)";
+    const monto = Number(f.montoLibre);
+    if (!f.montoLibre.trim() || isNaN(monto) || monto <= 0) e.montoLibre = "Ingrese un monto válido mayor a 0";
+  }
+  if (f.nombreCuenta.trim().length < 4) e.nombreCuenta = "Ingrese el nombre de la cuenta de origen";
+  if (!esOtro && f.asunto.trim().length < 4) e.asunto = "Ingrese el asunto (mín. 4 caracteres)";
+  if (f.numeroTransaccion.trim().length < 3) e.numeroTransaccion = "Ingrese el número de transacción";
+  if (!f.fechaTransferencia) e.fechaTransferencia = "Seleccione la fecha de la transferencia";
+  return e;
+}
+
+const NUEVO_PAGO_EMPTY: NuevoPagoData = {
+  idRubro: "", motivoLibre: "", montoLibre: "", nombreCuenta: "", asunto: "",
+  numeroTransaccion: "", fechaTransferencia: new Date().toISOString().slice(0, 10),
+};
+
+function NuevoPagoForm({ idEstudiante, onPagado, toast }: {
+  idEstudiante: number; onPagado: () => void; toast: ReturnType<typeof useToast>;
 }) {
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [rubros, setRubros] = useState<RubroResponse[]>([]);
+  const [form, setForm] = useState<NuevoPagoData>(NUEVO_PAGO_EMPTY);
+  const [touched, setTouched] = useState<Partial<Record<keyof NuevoPagoData, boolean>>>({});
+  const [attempted, setAttempted] = useState(false);
+  const [comprobante, setComprobante] = useState<File | null>(null);
+  const [comprobanteTocado, setComprobanteTocado] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (mostrarForm && rubros.length === 0) {
+      finanzasApi.rubros().then(setRubros).catch(() => toast.error("No se pudieron cargar los motivos de pago."));
+    }
+  }, [mostrarForm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const idBase = "pago-nuevo";
+  const rubroSeleccionado = rubros.find(r => r.idRubro === form.idRubro);
+  const esOtro = rubroSeleccionado?.nombre === OTRO_MOTIVO_NOMBRE;
+
+  const set = <K extends keyof NuevoPagoData>(key: K, value: NuevoPagoData[K]) => {
+    setForm(p => ({ ...p, [key]: value }));
+    setTouched(p => ({ ...p, [key]: true }));
+  };
+
+  const errors = nuevoPagoErrors(form, esOtro);
+  const err = (key: keyof NuevoPagoData) => (touched[key] || attempted) ? errors[key] : undefined;
+  const cls = (key: keyof NuevoPagoData, base: string) => {
+    if (!touched[key] && !attempted) return base;
+    if (errors[key]) return `${base} is-invalid`;
+    const v = form[key];
+    return String(v).trim().length > 0 ? `${base} is-valid` : base;
+  };
+  const comprobanteInvalido = (comprobanteTocado || attempted) && !comprobante;
+  const allOk = Object.keys(errors).length === 0 && comprobante != null;
+
+  const limpiar = () => {
+    setForm(NUEVO_PAGO_EMPTY);
+    setTouched({});
+    setAttempted(false);
+    setComprobante(null);
+    setComprobanteTocado(false);
+  };
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAttempted(true);
+    setComprobanteTocado(true);
+    if (!allOk) return;
+    setEnviando(true);
+    try {
+      await finanzasApi.subirComprobante({
+        idRubro: Number(form.idRubro), idEstudiante, banco: form.nombreCuenta.trim(),
+        asunto: (esOtro ? form.motivoLibre : form.asunto).trim(),
+        numeroReferencia: form.numeroTransaccion.trim(), fechaPago: form.fechaTransferencia,
+        valorPagado: esOtro ? Number(form.montoLibre) : undefined,
+        comprobante: comprobante!,
+      });
+      toast.success("Comprobante enviado. Un administrador lo revisará pronto.");
+      setMostrarForm(false);
+      limpiar();
+      onPagado();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "No se pudo enviar el comprobante.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+      {!mostrarForm ? (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#1A1A1A]">Registrar un pago por transferencia</p>
+            <p className="text-xs text-gray-600 mt-0.5">Matrícula, mensualidad, uniforme u otro motivo — no necesita esperar a que administración lo registre primero.</p>
+          </div>
+          <Btn size="sm" onClick={() => setMostrarForm(true)} className="flex-shrink-0">
+            <Upload size={13} aria-hidden="true" />Nuevo pago
+          </Btn>
+        </div>
+      ) : (
+        <div className="matricula-form">
+          <form onSubmit={enviar} className="card border-0" noValidate>
+            <div className="card-body p-0 d-flex flex-column gap-3">
+              <p className="text-sm font-semibold text-[#1A1A1A] mb-0">Registrar un pago por transferencia</p>
+
+              <div>
+                <label htmlFor={`${idBase}-motivo`} className="form-label">Motivo de pago</label>
+                <select id={`${idBase}-motivo`} className={cls("idRubro", "form-select")} disabled={enviando}
+                  value={form.idRubro} onChange={e => set("idRubro", e.target.value ? Number(e.target.value) : "")}>
+                  <option value="">Seleccione…</option>
+                  {rubros.map(r => (
+                    <option key={r.idRubro} value={r.idRubro}>
+                      {r.nombre}{r.nombre !== OTRO_MOTIVO_NOMBRE ? ` — $${r.valor.toFixed(2)}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {err("idRubro") ? (
+                  <div className="invalid-feedback d-block">{err("idRubro")}</div>
+                ) : rubroSeleccionado && !esOtro ? (
+                  <div className="form-text">Monto a pagar: <strong>${rubroSeleccionado.valor.toFixed(2)}</strong></div>
+                ) : null}
+              </div>
+
+              {esOtro && (
+                <div>
+                  <label htmlFor={`${idBase}-motivo-libre`} className="form-label">Especifique el motivo</label>
+                  <input id={`${idBase}-motivo-libre`} type="text" className={cls("motivoLibre", "form-control")}
+                    maxLength={150} placeholder="Ej. Cuota de excursión, carnet, multa por daño de material…"
+                    value={form.motivoLibre} onChange={e => set("motivoLibre", e.target.value)} disabled={enviando} />
+                  {err("motivoLibre") && <div className="invalid-feedback d-block">{err("motivoLibre")}</div>}
+                </div>
+              )}
+
+              {esOtro && (
+                <div>
+                  <label htmlFor={`${idBase}-monto-libre`} className="form-label">Monto a pagar</label>
+                  <div className="input-group">
+                    <span className="input-group-text">$</span>
+                    <input id={`${idBase}-monto-libre`} type="number" min="0.01" step="0.01"
+                      className={cls("montoLibre", "form-control")}
+                      value={form.montoLibre} onChange={e => set("montoLibre", e.target.value)} disabled={enviando} />
+                  </div>
+                  {err("montoLibre") && <div className="invalid-feedback d-block">{err("montoLibre")}</div>}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor={`${idBase}-cuenta`} className="form-label">Nombre de la cuenta</label>
+                <input id={`${idBase}-cuenta`} type="text" className={cls("nombreCuenta", "form-control")} maxLength={60}
+                  placeholder="Ej. Banco Pichincha — Juan Pérez"
+                  value={form.nombreCuenta} onChange={e => set("nombreCuenta", e.target.value)} disabled={enviando} />
+                {err("nombreCuenta") && <div className="invalid-feedback d-block">{err("nombreCuenta")}</div>}
+              </div>
+
+              {!esOtro && (
+                <div>
+                  <label htmlFor={`${idBase}-asunto`} className="form-label">Asunto</label>
+                  <input id={`${idBase}-asunto`} type="text" className={cls("asunto", "form-control")} maxLength={150}
+                    placeholder="Ej. Pago de pensión"
+                    value={form.asunto} onChange={e => set("asunto", e.target.value)} disabled={enviando} />
+                  {err("asunto") && <div className="invalid-feedback d-block">{err("asunto")}</div>}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor={`${idBase}-numero`} className="form-label">Número de transacción</label>
+                <input id={`${idBase}-numero`} type="text" className={cls("numeroTransaccion", "form-control")} maxLength={50}
+                  value={form.numeroTransaccion} onChange={e => set("numeroTransaccion", e.target.value)} disabled={enviando} />
+                {err("numeroTransaccion") && <div className="invalid-feedback d-block">{err("numeroTransaccion")}</div>}
+              </div>
+
+              <div>
+                <label htmlFor={`${idBase}-fecha`} className="form-label">Fecha de la transferencia</label>
+                <DateField id={`${idBase}-fecha`} className={cls("fechaTransferencia", "form-control")}
+                  value={form.fechaTransferencia} onChange={v => set("fechaTransferencia", v)}
+                  maxDate={new Date()} disabled={enviando} />
+                {err("fechaTransferencia") && <div className="invalid-feedback d-block">{err("fechaTransferencia")}</div>}
+              </div>
+
+              <div>
+                <label htmlFor={`${idBase}-archivo`} className="form-label">Subir comprobante de transferencia</label>
+                <input id={`${idBase}-archivo`} type="file"
+                  className={`form-control ${comprobanteInvalido ? "is-invalid" : comprobante ? "is-valid" : ""}`}
+                  accept=".jpg,.jpeg,.png,.webp,.pdf" disabled={enviando}
+                  onChange={e => { setComprobante(e.target.files?.[0] ?? null); setComprobanteTocado(true); }} />
+                {comprobanteInvalido ? (
+                  <div className="invalid-feedback d-block">Adjunte la imagen o PDF del comprobante</div>
+                ) : comprobante ? (
+                  <div className="form-text">{comprobante.name} · {(comprobante.size / 1024).toFixed(0)} KB</div>
+                ) : null}
+              </div>
+
+              <div className="d-flex gap-2 pt-1">
+                <button type="button" className="btn btn-outline-secondary flex-fill" disabled={enviando}
+                  onClick={() => { setMostrarForm(false); limpiar(); }}>
+                  Cancelar
+                </button>
+                <button type="submit" className={`btn ${attempted && !allOk ? "btn-danger" : "btn-primary"} flex-fill`} disabled={enviando}>
+                  {enviando ? "Enviando…" : attempted && !allOk ? "Corrija los campos marcados" : "Subir"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tarjeta de obligación de pago (con subida de comprobante por transferencia) ─
+// El estudiante y su representante comparten el mismo acceso — ambos pueden pagar.
+function ObligacionCard({ obligacion: o, onPagado, toast }: {
+  obligacion: ObligacionResponse; onPagado: () => void; toast: ReturnType<typeof useToast>;
+}) {
+  const hoy = new Date().toISOString().slice(0, 10);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombreCuenta, setNombreCuenta] = useState("");
   const [asunto, setAsunto] = useState("");
   const [numeroTransaccion, setNumeroTransaccion] = useState("");
+  const [fechaTransferencia, setFechaTransferencia] = useState(hoy);
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -468,17 +719,17 @@ function ObligacionCard({ obligacion: o, onPagado, toast, puedePagar: puedeSubir
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comprobante || !nombreCuenta.trim() || !asunto.trim() || !numeroTransaccion.trim()) return;
+    if (!comprobante || !nombreCuenta.trim() || !asunto.trim() || !numeroTransaccion.trim() || !fechaTransferencia) return;
     setEnviando(true);
     try {
       await finanzasApi.subirComprobante({
         idObligacion: o.idObligacion, valorPagado: o.valor, banco: nombreCuenta.trim(),
         asunto: asunto.trim(), numeroReferencia: numeroTransaccion.trim(),
-        fechaPago: new Date().toISOString().slice(0, 10), comprobante,
+        fechaPago: fechaTransferencia, comprobante,
       });
       toast.success("Comprobante enviado. Un administrador lo revisará pronto.");
       setMostrarForm(false);
-      setNombreCuenta(""); setAsunto(""); setNumeroTransaccion(""); setComprobante(null);
+      setNombreCuenta(""); setAsunto(""); setNumeroTransaccion(""); setFechaTransferencia(hoy); setComprobante(null);
       onPagado();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo enviar el comprobante.");
@@ -504,11 +755,7 @@ function ObligacionCard({ obligacion: o, onPagado, toast, puedePagar: puedeSubir
         <p className="text-[11px] text-amber-600 mt-2">Comprobante enviado, en revisión por administración.</p>
       )}
 
-      {obligacionPendiente && !yaEnRevision && !puedeSubirComprobante && (
-        <p className="text-[11px] text-gray-500 mt-2">Pídale a su representante que registre el pago.</p>
-      )}
-
-      {obligacionPendiente && !yaEnRevision && puedeSubirComprobante && (
+      {obligacionPendiente && !yaEnRevision && (
         <div className="mt-3">
           {!mostrarForm ? (
             <Btn size="sm" variant="secondary" onClick={() => setMostrarForm(true)} className="w-full">
@@ -539,6 +786,12 @@ function ObligacionCard({ obligacion: o, onPagado, toast, puedePagar: puedeSubir
                       <input id={`${idBase}-numero`} type="text" className="form-control" required maxLength={50}
                         value={numeroTransaccion} onChange={e => setNumeroTransaccion(e.target.value)} disabled={enviando} />
                     </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label htmlFor={`${idBase}-fecha`} className="form-label">Fecha de la transferencia</label>
+                    <DateField id={`${idBase}-fecha`} className="form-control" value={fechaTransferencia}
+                      onChange={setFechaTransferencia} maxDate={new Date()} disabled={enviando} />
                   </div>
 
                   <div className="mb-3">

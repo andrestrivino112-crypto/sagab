@@ -7,12 +7,10 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 public interface CalificacionRepository extends JpaRepository<Calificacion, Long> {
     List<Calificacion> findByIdAsignacionAndParcial(Long idAsignacion, short parcial);
     List<Calificacion> findByEstudianteIdOrderByParcialAsc(Long idEstudiante);
-    Optional<Calificacion> findByEstudianteIdAndIdAsignacionAndParcial(Long idEstudiante, Long idAsignacion, short parcial);
 
     /** Trae de una sola consulta las calificaciones ya existentes de un lote de estudiantes (evita N+1 en registrarMasivo). */
     List<Calificacion> findByIdAsignacionAndParcialAndEstudianteIdIn(Long idAsignacion, short parcial, List<Long> estudianteIds);
@@ -36,6 +34,75 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
     interface RendimientoParaleloProjection {
         String getParalelo();
         BigDecimal getPromedio();
+    }
+
+    /** Igual que rendimientoPorParalelo(), pero con el total de calificaciones por paralelo —
+     * forma unificada con el resto de agrupaciones del drill-down "Promedio institucional". */
+    @Query(value = """
+            SELECT p.nivel || ' ' || p.seccion AS etiqueta, AVG(c.promedio) AS promedio, COUNT(*) AS total
+            FROM sagab.calificacion c
+            JOIN sagab.estudiante e ON e.id_estudiante = c.id_estudiante
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            WHERE c.promedio IS NOT NULL
+            GROUP BY p.nivel, p.seccion
+            ORDER BY p.nivel, p.seccion
+            """, nativeQuery = true)
+    List<PromedioAgrupadoProjection> promedioPorParalelo();
+
+    /** Drill-down "Promedio institucional" del Dashboard: promedio por curso (nivel, agrupando
+     * todos sus paralelos), para comparar entre niveles independientemente de la sección. */
+    @Query(value = """
+            SELECT p.nivel AS etiqueta, AVG(c.promedio) AS promedio, COUNT(*) AS total
+            FROM sagab.calificacion c
+            JOIN sagab.estudiante e ON e.id_estudiante = c.id_estudiante
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            WHERE c.promedio IS NOT NULL
+            GROUP BY p.nivel
+            ORDER BY p.nivel
+            """, nativeQuery = true)
+    List<PromedioAgrupadoProjection> promedioPorCurso();
+
+    /** Promedio por materia. */
+    @Query(value = """
+            SELECT m.nombre AS etiqueta, AVG(c.promedio) AS promedio, COUNT(*) AS total
+            FROM sagab.calificacion c
+            JOIN sagab.asignacion_docente a ON a.id_asignacion = c.id_asignacion
+            JOIN sagab.materia m ON m.id_materia = a.id_materia
+            WHERE c.promedio IS NOT NULL
+            GROUP BY m.nombre
+            ORDER BY m.nombre
+            """, nativeQuery = true)
+    List<PromedioAgrupadoProjection> promedioPorMateria();
+
+    /** Drill-down "Promedio institucional" del Dashboard, pestaña "Tendencia por año": promedio por
+     * año lectivo, desglosado por curso y paralelo (no solo el año) para que cada dato tenga contexto
+     * completo — ver DashboardDtos.TendenciaAnual. */
+    @Query(value = """
+            SELECT per.anio_lectivo AS anioLectivo, p.nivel AS curso, p.seccion AS paralelo,
+                   AVG(c.promedio) AS promedio, COUNT(*) AS total
+            FROM sagab.calificacion c
+            JOIN sagab.estudiante e ON e.id_estudiante = c.id_estudiante
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            JOIN sagab.asignacion_docente a ON a.id_asignacion = c.id_asignacion
+            JOIN sagab.periodo_academico per ON per.id_periodo = a.id_periodo
+            WHERE c.promedio IS NOT NULL
+            GROUP BY per.anio_lectivo, p.nivel, p.seccion
+            ORDER BY per.anio_lectivo DESC, p.nivel, p.seccion
+            """, nativeQuery = true)
+    List<TendenciaAnualProjection> tendenciaPorAnioLectivo();
+
+    interface TendenciaAnualProjection {
+        String getAnioLectivo();
+        String getCurso();
+        String getParalelo();
+        BigDecimal getPromedio();
+        long getTotal();
+    }
+
+    interface PromedioAgrupadoProjection {
+        String getEtiqueta();
+        BigDecimal getPromedio();
+        long getTotal();
     }
 
     /**
@@ -71,6 +138,7 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
               AND (CAST(:idDocente AS BIGINT) IS NULL OR a.id_docente = :idDocente)
               AND (CAST(:parcial AS SMALLINT) IS NULL OR c.parcial = :parcial)
             ORDER BY per.fecha_inicio DESC, e.apellidos, e.nombres, c.parcial
+            LIMIT 500
             """, nativeQuery = true)
     List<NotaBusquedaProjection> buscar(
             @Param("idEstudiante") Long idEstudiante,

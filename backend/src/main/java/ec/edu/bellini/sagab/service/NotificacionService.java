@@ -5,6 +5,7 @@ import ec.edu.bellini.sagab.model.Estudiante;
 import ec.edu.bellini.sagab.model.Notificacion;
 import ec.edu.bellini.sagab.repository.NotificacionRepository;
 import ec.edu.bellini.sagab.repository.UsuarioRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,9 @@ import java.util.NoSuchElementException;
 public class NotificacionService {
 
     private static final BigDecimal NOTA_MINIMA_APROBACION = new BigDecimal("7.00");
+    /** Tope de notificaciones propias: sin paginación en el frontend, se acota en el servidor
+     * (ver INFORME_AUDITORIA_FUNCIONAL.md, BE-16). */
+    private static final int MAX_NOTIFICACIONES = 100;
 
     private final NotificacionRepository notificaciones;
     private final UsuarioRepository usuarios;
@@ -41,19 +45,30 @@ public class NotificacionService {
         if (estudiante.getUsuario() != null) {
             String mensaje = "Obtuviste una calificación de " + promedio + " en " + materia +
                     ". Debes mejorar tu rendimiento académico.";
-            crear(estudiante.getUsuario().getId(), materia, promedio, mensaje, idCalificacion);
+            crear(estudiante.getUsuario().getId(), Notificacion.TipoNotificacion.CALIFICACION, materia, promedio, mensaje, idCalificacion);
         }
         if (estudiante.getRepresentante() != null) {
             String mensaje = "Su representado/a " + estudiante.nombreCompleto() + " obtuvo una calificación de " +
                     promedio + " en " + materia + ". Debe mejorar su rendimiento académico.";
-            crear(estudiante.getRepresentante().getUsuario().getId(), materia, promedio, mensaje, idCalificacion);
+            crear(estudiante.getRepresentante().getUsuario().getId(), Notificacion.TipoNotificacion.CALIFICACION, materia, promedio, mensaje, idCalificacion);
         }
     }
 
-    private void crear(Long idDestinatario, String materia, BigDecimal calificacion, String mensaje, Long idCalificacion) {
+    /**
+     * Notificación no académica (p. ej. recordatorios de pago) — reutiliza la misma tabla/entidad
+     * que las alertas de calificación, sin materia/calificación/id de calificación asociados.
+     */
+    @Transactional
+    public void crearGenerica(Long idDestinatario, Notificacion.TipoNotificacion tipo, String mensaje) {
+        crear(idDestinatario, tipo, null, null, mensaje, null);
+    }
+
+    private void crear(Long idDestinatario, Notificacion.TipoNotificacion tipo, String materia,
+                        BigDecimal calificacion, String mensaje, Long idCalificacion) {
         Notificacion n = new Notificacion();
         n.setIdDestinatario(idDestinatario);
         n.setIdCalificacion(idCalificacion);
+        n.setTipo(tipo);
         n.setMateria(materia);
         n.setCalificacion(calificacion);
         n.setMensaje(mensaje);
@@ -63,9 +78,9 @@ public class NotificacionService {
     @Transactional(readOnly = true)
     public List<NotificacionDtos.NotificacionResponse> mias(Authentication auth) {
         Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
-        return notificaciones.findByIdDestinatarioOrderByCreadoEnDesc(idUsuario).stream()
+        return notificaciones.findByIdDestinatarioOrderByCreadoEnDesc(idUsuario, PageRequest.of(0, MAX_NOTIFICACIONES)).stream()
                 .map(n -> new NotificacionDtos.NotificacionResponse(
-                        n.getId(), n.getMateria(), n.getCalificacion(), n.getMensaje(),
+                        n.getId(), n.getTipo().name(), n.getMateria(), n.getCalificacion(), n.getMensaje(),
                         n.getCreadoEn(), n.getLeidoEn() != null))
                 .toList();
     }

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Eye, Loader2, Receipt, Search, X } from "lucide-react";
+import { AlertCircle, Check, Eye, Loader2, Plus, Receipt, Search, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
   estudiantes as estudiantesApi, finanzas as finanzasApi,
-  type EstudianteConParalelo, type ObligacionResponse, type PagoRevisionResponse,
+  type EstudianteConParalelo, type ObligacionResponse, type PagoRevisionResponse, type RubroResponse,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Badge } from "../components/Badge";
 import { Btn } from "../components/Btn";
+import { Modal } from "../components/Modal";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
 import { useDebouncedSearch } from "../hooks/useDebouncedSearch";
@@ -25,6 +26,15 @@ export function FinancialView() {
 
   const [cola, setCola] = useState<PagoRevisionResponse[]>([]);
   const [procesando, setProcesando] = useState<number | null>(null);
+
+  const [rubros, setRubros] = useState<RubroResponse[]>([]);
+  const [mostrarNuevaObligacion, setMostrarNuevaObligacion] = useState(false);
+  const [idRubroNueva, setIdRubroNueva] = useState<number | "">("");
+  const [creandoObligacion, setCreandoObligacion] = useState(false);
+
+  const [confirmandoPago, setConfirmandoPago] = useState<ObligacionResponse | null>(null);
+
+  useEffect(() => { finanzasApi.rubros().then(setRubros).catch(() => {}); }, []);
 
   const cargarCola = () => { finanzasApi.colaRevision().then(setCola).catch(() => {}); };
   useEffect(cargarCola, []);
@@ -67,11 +77,30 @@ export function FinancialView() {
     cargarObligaciones(e.id);
   };
 
-  const registrarPago = async (o: ObligacionResponse) => {
+  const crearObligacion = async () => {
+    if (!estudiante || idRubroNueva === "") return;
+    setCreandoObligacion(true);
+    try {
+      await finanzasApi.crearObligacion(estudiante.id, idRubroNueva);
+      toast.success("Obligación creada correctamente");
+      setMostrarNuevaObligacion(false);
+      setIdRubroNueva("");
+      cargarObligaciones(estudiante.id);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo crear la obligación.");
+    } finally {
+      setCreandoObligacion(false);
+    }
+  };
+
+  const registrarPago = async () => {
+    if (!confirmandoPago) return;
+    const o = confirmandoPago;
     setPagando(o.idObligacion);
     try {
       await finanzasApi.registrarPago(o.idObligacion, o.valor);
       toast.success("Pago registrado correctamente");
+      setConfirmandoPago(null);
       if (estudiante) cargarObligaciones(estudiante.id);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo registrar el pago.");
@@ -151,7 +180,7 @@ export function FinancialView() {
           <div className="relative mt-1 max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Nombre o apellido del estudiante"
+              placeholder="Nombre, apellido o cédula (del estudiante o representante)"
               className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
             {resultados.length > 0 && (
               <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
@@ -184,7 +213,8 @@ export function FinancialView() {
         )}
 
         {estudiante && !loading && obligaciones.length === 0 && (
-          <EmptyState icon={Receipt} title="Este estudiante no tiene obligaciones de pago registradas." />
+          <EmptyState icon={Receipt} title="Este estudiante no tiene obligaciones de pago registradas."
+            action={{ label: "Crear obligación", onClick: () => setMostrarNuevaObligacion(true) }} />
         )}
 
         {estudiante && !loading && obligaciones.length > 0 && (
@@ -212,6 +242,9 @@ export function FinancialView() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-[#1A1A1A]">Detalle de obligaciones</h3>
+            <Btn type="button" variant="secondary" size="sm" onClick={() => setMostrarNuevaObligacion(true)}>
+              <Plus size={13} aria-hidden="true" />Nueva obligación
+            </Btn>
           </div>
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -241,7 +274,7 @@ export function FinancialView() {
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       {(o.estado === "PENDIENTE" || o.estado === "VENCIDO") && (
-                        <Btn variant="secondary" size="sm" disabled={pagando === o.idObligacion} onClick={() => registrarPago(o)}>
+                        <Btn variant="secondary" size="sm" disabled={pagando === o.idObligacion} onClick={() => setConfirmandoPago(o)}>
                           {pagando === o.idObligacion ? <><Loader2 size={12} className="animate-spin" aria-hidden="true" />Registrando…</> : "Registrar pago"}
                         </Btn>
                       )}
@@ -256,6 +289,54 @@ export function FinancialView() {
         </>
         )}
       </div>
+
+      {mostrarNuevaObligacion && estudiante && (
+        <Modal title={`Nueva obligación — ${estudiante.nombreCompleto}`} onClose={() => setMostrarNuevaObligacion(false)} size="sm">
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="nueva-obligacion-rubro" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">
+                Motivo de pago
+              </label>
+              <select id="nueva-obligacion-rubro" value={idRubroNueva}
+                onChange={e => setIdRubroNueva(e.target.value ? Number(e.target.value) : "")}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
+                <option value="">Seleccione un motivo…</option>
+                {rubros.map(r => (
+                  <option key={r.idRubro} value={r.idRubro}>{r.nombre} · ${r.valor.toFixed(2)}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-gray-500">
+              Se creará la obligación del mes en curso para este rubro. Si ya existe una, se reutiliza (no se duplica).
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Btn type="button" variant="secondary" onClick={() => setMostrarNuevaObligacion(false)}>Cancelar</Btn>
+              <Btn type="button" onClick={crearObligacion} disabled={creandoObligacion || idRubroNueva === ""}>
+                {creandoObligacion ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+                Crear obligación
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {confirmandoPago && (
+        <Modal title="Registrar pago" onClose={() => setConfirmandoPago(null)} size="sm">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              ¿Registrar el pago de <strong>{confirmandoPago.rubro}</strong> por <strong>${confirmandoPago.valor.toFixed(2)}</strong>
+              {estudiante ? <> para <strong>{estudiante.nombreCompleto}</strong></> : null}?
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <Btn type="button" variant="secondary" onClick={() => setConfirmandoPago(null)}>Cancelar</Btn>
+              <Btn type="button" onClick={registrarPago} disabled={pagando === confirmandoPago.idObligacion}>
+                {pagando === confirmandoPago.idObligacion ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
+                Registrar pago
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

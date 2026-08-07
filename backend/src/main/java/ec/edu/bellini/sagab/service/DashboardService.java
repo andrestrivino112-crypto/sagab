@@ -51,4 +51,23 @@ public class DashboardService {
         return new DashboardDtos.ResumenDashboard(
                 calificaciones.promedioInstitucional(), estudiantesEnMora, ausenciasHoy, mensajesPendientes, rendimiento);
     }
+
+    /** Drill-down de la tarjeta "Promedio institucional": la misma agregación en varias dimensiones. */
+    @Transactional(readOnly = true)
+    public DashboardDtos.PromedioDetalle promedioDetalle() {
+        return new DashboardDtos.PromedioDetalle(
+                calificaciones.promedioInstitucional(),
+                agrupar(calificaciones.promedioPorCurso()),
+                agrupar(calificaciones.promedioPorParalelo()),
+                agrupar(calificaciones.promedioPorMateria()),
+                calificaciones.tendenciaPorAnioLectivo().stream()
+                        .map(t -> new DashboardDtos.TendenciaAnual(t.getAnioLectivo(), t.getCurso(), t.getParalelo(), t.getPromedio(), t.getTotal()))
+                        .toList());
+    }
+
+    private List<DashboardDtos.PromedioAgrupado> agrupar(List<CalificacionRepository.PromedioAgrupadoProjection> filas) {
+        return filas.stream()
+                .map(p -> new DashboardDtos.PromedioAgrupado(p.getEtiqueta(), p.getPromedio(), p.getTotal()))
+                .toList();
+    }
 }

@@ -37,13 +37,18 @@ public class CalificacionService {
     private final DocenteRepository docentes;
     private final EstudianteService estudianteService;
     private final NotificacionService notificacionService;
+    private final AsignacionDocenteService asignacionDocenteService;
+    private final PapeletaPdfService papeletaPdfService;
 
     public CalificacionService(CalificacionRepository c, EstudianteRepository e, UsuarioRepository u,
                                AsignacionDocenteRepository asignaciones, DocenteRepository docentes,
-                               EstudianteService estudianteService, NotificacionService notificacionService) {
+                               EstudianteService estudianteService, NotificacionService notificacionService,
+                               AsignacionDocenteService asignacionDocenteService, PapeletaPdfService papeletaPdfService) {
         this.calificaciones = c; this.estudiantes = e; this.usuarios = u;
         this.asignaciones = asignaciones; this.docentes = docentes; this.estudianteService = estudianteService;
         this.notificacionService = notificacionService;
+        this.asignacionDocenteService = asignacionDocenteService;
+        this.papeletaPdfService = papeletaPdfService;
     }
 
     /**
@@ -53,8 +58,12 @@ public class CalificacionService {
      */
     @Transactional
     public List<CalificacionDtos.NotaResponse> registrarMasivo(CalificacionDtos.RegistroMasivoRequest req,
-                                                               String emailDocente) {
-        Long idUsuario = usuarios.findByEmail(emailDocente).orElseThrow().getId();
+                                                               Authentication auth) {
+        AsignacionDocente asignacionDestino = asignaciones.findById(req.idAsignacion())
+                .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
+        asignacionDocenteService.exigirDueñoDeAsignacion(asignacionDestino, auth);
+
+        Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
 
         List<Long> idsEstudiantes = req.notas().stream().map(CalificacionDtos.NotaRequest::idEstudiante).toList();
 
@@ -89,11 +98,9 @@ public class CalificacionService {
 
         calificaciones.saveAll(paraGuardar);
 
-        // Notificaciones automáticas por nota < 7 (una sola consulta para el nombre de la
-        // materia, compartida por todo el lote: todas las notas del request son de la misma
-        // asignación).
-        String materia = asignaciones.findById(req.idAsignacion())
-                .map(a -> a.getMateria().getNombre()).orElse("—");
+        // Notificaciones automáticas por nota < 7 (todas las notas del request son de la misma
+        // asignación, ya cargada arriba para el chequeo de propiedad).
+        String materia = asignacionDestino.getMateria().getNombre();
         paraGuardar.forEach(cal -> notificacionService.notificarSiEnRiesgo(
                 cal.getEstudiante(), materia, cal.getPromedio(), cal.getId()));
 
@@ -118,7 +125,10 @@ public class CalificacionService {
     }
 
     @Transactional(readOnly = true)
-    public List<CalificacionDtos.NotaResponse> porAsignacion(Long idAsignacion, short parcial) {
+    public List<CalificacionDtos.NotaResponse> porAsignacion(Long idAsignacion, short parcial, Authentication auth) {
+        AsignacionDocente asignacion = asignaciones.findById(idAsignacion)
+                .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
+        asignacionDocenteService.exigirDueñoDeAsignacion(asignacion, auth);
         return calificaciones.findByIdAsignacionAndParcial(idAsignacion, parcial).stream()
                 .map(c -> new CalificacionDtos.NotaResponse(
                         c.getId(), c.getEstudiante().getId(), c.getEstudiante().nombreCompleto(),
@@ -150,6 +160,12 @@ public class CalificacionService {
                         p.getNotaTarea(), p.getNotaClase(), p.getNotaExamen(), p.getPromedio(),
                         p.getPromedio() != null && p.getPromedio().compareTo(NOTA_MINIMA_APROBACION) < 0))
                 .toList();
+    }
+
+    /** Genera la papeleta de calificaciones en PDF de un estudiante — botón "Generar Papeleta" de la búsqueda avanzada. */
+    @Transactional(readOnly = true)
+    public byte[] generarPapeleta(Long idEstudiante, Integer idPeriodo) {
+        return papeletaPdfService.generar(idEstudiante, idPeriodo);
     }
 
     /** Elimina una calificación. ADMIN puede eliminar cualquiera; DOCENTE solo las de sus propias asignaciones. */

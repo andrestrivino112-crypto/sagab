@@ -51,12 +51,20 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/personal/**").hasRole("ADMIN")
+                // Regla específica antes de la general de abajo: la cola de revisión es solo ADMIN
+                // (coincide con @PreAuthorize de FinanzasController.colaRevision(), documentado aquí
+                // también para que SecurityConfig no sugiera una regla más permisiva de la real).
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/pagos/revision").hasRole("ADMIN")
+                // Drill-down "Estudiantes en mora" del Dashboard: mismos roles que ya ven el Dashboard
+                // (DashboardController.resumen), no la regla general de abajo (que incluye a las
+                // familias) — es un listado institucional completo, no el de un único estudiante.
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/mora").hasAnyRole("ADMIN", "DOCENTE", "AUDITOR", "DECE")
                 .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE", "ESTUDIANTE")
-                // Solo el representante sube comprobantes de su propia transferencia (verificado
-                // además por FinanzasService.esPropio); el admin únicamente revisa (aprobar/rechazar),
-                // nunca sube. El resto de /api/finanzas/** sigue siendo solo ADMIN.
-                .requestMatchers(HttpMethod.POST, "/api/finanzas/pagos/transferencia").hasRole("REPRESENTANTE")
+                // El estudiante o su representante suben comprobantes de su propia transferencia
+                // (verificado además por FinanzasService.esPropio); el admin únicamente revisa
+                // (aprobar/rechazar), nunca sube. El resto de /api/finanzas/** sigue siendo solo ADMIN.
+                .requestMatchers(HttpMethod.POST, "/api/finanzas/pagos/transferencia").hasAnyRole("REPRESENTANTE", "ESTUDIANTE")
                 .requestMatchers("/api/finanzas/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

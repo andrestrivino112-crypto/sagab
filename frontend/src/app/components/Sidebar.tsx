@@ -1,27 +1,31 @@
 import {
   BookOpen, Users, DollarSign, Home, LogOut,
-  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp,
+  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp, AlertTriangle, History, IdCard, CalendarDays,
 } from "lucide-react";
 import type { RolSistema } from "../../api/auth";
 import type { Screen } from "../types";
 import { initials } from "../helpers";
 
 export const NAV = [
-  { id:"dashboard"  as Screen, label:"Inicio",          icon: Home },
-  { id:"matricula"  as Screen, label:"Matrícula",       icon: UserPlus },
-  { id:"grades"     as Screen, label:"Académico",        icon: BookOpen },
-  { id:"attendance" as Screen, label:"Asistencia",       icon: Users },
-  { id:"tareas"     as Screen, label:"Deberes",          icon: FileUp },
-  { id:"financial"  as Screen, label:"Financiero",       icon: DollarSign },
-  { id:"parent"     as Screen, label:"Portal Familiar",  icon: Smartphone },
+  { id:"dashboard"    as Screen, label:"Inicio",             icon: Home },
+  { id:"matricula"    as Screen, label:"Matrícula",          icon: UserPlus },
+  { id:"grades"       as Screen, label:"Académico",           icon: BookOpen },
+  { id:"attendance"   as Screen, label:"Asistencia",          icon: Users },
+  { id:"calendar"      as Screen, label:"Calendario",          icon: CalendarDays },
+  { id:"deceAlertas"  as Screen, label:"Alertas de Asistencia", icon: AlertTriangle },
+  { id:"tareas"       as Screen, label:"Deberes",             icon: FileUp },
+  { id:"financial"    as Screen, label:"Financiero",          icon: DollarSign },
+  { id:"personal"     as Screen, label:"Personal",            icon: IdCard },
+  { id:"auditoria"    as Screen, label:"Auditoría",           icon: History },
+  { id:"parent"       as Screen, label:"Portal Familiar",     icon: Smartphone },
 ];
 
 /** Qué módulos ve cada rol — el docente no debe ver Matrícula ni Financiero. */
 export const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
-  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "tareas", "financial", "parent"],
-  DOCENTE:       ["dashboard", "grades", "attendance", "tareas"],
-  DECE:          ["dashboard", "attendance"],
-  AUDITOR:       ["dashboard"],
+  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "calendar", "tareas", "financial", "personal", "parent"],
+  DOCENTE:       ["dashboard", "grades", "attendance", "calendar", "tareas"],
+  DECE:          ["dashboard", "calendar", "deceAlertas"],
+  AUDITOR:       ["dashboard", "auditoria"],
   REPRESENTANTE: [],
   // El estudiante usa el Portal Familiar (mismo componente que el representante, viendo sus
   // propios datos) en vez del layout con Sidebar — ver App.tsx.

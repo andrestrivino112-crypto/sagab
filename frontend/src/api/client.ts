@@ -50,6 +50,31 @@ export async function apiForm<T>(path: string, formData: FormData): Promise<T> {
   return manejarRespuesta<T>(res, token);
 }
 
+/** Igual que api(), pero para descargar un archivo binario (p. ej. la papeleta en PDF) — el
+ * cuerpo de la respuesta no es JSON, así que no puede pasar por manejarRespuesta(). */
+export async function apiBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = tokenStore.get();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { headers });
+
+  if (res.status === 401 && token) {
+    tokenStore.clear();
+    window.dispatchEvent(new Event("sagab:sesion-expirada"));
+    throw new ApiError(401, "Sesión expirada. Inicie sesión nuevamente.");
+  }
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const data = await res.json();
+      mensaje = data.mensaje ?? mensaje;
+    } catch { /* respuesta sin cuerpo JSON */ }
+    throw new ApiError(res.status, mensaje);
+  }
+  return res.blob();
+}
+
 async function manejarRespuesta<T>(res: Response, token: string | null): Promise<T> {
   if (res.status === 401 && token) {
     // Había una sesión activa (se envió token) y el backend la rechazó: sí expiró/es inválida.

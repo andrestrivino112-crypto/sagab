@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -27,6 +28,13 @@ public class Tarea {
 
     @Column(name = "fecha_limite", nullable = false)
     private OffsetDateTime fechaLimite;
+
+    @Column(nullable = false)
+    private short parcial;
+
+    /** Puntaje máximo del deber (independiente de la nota 1-10 de cada entrega). */
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal puntaje = new BigDecimal("10.00");
 
     @Column(name = "creado_por", nullable = false)
     private Long creadoPor;

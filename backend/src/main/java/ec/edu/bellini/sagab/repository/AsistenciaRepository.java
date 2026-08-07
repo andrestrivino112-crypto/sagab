@@ -64,4 +64,44 @@ public interface AsistenciaRepository extends JpaRepository<Asistencia, Long> {
         Long getIdEstudiante();
         Long getConsecutivas();
     }
+
+    /**
+     * Drill-down "Ausencias" del Dashboard: todos los registros que no son PRESENTE (faltas
+     * justificadas, injustificadas y atrasos), con filtros opcionales por rango de fecha, curso
+     * y paralelo. La asistencia se registra una vez al día por paralelo (no por materia/docente
+     * de una clase puntual), así que no existe un filtro por materia — "profesor" se resuelve
+     * en el cliente a partir de quién registró cada fila (columna registradoPor).
+     */
+    @Query(value = """
+            SELECT a.id_asistencia AS idAsistencia, e.id_estudiante AS idEstudiante,
+                   e.apellidos || ' ' || e.nombres AS estudiante,
+                   p.nivel AS curso, p.nivel || ' ' || p.seccion AS paralelo,
+                   a.fecha AS fecha, CAST(a.estado AS TEXT) AS estado, a.justificacion AS justificacion,
+                   ru.apellidos || ' ' || ru.nombres AS registradoPor
+            FROM sagab.asistencia a
+            JOIN sagab.estudiante e ON e.id_estudiante = a.id_estudiante
+            JOIN sagab.paralelo p ON p.id_paralelo = a.id_paralelo
+            LEFT JOIN sagab.usuario ru ON ru.id_usuario = a.registrado_por
+            WHERE a.estado <> 'PRESENTE'
+              AND (CAST(:desde AS DATE) IS NULL OR a.fecha >= :desde)
+              AND (CAST(:hasta AS DATE) IS NULL OR a.fecha <= :hasta)
+              AND (CAST(:idParalelo AS INT) IS NULL OR a.id_paralelo = :idParalelo)
+              AND (CAST(:curso AS TEXT) IS NULL OR p.nivel = :curso)
+            ORDER BY a.fecha DESC, e.apellidos, e.nombres
+            LIMIT 500
+            """, nativeQuery = true)
+    List<AusenciaListadoProjection> reporteAusencias(@Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta,
+            @Param("idParalelo") Integer idParalelo, @Param("curso") String curso);
+
+    interface AusenciaListadoProjection {
+        Long getIdAsistencia();
+        Long getIdEstudiante();
+        String getEstudiante();
+        String getCurso();
+        String getParalelo();
+        LocalDate getFecha();
+        String getEstado();
+        String getJustificacion();
+        String getRegistradoPor();
+    }
 }

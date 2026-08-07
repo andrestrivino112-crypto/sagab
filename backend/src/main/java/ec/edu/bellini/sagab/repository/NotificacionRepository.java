@@ -1,6 +1,7 @@
 package ec.edu.bellini.sagab.repository;
 
 import ec.edu.bellini.sagab.model.Notificacion;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,7 +11,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface NotificacionRepository extends JpaRepository<Notificacion, Long> {
-    List<Notificacion> findByIdDestinatarioOrderByCreadoEnDesc(Long idDestinatario);
+    /** Acotada con Pageable: un historial de años de notificaciones no debe devolver todo de golpe. */
+    List<Notificacion> findByIdDestinatarioOrderByCreadoEnDesc(Long idDestinatario, Pageable pageable);
 
     /** Igual que MensajeDestinatarioRepository.marcarLeido: la restricción de propiedad va en el WHERE. */
     @Modifying

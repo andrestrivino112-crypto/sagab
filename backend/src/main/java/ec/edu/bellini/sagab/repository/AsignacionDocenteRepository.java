@@ -9,4 +9,10 @@ public interface AsignacionDocenteRepository extends JpaRepository<AsignacionDoc
     List<AsignacionDocente> findByDocenteUsuarioEmailOrderByPeriodoFechaInicioDesc(String email);
 
     List<AsignacionDocente> findAllByOrderByPeriodoFechaInicioDesc();
+
+    /** Materias que cursa un paralelo en un período dado — "Mis materias" del Portal Familiar. */
+    List<AsignacionDocente> findByParaleloIdAndPeriodoId(Integer idParalelo, Integer idPeriodo);
+
+    /** ¿El docente de este email dicta alguna materia en este paralelo? — chequeo de propiedad por paralelo completo. */
+    boolean existsByDocenteUsuarioEmailAndParaleloId(String email, Integer idParalelo);
 }

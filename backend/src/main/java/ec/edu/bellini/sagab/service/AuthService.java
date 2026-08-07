@@ -86,6 +86,15 @@ public class AuthService {
                 u.isDebeCambiarClave());
     }
 
+    /** Reconstruye los datos de sesión a partir de un access token ya válido (JwtAuthFilter ya
+     * autenticó la petición) — usado al recargar la página para no perder la sesión. */
+    @Transactional(readOnly = true)
+    public AuthDtos.SesionResponse me(String email) {
+        Usuario u = usuarios.findByEmail(email).orElseThrow();
+        return new AuthDtos.SesionResponse(
+                u.nombreCompleto(), u.getRoles().stream().map(Rol::getCodigo).toList(), u.isDebeCambiarClave());
+    }
+
     /** Cambio de contraseña por el propio usuario (incluye el cambio obligatorio en el primer login). */
     @Transactional
     public void cambiarClave(String email, String claveActual, String claveNueva) {

@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
@@ -54,6 +55,10 @@ public class EntregaTarea {
 
     @Column(name = "observacion_docente", length = 500)
     private String observacionDocente;
+
+    /** Calificación numérica opcional de la entrega — una entrega puede quedar REVISADO solo con observación. */
+    @Column(precision = 4, scale = 2)
+    private BigDecimal nota;
 
     @Column(name = "revisado_por")
     private Long revisadoPor;

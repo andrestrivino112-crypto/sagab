@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, BookOpen, Loader2, Save, Search, UserPlus } from "lucide-react";
+import { AlertCircle, BookOpen, Download, ExternalLink, FileDown, FileText, Link2, Loader2, Save, Search, Send, UserPlus } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
-  estudiantes as estudiantesApi, calificaciones as calificacionesApi,
+  estudiantes as estudiantesApi, calificaciones as calificacionesApi, recursosAcademicos as recursosApi,
   type AsignacionOpcion, type EstudianteConParalelo, type NotaBusquedaResponse,
+  type RecursoAcademicoResponse, type TipoRecursoAcademico,
 } from "../../api/sagab";
 import { EmptyState } from "../components/EmptyState";
 import { Btn } from "../components/Btn";
+import { FileUpload } from "../components/FileUpload";
+import { MaterialSemanalPanel } from "../components/MaterialSemanalPanel";
 import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
 import { useAsignaciones } from "../hooks/useAsignaciones";
@@ -20,7 +23,7 @@ const FILAS_POR_PAGINA = 15;
 
 export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
-  const [modo, setModo] = useState<"ingreso" | "consulta">("ingreso");
+  const [modo, setModo] = useState<"ingreso" | "consulta" | "recursos">("ingreso");
   const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
   const [parcial, setParcial] = useState(1);
   const [rows, setRows] = useState<NotaRow[]>([]);
@@ -68,7 +71,7 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
         idEstudiante: r.idEstudiante,
         notaTarea: parseFloat(r.tarea), notaClase: parseFloat(r.clase), notaExamen: parseFloat(r.examen),
       })));
-      toast.success("Nota guardada correctamente");
+      toast.success(`${completas.length} calificación${completas.length === 1 ? "" : "es"} guardada${completas.length === 1 ? "" : "s"} correctamente`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudieron guardar las calificaciones.");
     } finally {
@@ -97,12 +100,12 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
       <div className="p-6">
         {/* Modo */}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 w-fit mb-4" role="tablist" aria-label="Modo de calificaciones">
-          {(["ingreso", "consulta"] as const).map(m => (
+          {(["ingreso", "consulta", "recursos"] as const).map(m => (
             <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => setModo(m)}
               className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40
                 ${modo === m ? "bg-[#1F4E79] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-              {m === "ingreso" ? "Ingreso de notas" : "Búsqueda avanzada"}
+              {m === "ingreso" ? "Ingreso de notas" : m === "consulta" ? "Búsqueda avanzada" : "Recursos"}
             </button>
           ))}
         </div>
@@ -138,9 +141,15 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
             </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <Btn onClick={guardar} disabled={!allOk || saving || completas.length === 0}>
+            <Btn onClick={guardar} disabled={saving || completas.length === 0}>
               {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
-              {saving ? "Guardando…" : allOk ? "Guardar calificaciones" : "Completar todos los campos"}
+              {saving
+                ? "Guardando…"
+                : completas.length === 0
+                  ? "Complete al menos un estudiante"
+                  : allOk
+                    ? "Guardar calificaciones"
+                    : `Guardar ${completas.length} de ${rows.length} completas`}
             </Btn>
           </div>
         </div>
@@ -270,7 +279,195 @@ export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) 
         {modo === "consulta" && (
           <BusquedaCalificaciones asignaciones={asignacionesOpciones} toast={toast} />
         )}
+
+        {modo === "recursos" && <>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-end gap-4 flex-wrap">
+            <div className="flex flex-col gap-1 min-w-[280px]">
+              <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
+              <select value={idAsignacion} onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
+                {asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
+                {asignacionesOpciones.map(a => (
+                  <option key={a.idAsignacion} value={a.idAsignacion}>
+                    {a.paralelo} · {a.materia} · {a.periodo}{a.docente ? ` · ${a.docente}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {!asignacion && asignacionesOpciones.length === 0 && (
+            <EmptyState icon={BookOpen} title="No tiene asignaciones de materias registradas todavía." />
+          )}
+          {asignacion && <RecursosAcademicosTab idAsignacion={asignacion.idAsignacion} toast={toast} />}
+        </>}
       </div>
+    </div>
+  );
+}
+
+// ── Recursos académicos (sílabo, formatos, link de clase) de una asignación ─
+function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; toast: ReturnType<typeof useToast> }) {
+  const [recursos, setRecursos] = useState<RecursoAcademicoResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [tipoArchivo, setTipoArchivo] = useState<Exclude<TipoRecursoAcademico, "LINK_CLASE">>("SILABO");
+  const [nombreArchivo, setNombreArchivo] = useState("");
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+
+  const [nombreLink, setNombreLink] = useState("");
+  const [urlLink, setUrlLink] = useState("");
+  const [publicandoLink, setPublicandoLink] = useState(false);
+
+  const cargar = () => {
+    setLoading(true);
+    setError(null);
+    recursosApi.porAsignacion(idAsignacion)
+      .then(setRecursos)
+      .catch(e => setError(e instanceof ApiError ? e.message : "No se pudieron cargar los recursos de esta asignación."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(cargar, [idAsignacion]);
+
+  const subirArchivo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!archivo || !nombreArchivo.trim()) return;
+    setSubiendoArchivo(true);
+    try {
+      await recursosApi.subirArchivo(idAsignacion, tipoArchivo, nombreArchivo.trim(), archivo);
+      toast.success("Recurso publicado correctamente");
+      setNombreArchivo(""); setArchivo(null);
+      cargar();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el recurso.");
+    } finally {
+      setSubiendoArchivo(false);
+    }
+  };
+
+  const publicarLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nombreLink.trim() || !urlLink.trim()) return;
+    setPublicandoLink(true);
+    try {
+      await recursosApi.crearLink(idAsignacion, nombreLink.trim(), urlLink.trim());
+      toast.success("Link de clase publicado correctamente");
+      setNombreLink(""); setUrlLink("");
+      cargar();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el link.");
+    } finally {
+      setPublicandoLink(false);
+    }
+  };
+
+  const descargar = async (idRecurso: number) => {
+    try {
+      const { url } = await recursosApi.urlDescarga(idRecurso);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "No se pudo generar el enlace de descarga.");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="space-y-4">
+        <form onSubmit={subirArchivo} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Publicar sílabo o formato</p>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label htmlFor="recurso-tipo" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Tipo</label>
+              <select id="recurso-tipo" value={tipoArchivo} onChange={e => setTipoArchivo(e.target.value as typeof tipoArchivo)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
+                <option value="SILABO">Sílabo</option>
+                <option value="FORMATO">Formato</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label htmlFor="recurso-nombre" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Nombre</label>
+              <input id="recurso-nombre" value={nombreArchivo} onChange={e => setNombreArchivo(e.target.value)} required maxLength={150}
+                placeholder="Ej. Sílabo 2026"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+            </div>
+          </div>
+          <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15} onFileSelected={setArchivo}
+            disabled={subiendoArchivo} label="Adjuntar archivo (PDF, Word, ZIP o imagen)" />
+          <Btn disabled={subiendoArchivo || !archivo || !nombreArchivo.trim()}>
+            {subiendoArchivo ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
+            Publicar
+          </Btn>
+        </form>
+
+        <form onSubmit={publicarLink} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Publicar link de clase virtual</p>
+          <div>
+            <label htmlFor="link-nombre" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Nombre</label>
+            <input id="link-nombre" value={nombreLink} onChange={e => setNombreLink(e.target.value)} required maxLength={150}
+              placeholder="Ej. Clase virtual — Zoom"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+          </div>
+          <div>
+            <label htmlFor="link-url" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">URL</label>
+            <input id="link-url" type="url" value={urlLink} onChange={e => setUrlLink(e.target.value)} required
+              placeholder="https://…"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+          </div>
+          <Btn disabled={publicandoLink || !nombreLink.trim() || !urlLink.trim()}>
+            {publicandoLink ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Link2 size={14} aria-hidden="true" />}
+            Publicar link
+          </Btn>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest px-4 pt-4 pb-2">Recursos publicados</p>
+        {error && (
+          <div role="alert" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{error}
+          </div>
+        )}
+        {loading && <div className="px-4 pb-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…</div>}
+        {!loading && recursos.length === 0 && !error && (
+          <div className="px-4 pb-4"><EmptyState icon={FileText} title="Todavía no hay recursos publicados para esta asignación." /></div>
+        )}
+        {!loading && recursos.length > 0 && (
+          <ul className="divide-y divide-gray-100">
+            {recursos.map(r => (
+              <li key={r.idRecurso} className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#1A1A1A] truncate">{r.nombre}</p>
+                  <p className="text-[11px] text-gray-500">
+                    {r.tipo === "SILABO" ? "Sílabo" : r.tipo === "FORMATO" ? "Formato" : "Link de clase"}
+                    {" · "}{new Date(r.creadoEn).toLocaleDateString("es-EC", { day:"2-digit", month:"short", year:"numeric" })}
+                  </p>
+                </div>
+                {r.tipo === "LINK_CLASE" && r.urlExterna ? (
+                  <a href={r.urlExterna} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline flex-shrink-0">
+                    <ExternalLink size={12} aria-hidden="true" />Abrir
+                  </a>
+                ) : (
+                  <button type="button" onClick={() => descargar(r.idRecurso)}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline flex-shrink-0 focus:outline-none">
+                    <Download size={12} aria-hidden="true" />Descargar
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+
+    <div>
+      <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Material de la semana</p>
+      <MaterialSemanalPanel idAsignacion={idAsignacion} materiales={recursos.filter(r => r.tipo === "MATERIAL")}
+        onChanged={cargar} toast={toast} />
+    </div>
     </div>
   );
 }
@@ -324,6 +521,25 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
       toast.error(e instanceof ApiError ? e.message : "No se pudo completar la búsqueda.");
     } finally {
       setBuscando(false);
+    }
+  };
+
+  const [generandoPapeletaId, setGenerandoPapeletaId] = useState<number | null>(null);
+
+  const generarPapeleta = async (r: NotaBusquedaResponse) => {
+    setGenerandoPapeletaId(r.idCalificacion);
+    try {
+      const blob = await calificacionesApi.papeleta(r.idEstudiante);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `papeleta-${r.estudiante.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo generar la papeleta.");
+    } finally {
+      setGenerandoPapeletaId(null);
     }
   };
 
@@ -467,14 +683,24 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
                     <span className={`inline-flex items-center justify-center w-14 h-7 rounded-lg text-sm font-bold
                       ${r.enRiesgo ? "bg-red-100 text-[#C62828]" : "bg-[#EAF2FB] text-[#1F4E79]"}`}>{r.promedio}</span>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <button type="button" onClick={() => eliminar(r.idCalificacion)}
-                      aria-label={confirmandoId === r.idCalificacion ? `Confirmar eliminación de la calificación de ${r.estudiante}` : `Eliminar calificación de ${r.estudiante}`}
-                      aria-live="polite"
-                      className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C62828]/40
-                        ${confirmandoId === r.idCalificacion ? "bg-[#C62828] text-white" : "text-[#C62828] hover:bg-red-50"}`}>
-                      {confirmandoId === r.idCalificacion ? "¿Confirmar?" : "Eliminar"}
-                    </button>
+                  <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
+                      <button type="button" onClick={() => generarPapeleta(r)} disabled={generandoPapeletaId === r.idCalificacion}
+                        aria-label={`Generar papeleta de ${r.estudiante}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline focus:outline-none disabled:opacity-50">
+                        {generandoPapeletaId === r.idCalificacion
+                          ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                          : <FileDown size={12} aria-hidden="true" />}
+                        Generar Papeleta
+                      </button>
+                      <button type="button" onClick={() => eliminar(r.idCalificacion)}
+                        aria-label={confirmandoId === r.idCalificacion ? `Confirmar eliminación de la calificación de ${r.estudiante}` : `Eliminar calificación de ${r.estudiante}`}
+                        aria-live="polite"
+                        className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C62828]/40
+                          ${confirmandoId === r.idCalificacion ? "bg-[#C62828] text-white" : "text-[#C62828] hover:bg-red-50"}`}>
+                        {confirmandoId === r.idCalificacion ? "¿Confirmar?" : "Eliminar"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

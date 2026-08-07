@@ -41,9 +41,18 @@ const ATT_STATUS_TO_API: Record<AttendanceStatus, EstadoAsistencia> = {
   present: "PRESENTE", justified: "AUSENCIA_JUSTIFICADA", unjustified: "AUSENCIA_INJUSTIFICADA",
 };
 
+// ATRASO no tiene equivalente en el toggle de esta pantalla (solo P/AJ/AI); se trata como
+// "presente" si llegara a existir un registro así por otra vía, para no perder el dato al re-guardar.
+const API_STATUS_TO_ATT: Record<EstadoAsistencia, AttendanceStatus> = {
+  PRESENTE: "present", AUSENCIA_JUSTIFICADA: "justified", AUSENCIA_INJUSTIFICADA: "unjustified", ATRASO: "present",
+};
+
+const hoyIso = () => new Date().toISOString().slice(0, 10);
+
 export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
   const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
+  const [fecha, setFecha] = useState(hoyIso);
   const [roster, setRoster] = useState<EstudianteResumen[]>([]);
   const [estado, setEstado] = useState<Record<number, AttendanceStatus>>({});
   const [consecutivas, setConsecutivas] = useState<Record<number, number>>({});
@@ -58,13 +67,18 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
     Promise.all([
       estudiantesApi.porParalelo(asignacion.idParalelo),
       asistenciaApi.consecutivasPorParalelo(asignacion.idParalelo),
-    ]).then(([lista, cons]) => {
+      asistenciaApi.porParalelo(asignacion.idParalelo, fecha),
+    ]).then(([lista, cons, registrosDelDia]) => {
       setRoster(lista);
       setConsecutivas(cons);
-      setEstado(Object.fromEntries(lista.map(e => [e.id, "present" as AttendanceStatus])));
+      // Precarga lo ya registrado en la fecha seleccionada para este paralelo; solo asume
+      // "Presente" para quien todavía no tiene ningún registro ese día. Sin esto, volver a
+      // guardar sobrescribía en silencio las ausencias ya guardadas de todos los demás estudiantes.
+      const yaRegistrado = new Map(registrosDelDia.map(r => [r.idEstudiante, API_STATUS_TO_ATT[r.estado]]));
+      setEstado(Object.fromEntries(lista.map(e => [e.id, yaRegistrado.get(e.id) ?? "present"])));
     }).catch(() => setErrorApi("No se pudieron cargar los estudiantes de esta asignación."))
       .finally(() => setLoading(false));
-  }, [asignacion?.idParalelo]);
+  }, [asignacion?.idParalelo, fecha]);
 
   const update = (id: number, s: AttendanceStatus) => {
     setEstado(p => ({ ...p, [id]: s }));
@@ -83,7 +97,7 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
       await asistenciaApi.registrar(asignacion.idParalelo, roster.map(e => ({
         idEstudiante: e.id,
         estado: ATT_STATUS_TO_API[estado[e.id] ?? "present"],
-      })));
+      })), fecha);
       toast.success("Asistencia guardada correctamente");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo guardar la asistencia.");
@@ -92,11 +106,11 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
     }
   };
 
-  const hoy = new Date().toLocaleDateString("es-EC", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const fechaFormateada = new Date(fecha + "T00:00:00").toLocaleDateString("es-EC", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   return (
     <div>
-      <TopBar title="Registro de Asistencia" subtitle={hoy.charAt(0).toUpperCase() + hoy.slice(1)} />
+      <TopBar title="Registro de Asistencia" subtitle={fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1)} />
       <div className="p-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-center gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
@@ -108,6 +122,11 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
                 <option key={a.idAsignacion} value={a.idAsignacion}>{a.paralelo} · {a.materia}</option>
               ))}
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="asistencia-fecha" className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Fecha</label>
+            <input id="asistencia-fecha" type="date" value={fecha} max={hoyIso()} onChange={e => setFecha(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white" />
           </div>
           {roster.length > 0 && (
             <div className="flex items-center gap-2.5 ml-4">

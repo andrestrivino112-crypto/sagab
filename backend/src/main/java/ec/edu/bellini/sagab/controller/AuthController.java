@@ -25,6 +25,13 @@ public class AuthController {
                 http.getRemoteAddr(), http.getHeader("User-Agent")));
     }
 
+    /** Reconstruye la sesión a partir del access token vigente (Authorization: Bearer) — el
+     * frontend lo llama al arrancar para no perder la sesión al recargar la página. */
+    @GetMapping("/me")
+    public AuthDtos.SesionResponse me(Authentication auth) {
+        return authService.me(auth.getName());
+    }
+
     @PostMapping("/cambiar-clave")
     public ResponseEntity<Void> cambiarClave(@Valid @RequestBody AuthDtos.CambiarClaveRequest req,
                                              Authentication auth) {

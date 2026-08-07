@@ -1,8 +1,10 @@
 -- ============================================================================
 -- SAGAB — 05_datos_prueba.sql : Datos de desarrollo (NO ejecutar en producción)
 -- Contraseña de todos los usuarios demo: pedir al equipo (no se documenta en el repo).
--- Hash BCrypt(12) correspondiente:
---   $2a$12$LJ3m4ySfPr5vX0IhFqGdBuQeQnhPZWD3Uy0o5rF8mHnZbXhVzTfKa   ← regenerar con la app
+-- El hash BCrypt(12) de abajo es real y funcional (verificado con
+-- BCryptPasswordEncoder(12).matches) — a diferencia de versiones anteriores de
+-- este script, que traían un placeholder inválido y dejaban estas cuentas sin
+-- poder iniciar sesión.
 -- ============================================================================
 SET search_path TO sagab;
 
@@ -22,12 +24,14 @@ INSERT INTO materia (codigo, nombre, area) VALUES
  ('HIS','Historia','Sociales'),
  ('ING','Inglés','Idiomas');
 
--- Usuarios demo (el hash debe regenerarse; ver README)
-INSERT INTO usuario (email, hash_password, nombres, apellidos, debe_cambiar_clave) VALUES
- ('direccion@bellini.edu.ec', '$2a$12$REEMPLAZAR_HASH_BCRYPT_AQUI_000000000000000000000000', 'María', 'Rectora Bellini', false),
- ('docente@bellini.edu.ec',   '$2a$12$REEMPLAZAR_HASH_BCRYPT_AQUI_000000000000000000000000', 'Carlos', 'Pérez Docente', false),
- ('auditor@bellini.edu.ec',   '$2a$12$REEMPLAZAR_HASH_BCRYPT_AQUI_000000000000000000000000', 'Ana', 'Auditora Externa', false),
- ('padre@bellini.edu.ec',     '$2a$12$REEMPLAZAR_HASH_BCRYPT_AQUI_000000000000000000000000', 'Luis', 'Morales Representante', false);
+-- Usuarios demo. username incluido a propósito: AuthService.login busca por username, no por
+-- email — sin esta columna estas cuentas quedan creadas pero no pueden iniciar sesión (ver
+-- INFORME_AUDITORIA.md, hallazgo "Cuentas demo rotas").
+INSERT INTO usuario (email, username, hash_password, nombres, apellidos, debe_cambiar_clave) VALUES
+ ('direccion@bellini.edu.ec', 'direccion',   '$2a$12$BenMdYCCcM3K4er2X7seaumSUE4LlKKmXqZvLUrbKou07/WzFP.rG', 'María', 'Rectora Bellini', false),
+ ('docente@bellini.edu.ec',   'carlos.perez','$2a$12$BenMdYCCcM3K4er2X7seaumSUE4LlKKmXqZvLUrbKou07/WzFP.rG', 'Carlos', 'Pérez Docente', false),
+ ('auditor@bellini.edu.ec',   'ana.auditora','$2a$12$BenMdYCCcM3K4er2X7seaumSUE4LlKKmXqZvLUrbKou07/WzFP.rG', 'Ana', 'Auditora Externa', false),
+ ('padre@bellini.edu.ec',     'luis.morales','$2a$12$BenMdYCCcM3K4er2X7seaumSUE4LlKKmXqZvLUrbKou07/WzFP.rG', 'Luis', 'Morales Representante', false);
 
 INSERT INTO usuario_rol (id_usuario, id_rol)
 SELECT u.id_usuario, r.id_rol FROM usuario u JOIN rol r ON

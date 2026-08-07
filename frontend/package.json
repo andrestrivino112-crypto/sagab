@@ -12,10 +12,14 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "bootstrap": "^5.3.8",
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "0.487.0",
     "react": "18.3.1",
     "react-day-picker": "8.10.1",
     "react-dom": "18.3.1",
+    "react-router-dom": "^6.30.4",
     "recharts": "2.15.2",
     "tw-animate-css": "1.3.8"
   },

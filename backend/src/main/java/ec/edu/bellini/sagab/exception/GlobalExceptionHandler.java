@@ -11,6 +11,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import jakarta.validation.ConstraintViolationException;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -48,6 +51,22 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .findFirst().orElse("Datos inválidos");
         return error(HttpStatus.BAD_REQUEST, detalle);
+    }
+
+    /** @Validated en parámetros sueltos (@RequestParam/@PathVariable), a diferencia de @Valid @RequestBody. */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> validacionParametro(ConstraintViolationException e) {
+        String detalle = e.getConstraintViolations().stream()
+                .findFirst()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .orElse("Datos inválidos");
+        return error(HttpStatus.BAD_REQUEST, detalle);
+    }
+
+    /** Archivo más grande que spring.servlet.multipart.max-file-size — se dispara antes de llegar a FileValidationService. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> archivoDemasiadoGrande(MaxUploadSizeExceededException e) {
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el tamaño máximo permitido.");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

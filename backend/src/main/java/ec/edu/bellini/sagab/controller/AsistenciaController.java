@@ -22,21 +22,22 @@ public class AsistenciaController {
     @PostMapping
     @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
     public Map<String, Object> registrar(@Valid @RequestBody AsistenciaDtos.RegistroDiarioRequest req, Authentication auth) {
-        return service.registrar(req, auth.getName());
+        return service.registrar(req, auth);
     }
 
+    /** Registro de un paralelo — DOCENTE solo el suyo, ADMIN/DECE cualquiera (DECE monitorea ausentismo institucional). */
     @GetMapping("/paralelo/{idParalelo}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','DECE')")
     public List<AsistenciaDtos.RegistroParaleloResponse> porParalelo(@PathVariable Integer idParalelo,
-                                        @RequestParam(required = false) LocalDate fecha) {
-        return service.porParalelo(idParalelo, fecha);
+                                        @RequestParam(required = false) LocalDate fecha, Authentication auth) {
+        return service.porParalelo(idParalelo, fecha, auth);
     }
 
     /** Ausencias injustificadas consecutivas de cada estudiante del paralelo (alerta DECE en la tabla de registro). */
     @GetMapping("/paralelo/{idParalelo}/consecutivas")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
-    public Map<Long, Long> consecutivasPorParalelo(@PathVariable Integer idParalelo) {
-        return service.consecutivasPorParalelo(idParalelo);
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','DECE')")
+    public Map<Long, Long> consecutivasPorParalelo(@PathVariable Integer idParalelo, Authentication auth) {
+        return service.consecutivasPorParalelo(idParalelo, auth);
     }
 
     /** Historial de asistencia de un estudiante (últimos 6 meses por defecto) — Portal Familiar. */
@@ -47,5 +48,16 @@ public class AsistenciaController {
                                                 @RequestParam(required = false) LocalDate hasta,
                                                 Authentication auth) {
         return service.porEstudiante(idEstudiante, desde, hasta, auth);
+    }
+
+    /** Drill-down "Ausencias" del Dashboard: faltas y atrasos institucionales, con filtros. */
+    @GetMapping("/reporte")
+    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','AUDITOR','DECE')")
+    public List<AsistenciaDtos.ReporteAusenciaResponse> reporte(
+            @RequestParam(required = false) LocalDate desde,
+            @RequestParam(required = false) LocalDate hasta,
+            @RequestParam(required = false) Integer idParalelo,
+            @RequestParam(required = false) String curso) {
+        return service.reporteAusencias(desde, hasta, idParalelo, curso);
     }
 }

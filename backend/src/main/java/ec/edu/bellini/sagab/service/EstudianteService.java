@@ -21,17 +21,20 @@ public class EstudianteService {
     private final EstudianteRepository estudiantes;
     private final RepresentanteRepository representantes;
     private final UsuarioRepository usuarios;
+    private final AsignacionDocenteService asignacionDocenteService;
 
     public EstudianteService(EstudianteRepository estudiantes, RepresentanteRepository representantes,
-                             UsuarioRepository usuarios) {
+                             UsuarioRepository usuarios, AsignacionDocenteService asignacionDocenteService) {
         this.estudiantes = estudiantes;
         this.representantes = representantes;
         this.usuarios = usuarios;
+        this.asignacionDocenteService = asignacionDocenteService;
     }
 
-    /** Nómina de un paralelo — usada por Notas y Asistencia. */
+    /** Nómina de un paralelo — usada por Notas y Asistencia. DOCENTE solo la del paralelo donde dicta. */
     @Transactional(readOnly = true)
-    public List<EstudianteDtos.EstudianteResumen> porParalelo(Integer idParalelo) {
+    public List<EstudianteDtos.EstudianteResumen> porParalelo(Integer idParalelo, Authentication auth) {
+        asignacionDocenteService.exigirDocenteDelParalelo(idParalelo, auth);
         return estudiantes.findByParaleloIdAndActivoTrueOrderByApellidosAscNombresAsc(idParalelo).stream()
                 .map(e -> new EstudianteDtos.EstudianteResumen(e.getId(), e.getCodigo(), e.nombreCompleto()))
                 .toList();
