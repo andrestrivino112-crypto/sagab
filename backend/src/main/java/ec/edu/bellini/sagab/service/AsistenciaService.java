@@ -8,6 +8,7 @@ import ec.edu.bellini.sagab.repository.EstudianteRepository;
 import ec.edu.bellini.sagab.repository.UsuarioRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -123,12 +124,16 @@ public class AsistenciaService {
                 .toList();
     }
 
-    /** Drill-down "Ausencias" del Dashboard — mismos roles que ya ven el KPI (institucional, no
-     * acotado al paralelo del docente que consulta, a diferencia de porParalelo()). */
+    /** Drill-down "Ausencias" del Dashboard. ADMIN/AUDITOR/DECE consultan el ámbito
+     * institucional; DOCENTE queda acotado en la propia consulta a los paralelos de sus
+     * asignaciones. El ámbito no depende de que el cliente envíe correctamente los filtros. */
     @Transactional(readOnly = true)
     public List<AsistenciaDtos.ReporteAusenciaResponse> reporteAusencias(LocalDate desde, LocalDate hasta,
-                                                                          Integer idParalelo, String curso) {
-        return asistencias.reporteAusencias(desde, hasta, idParalelo, curso).stream()
+                                                                          Integer idParalelo, String curso,
+                                                                          Authentication auth) {
+        String docenteEmail = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+                ? auth.getName() : null;
+        return asistencias.reporteAusencias(desde, hasta, idParalelo, curso, docenteEmail).stream()
                 .map(p -> new AsistenciaDtos.ReporteAusenciaResponse(
                         p.getIdAsistencia(), p.getIdEstudiante(), p.getEstudiante(), p.getCurso(), p.getParalelo(),
                         p.getFecha(), p.getEstado(), p.getJustificacion(), p.getRegistradoPor()))

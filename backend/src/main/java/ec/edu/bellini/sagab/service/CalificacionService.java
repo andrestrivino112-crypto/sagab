@@ -139,24 +139,24 @@ public class CalificacionService {
     }
 
     /**
-     * Búsqueda avanzada por estudiante, curso, materia, período y/o docente (RF-02).
+     * Búsqueda avanzada por estudiante, curso, materia y/o parcial (RF-02).
      * ADMIN busca sin restricción; DOCENTE solo puede ver sus propias asignaciones.
      */
     @Transactional(readOnly = true)
     public List<CalificacionDtos.NotaBusquedaResponse> buscar(Long idEstudiante, Integer idParalelo,
-            Integer idMateria, Integer idPeriodo, Long idDocente, Short parcial, Authentication auth) {
+            Integer idMateria, Short parcial, Authentication auth) {
         boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
-        Long idDocenteEfectivo = idDocente;
+        Long idDocenteEfectivo = null;
         if (!esAdmin) {
             Docente propio = docentes.findByUsuarioEmail(auth.getName())
                     .orElseThrow(() -> new AccessDeniedException("No tiene un perfil de docente asociado"));
             idDocenteEfectivo = propio.getId();
         }
-        return calificaciones.buscar(idEstudiante, idParalelo, idMateria, idPeriodo, idDocenteEfectivo, parcial)
+        return calificaciones.buscar(idEstudiante, idParalelo, idMateria, idDocenteEfectivo, parcial)
                 .stream()
                 .map(p -> new CalificacionDtos.NotaBusquedaResponse(
                         p.getIdCalificacion(), p.getIdEstudiante(), p.getEstudiante(), p.getCurso(),
-                        p.getMateria(), p.getPeriodo(), p.getDocente(), p.getParcial(),
+                        p.getMateria(), p.getParcial(),
                         p.getNotaTarea(), p.getNotaClase(), p.getNotaExamen(), p.getPromedio(),
                         p.getPromedio() != null && p.getPromedio().compareTo(NOTA_MINIMA_APROBACION) < 0))
                 .toList();

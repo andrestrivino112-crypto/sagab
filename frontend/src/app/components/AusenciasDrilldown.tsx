@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Printer } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
-  asistencia as asistenciaApi, paralelos as paralelosApi,
+  asignaciones as asignacionesApi, asistencia as asistenciaApi, paralelos as paralelosApi,
   type EstadoAsistencia, type ParaleloOpcion, type ReporteAusenciaResponse,
 } from "../../api/sagab";
+import type { RolSistema } from "../../api/auth";
 import { Badge } from "./Badge";
 import type { BadgeVariant } from "./Badge";
 import { Btn } from "./Btn";
@@ -19,10 +20,18 @@ const ESTADO_CFG: Record<EstadoAsistencia, { v: BadgeVariant; label: string }> =
 };
 
 const hoy = () => new Date().toISOString().slice(0, 10);
+const escaparHtml = (valor: unknown) => String(valor ?? "—")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+const ordenarParalelos = (a: ParaleloOpcion, b: ParaleloOpcion) =>
+  a.nivel.localeCompare(b.nivel, "es", { numeric: true })
+  || a.seccion.localeCompare(b.seccion, "es", { numeric: true });
 
-export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
+export function AusenciasDrilldown({ onClose, rol }: { onClose: () => void; rol: RolSistema }) {
   const [filas, setFilas] = useState<ReporteAusenciaResponse[]>([]);
   const [paralelos, setParalelos] = useState<ParaleloOpcion[]>([]);
+  const [cargandoParalelos, setCargandoParalelos] = useState(true);
+  const [errorParalelos, setErrorParalelos] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorApi, setErrorApi] = useState<string | null>(null);
 
@@ -31,7 +40,34 @@ export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
   const [curso, setCurso] = useState("");
   const [idParalelo, setIdParalelo] = useState<number | "">("");
 
-  useEffect(() => { paralelosApi.listar().then(setParalelos).catch(() => {}); }, []);
+  useEffect(() => {
+    let vigente = true;
+    setCargandoParalelos(true);
+    setErrorParalelos(null);
+
+    const solicitud = rol !== "DOCENTE"
+      ? paralelosApi.listar()
+      : asignacionesApi.mias().then(asignaciones => {
+          const unicos = new Map<number, ParaleloOpcion>();
+          asignaciones.filter(a => a.periodoActivo).forEach(a => unicos.set(a.idParalelo, {
+            id: a.idParalelo,
+            nivel: a.nivel,
+            seccion: a.seccion,
+            anioLectivo: a.anioLectivo,
+            etiqueta: a.paralelo,
+          }));
+          return [...unicos.values()];
+        });
+
+    solicitud
+      .then(opciones => { if (vigente) setParalelos([...opciones].sort(ordenarParalelos)); })
+      .catch(e => {
+        if (vigente) setErrorParalelos(e instanceof ApiError ? e.message : "No se pudieron cargar los cursos asignados.");
+      })
+      .finally(() => { if (vigente) setCargandoParalelos(false); });
+
+    return () => { vigente = false; };
+  }, [rol]);
 
   const cargar = () => {
     setLoading(true);
@@ -45,9 +81,10 @@ export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(cargar, []);
 
-  const cursos = useMemo(() => [...new Set(paralelos.map(p => p.nivel))], [paralelos]);
+  const cursos = useMemo(() => [...new Set(paralelos.map(p => p.nivel))]
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true })), [paralelos]);
   const paralelosDelCurso = useMemo(
-    () => (curso ? paralelos.filter(p => p.nivel === curso) : paralelos),
+    () => (curso ? paralelos.filter(p => p.nivel === curso) : []),
     [paralelos, curso]);
 
   const imprimir = () => {
@@ -55,9 +92,9 @@ export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
     if (!ventana) return;
     const filasHtml = filas.map(f => `
       <tr>
-        <td>${f.estudiante}</td><td>${f.curso}</td><td>${f.paralelo}</td>
-        <td>${f.fecha}</td><td>${ESTADO_CFG[f.estado].label}</td>
-        <td>${f.justificacion ?? "—"}</td><td>${f.registradoPor ?? "—"}</td>
+        <td>${escaparHtml(f.estudiante)}</td><td>${escaparHtml(f.curso)}</td><td>${escaparHtml(f.paralelo)}</td>
+        <td>${escaparHtml(f.fecha)}</td><td>${escaparHtml(ESTADO_CFG[f.estado].label)}</td>
+        <td>${escaparHtml(f.justificacion)}</td><td>${escaparHtml(f.registradoPor)}</td>
       </tr>`).join("");
     ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de ausencias</title>
       <style>
@@ -69,7 +106,7 @@ export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
         th { background: #F5F7FA; text-transform: uppercase; font-size: 10px; }
       </style></head><body>
       <h1>Reporte de ausencias</h1>
-      <p>Periodo: ${desde} a ${hasta}${curso ? ` · Curso: ${curso}` : ""} — ${filas.length} registro(s)</p>
+      <p>Periodo: ${escaparHtml(desde)} a ${escaparHtml(hasta)}${curso ? ` · Curso: ${escaparHtml(curso)}` : ""} — ${filas.length} registro(s)</p>
       <table><thead><tr><th>Estudiante</th><th>Curso</th><th>Paralelo</th><th>Fecha</th><th>Estado</th><th>Justificación</th><th>Registrado por</th></tr></thead>
       <tbody>${filasHtml}</tbody></table>
       </body></html>`);
@@ -94,21 +131,29 @@ export function AusenciasDrilldown({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label htmlFor="aus-curso" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Curso</label>
-            <select id="aus-curso" value={curso} onChange={e => { setCurso(e.target.value); setIdParalelo(""); }}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
-              <option value="">Todos</option>
+            <select id="aus-curso" value={curso} disabled={cargandoParalelos || cursos.length === 0}
+              onChange={e => { setCurso(e.target.value); setIdParalelo(""); }}
+              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white disabled:bg-gray-50 disabled:text-gray-400">
+              <option value="">{cargandoParalelos ? "Cargando…" : cursos.length === 0 ? "Sin cursos asignados" : "Todos"}</option>
               {cursos.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
             <label htmlFor="aus-paralelo" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Paralelo</label>
-            <select id="aus-paralelo" value={idParalelo} onChange={e => setIdParalelo(e.target.value ? Number(e.target.value) : "")}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
-              <option value="">Todos</option>
-              {paralelosDelCurso.map(p => <option key={p.id} value={p.id}>{p.etiqueta}</option>)}
+            <select id="aus-paralelo" value={idParalelo} disabled={!curso || cargandoParalelos}
+              onChange={e => setIdParalelo(e.target.value ? Number(e.target.value) : "")}
+              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white disabled:bg-gray-50 disabled:text-gray-400">
+              <option value="">{curso ? "Todos" : "Seleccione un curso"}</option>
+              {paralelosDelCurso.map(p => <option key={p.id} value={p.id}>{p.seccion}</option>)}
             </select>
           </div>
         </div>
+
+        {errorParalelos && (
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorParalelos}
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <Btn variant="secondary" size="sm" onClick={cargar} disabled={loading}>

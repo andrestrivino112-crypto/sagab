@@ -2,10 +2,11 @@ package ec.edu.bellini.sagab.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "asignacion_docente")
-@Getter
+@Getter @Setter
 public class AsignacionDocente {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

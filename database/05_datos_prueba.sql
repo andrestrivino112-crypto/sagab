@@ -43,23 +43,34 @@ SELECT u.id_usuario, r.id_rol FROM usuario u JOIN rol r ON
 INSERT INTO docente (id_usuario) SELECT id_usuario FROM usuario WHERE email='docente@bellini.edu.ec';
 INSERT INTO representante (id_usuario) SELECT id_usuario FROM usuario WHERE email='padre@bellini.edu.ec';
 
--- Estudiantes de ejemplo en 2° BGU A
+-- Dos estudiantes ficticios por cada paralelo. Esto permite recorrer de punta a punta los
+-- selectores Curso -> Paralelo y probar asistencia/mensajería en las seis combinaciones demo.
 INSERT INTO estudiante (codigo, nombres, apellidos, fecha_nacimiento, genero, id_paralelo, id_representante)
+WITH paralelos_demo AS (
+    SELECT id_paralelo, row_number() OVER (ORDER BY nivel, seccion) AS posicion
+    FROM paralelo
+    WHERE anio_lectivo = '2026-2027'
+      AND nivel IN ('1° BGU', '2° BGU', '3° BGU')
+)
 SELECT 'EST-' || lpad(g::text, 4, '0'),
-       (ARRAY['Alejandra','Bryan','Carolina','Diego','Elena','Fernando','Gabriela','Héctor','Isabel','José'])[g],
-       (ARRAY['Morales Vega','Castillo Reyes','Fuentes Díaz','Hernández Ruiz','Pacheco Torres','Salazar Lima','Quispe Mamani','Villanueva Cruz','Coronado Peña','Maldonado Ortiz'])[g],
+       (ARRAY['Alejandra','Bryan','Carolina','Diego','Elena','Fernando','Gabriela','Héctor','Isabel','José','Karla','Mateo'])[g],
+       (ARRAY['Morales Vega','Castillo Reyes','Fuentes Díaz','Hernández Ruiz','Pacheco Torres','Salazar Lima','Quispe Mamani','Villanueva Cruz','Coronado Peña','Maldonado Ortiz','Mendoza León','Vargas Paz'])[g],
        DATE '2010-01-01' + (g * 30),
        CASE WHEN g % 2 = 0 THEN 'M' ELSE 'F' END,
-       (SELECT id_paralelo FROM paralelo WHERE nivel='2° BGU' AND seccion='A'),
+       pd.id_paralelo,
        (SELECT id_representante FROM representante LIMIT 1)
-FROM generate_series(1, 10) g;
+FROM generate_series(1, 12) g
+JOIN paralelos_demo pd ON pd.posicion = ((g - 1) / 2) + 1;
 
--- Asignación: docente demo dicta Matemáticas en 2° BGU A
+-- El único docente ficticio dicta Matemáticas en todos los paralelos demo. En datos reales este
+-- alcance se administra desde Asignaciones; la UI siempre muestra únicamente lo que allí exista.
 INSERT INTO asignacion_docente (id_docente, id_materia, id_paralelo, id_periodo)
 SELECT d.id_docente, m.id_materia, p.id_paralelo, pe.id_periodo
 FROM docente d, materia m, paralelo p, periodo_academico pe
-WHERE m.codigo='MAT' AND p.nivel='2° BGU' AND p.seccion='A' AND pe.activo
-LIMIT 1;
+WHERE m.codigo='MAT'
+  AND p.anio_lectivo = pe.anio_lectivo
+  AND p.nivel IN ('1° BGU', '2° BGU', '3° BGU')
+  AND pe.activo;
 
 -- Rubro de pensión y obligaciones del año
 INSERT INTO rubro (tipo, nombre, valor, anio_lectivo) VALUES ('PENSION', 'Pensión mensual', 180.00, '2026-2027');

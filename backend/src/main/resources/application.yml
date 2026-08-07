@@ -26,8 +26,8 @@ spring:
       mail.smtp.starttls.enable: true
   servlet:
     multipart:
-      max-file-size: ${SAGAB_UPLOAD_MAX_MB:20}MB
-      max-request-size: ${SAGAB_UPLOAD_MAX_MB:20}MB
+      max-file-size: ${SAGAB_UPLOAD_MAX_MB:100}MB
+      max-request-size: ${SAGAB_UPLOAD_MAX_MB:100}MB
 
 server:
   port: ${PORT:8080}
@@ -46,19 +46,25 @@ sagab:
   cors:
     origenes: ${SAGAB_CORS:http://localhost:5173}
   storage:
-    # Bucket S3-compatible para deberes y comprobantes de pago (AWS S3, Cloudflare R2, etc.).
-    # Si quedan vacíos, la app arranca igual pero los endpoints de subida de archivos
-    # devuelven un error claro en vez de un 500 genérico (ver StorageService.isConfigured()).
+    # S3-compatible es el proveedor recomendado. Cuando no hay SAGAB_S3_*, se usa almacenamiento
+    # local real; en producción ese directorio debe estar montado sobre un volumen persistente.
     endpoint: ${SAGAB_S3_ENDPOINT:}
     region: ${SAGAB_S3_REGION:auto}
     bucket: ${SAGAB_S3_BUCKET:}
     access-key: ${SAGAB_S3_ACCESS_KEY:}
     secret-key: ${SAGAB_S3_SECRET_KEY:}
+    local-dir: ${SAGAB_STORAGE_LOCAL_DIR:./data/uploads}
+    public-base-url: ${SAGAB_PUBLIC_API_URL:http://localhost:8080}
   uploads:
     max-mb-deberes: ${SAGAB_UPLOAD_MAX_MB_DEBERES:15}
     max-mb-comprobante: ${SAGAB_UPLOAD_MAX_MB_COMPROBANTE:8}
+    max-mb-recursos: ${SAGAB_UPLOAD_MAX_MB_RECURSOS:100}
 
 logging:
   level:
+    # Evita que un DEBUG global del entorno registre cuerpos HTTP, SQL o datos sensibles.
+    org.springframework: INFO
+    org.springframework.web: INFO
     org.springframework.security: INFO
+    org.hibernate.SQL: INFO
     ec.edu.bellini.sagab: INFO

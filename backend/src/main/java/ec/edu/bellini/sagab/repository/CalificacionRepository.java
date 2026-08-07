@@ -106,7 +106,7 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
     }
 
     /**
-     * Búsqueda avanzada por estudiante, curso, materia, período y/o docente (RF-02).
+     * Búsqueda avanzada por estudiante, curso, materia y/o parcial (RF-02).
      * Los parámetros nulos se ignoran (se castea explícitamente para que el
      * planificador de PostgreSQL pueda inferir el tipo cuando el valor es NULL).
      */
@@ -116,8 +116,6 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
                    e.apellidos || ' ' || e.nombres AS estudiante,
                    p.nivel || ' ' || p.seccion      AS curso,
                    m.nombre            AS materia,
-                   per.nombre || ' · ' || per.anio_lectivo AS periodo,
-                   du.nombres || ' ' || du.apellidos AS docente,
                    c.parcial           AS parcial,
                    c.nota_tarea        AS notaTarea,
                    c.nota_clase        AS notaClase,
@@ -128,23 +126,18 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
             JOIN sagab.asignacion_docente a ON a.id_asignacion = c.id_asignacion
             JOIN sagab.materia m           ON m.id_materia = a.id_materia
             JOIN sagab.paralelo p          ON p.id_paralelo = a.id_paralelo
-            JOIN sagab.periodo_academico per ON per.id_periodo = a.id_periodo
-            JOIN sagab.docente d           ON d.id_docente = a.id_docente
-            JOIN sagab.usuario du          ON du.id_usuario = d.id_usuario
             WHERE (CAST(:idEstudiante AS BIGINT) IS NULL OR c.id_estudiante = :idEstudiante)
               AND (CAST(:idParalelo AS INT) IS NULL OR a.id_paralelo = :idParalelo)
               AND (CAST(:idMateria AS INT) IS NULL OR a.id_materia = :idMateria)
-              AND (CAST(:idPeriodo AS INT) IS NULL OR a.id_periodo = :idPeriodo)
               AND (CAST(:idDocente AS BIGINT) IS NULL OR a.id_docente = :idDocente)
               AND (CAST(:parcial AS SMALLINT) IS NULL OR c.parcial = :parcial)
-            ORDER BY per.fecha_inicio DESC, e.apellidos, e.nombres, c.parcial
+            ORDER BY e.apellidos, e.nombres, c.parcial
             LIMIT 500
             """, nativeQuery = true)
     List<NotaBusquedaProjection> buscar(
             @Param("idEstudiante") Long idEstudiante,
             @Param("idParalelo") Integer idParalelo,
             @Param("idMateria") Integer idMateria,
-            @Param("idPeriodo") Integer idPeriodo,
             @Param("idDocente") Long idDocente,
             @Param("parcial") Short parcial);
 
@@ -154,8 +147,6 @@ public interface CalificacionRepository extends JpaRepository<Calificacion, Long
         String getEstudiante();
         String getCurso();
         String getMateria();
-        String getPeriodo();
-        String getDocente();
         short getParcial();
         BigDecimal getNotaTarea();
         BigDecimal getNotaClase();

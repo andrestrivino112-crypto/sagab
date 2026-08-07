@@ -44,6 +44,38 @@ public interface EstudianteRepository extends JpaRepository<Estudiante, Long> {
             """, nativeQuery = true)
     Page<Estudiante> buscarPorNombre(@Param("q") String q, Pageable pageable);
 
+    /** Selector DECE: solo datos mínimos para localizar un estudiante existente y saber si ya
+     * tiene expediente activo; evita duplicados y no carga entidades completas/N+1. */
+    @Query(value = """
+            SELECT e.id_estudiante AS idEstudiante, e.codigo AS codigo,
+                   e.apellidos || ' ' || e.nombres AS estudiante,
+                   p.nivel AS curso, p.nivel || ' ' || p.seccion AS paralelo,
+                   eu.email AS email, sd.id_seguimiento AS idSeguimiento
+            FROM sagab.estudiante e
+            LEFT JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            LEFT JOIN sagab.usuario eu ON eu.id_usuario = e.id_usuario
+            LEFT JOIN sagab.seguimiento_dece sd
+              ON sd.id_estudiante = e.id_estudiante AND sd.eliminado = false
+            WHERE e.activo = true AND (
+                (e.apellidos || ' ' || e.nombres) ILIKE '%' || :q || '%'
+                OR (e.nombres || ' ' || e.apellidos) ILIKE '%' || :q || '%'
+                OR e.codigo ILIKE '%' || :q || '%' OR e.cedula = :q
+            )
+            ORDER BY e.apellidos, e.nombres
+            LIMIT 15
+            """, nativeQuery = true)
+    List<BusquedaDeceProjection> buscarParaSeguimiento(@Param("q") String q);
+
+    interface BusquedaDeceProjection {
+        Long getIdEstudiante();
+        String getCodigo();
+        String getEstudiante();
+        String getCurso();
+        String getParalelo();
+        String getEmail();
+        Long getIdSeguimiento();
+    }
+
     /**
      * Ids de usuario destinatarios (representante + cuenta propia del estudiante, si tiene
      * Portal Familiar) de un conjunto de estudiantes — resuelve en una sola consulta el

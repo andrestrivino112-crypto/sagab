@@ -57,7 +57,8 @@ public class AsistenciaController {
             @RequestParam(required = false) LocalDate desde,
             @RequestParam(required = false) LocalDate hasta,
             @RequestParam(required = false) Integer idParalelo,
-            @RequestParam(required = false) String curso) {
-        return service.reporteAusencias(desde, hasta, idParalelo, curso);
+            @RequestParam(required = false) String curso,
+            Authentication auth) {
+        return service.reporteAusencias(desde, hasta, idParalelo, curso, auth);
     }
 }

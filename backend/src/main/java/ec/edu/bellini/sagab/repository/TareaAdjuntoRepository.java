@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TareaAdjuntoRepository extends JpaRepository<TareaAdjunto, Long> {
     List<TareaAdjunto> findByTareaIdOrderByCreadoEnDesc(Long idTarea);
+    List<TareaAdjunto> findByTareaIdIn(List<Long> idsTareas);
 }

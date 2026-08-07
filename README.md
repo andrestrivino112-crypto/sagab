@@ -4,6 +4,13 @@ Implementación de la propuesta profesional (Triviño & Cifuentes, 2025) para la
 
 **Stack:** Java 17 + Spring Boot 3.3 · React 18 + Vite + Tailwind (shadcn/ui) · PostgreSQL 15
 
+La implementación y validación del Prompt Maestro — Parte 1 (calendario unificado, mensajes
+institucionales, gestión de asignaciones y navegación protegida) está documentada en
+[`docs/PARTE_1_IMPLEMENTACION.md`](docs/PARTE_1_IMPLEMENTACION.md).
+
+La Parte 2 (ausencias/mensajes del docente, recursos reales, búsqueda depurada y seguimiento
+DECE) está documentada en [`docs/PARTE_2_IMPLEMENTACION.md`](docs/PARTE_2_IMPLEMENTACION.md).
+
 ```
 sagab/
 ├── database/    Scripts SQL (esquema, índices, auditoría, roles, datos de prueba)
@@ -16,12 +23,16 @@ sagab/
 ## 1. Base de datos (PostgreSQL 15+)
 
 ```bash
-createdb sagab
-psql -d sagab -f database/01_schema.sql
-psql -d sagab -f database/02_indices.sql
-psql -d sagab -f database/03_auditoria.sql
-psql -d sagab -f database/04_roles_bd.sql      # ⚠ cambiar contraseñas antes de producción
-psql -d sagab -f database/05_datos_prueba.sql  # solo desarrollo
+bash database/setup_db.sh
+```
+
+El inicializador ejecuta los 23 scripts estructurales en su orden real de dependencias. Los datos
+de demostración y las cuentas nominales se mantienen fuera de la ejecución automática. En una base
+existente que ya tenga las migraciones 01–27, aplicar:
+
+```bash
+sudo -u postgres psql -d sagab -v ON_ERROR_STOP=1 -f database/28_calendario_institucional.sql
+sudo -u postgres psql -d sagab -v ON_ERROR_STOP=1 -f database/29_seguimiento_dece.sql
 ```
 
 ### Diseño de seguridad en la BD (defensa en profundidad)
@@ -71,7 +82,22 @@ mvn spring-boot:run                      # http://localhost:8080
 | GET | `/api/calificaciones/asignacion/{id}/parcial/{p}` | DOCENTE, ADMIN |
 | POST | `/api/asistencia` (registro diario + alertas DECE) | DOCENTE, ADMIN |
 | GET | `/api/asistencia/paralelo/{id}` | DOCENTE, ADMIN |
+| GET | `/api/calendario?desde=…&hasta=…` | todos los roles autenticados |
+| POST/PUT/DELETE | `/api/calendario` | ADMIN |
+| POST | `/api/mensajes/institucionales` | ADMIN |
+| GET/POST/PUT/DELETE | `/api/asignaciones` | ADMIN; `/mias` también DOCENTE |
+| GET/POST/PUT/DELETE | `/api/dece/seguimientos` | DECE |
+| POST/GET | `/api/dece/seguimientos/{id}/mensajes` | DECE |
 | GET | `/api/auditoria/cambios` · `/eventos` · `/historial/{tabla}/{id}` | **AUDITOR**, ADMIN |
+
+### Almacenamiento de archivos
+
+- Sin variables S3, SAGAB usa almacenamiento local real en `./data/uploads`.
+- En producción local, monte `SAGAB_STORAGE_LOCAL_DIR` sobre un volumen persistente.
+- Configure `SAGAB_PUBLIC_API_URL` con el origen público del backend para los enlaces firmados.
+- Para S3/R2 defina el conjunto completo `SAGAB_S3_ENDPOINT`, `SAGAB_S3_REGION`,
+  `SAGAB_S3_BUCKET`, `SAGAB_S3_ACCESS_KEY` y `SAGAB_S3_SECRET_KEY`.
+- Una configuración S3 parcial se rechaza expresamente para evitar una caída silenciosa a disco.
 
 ### Generar el hash BCrypt para los usuarios semilla
 
@@ -79,13 +105,6 @@ mvn spring-boot:run                      # http://localhost:8080
 System.out.println(new BCryptPasswordEncoder(12).encode("TuContraseñaSegura123"));
 ```
 Reemplazar los hashes de `database/05_datos_prueba.sql` con el resultado.
-
-### Pendiente por implementar (siguiendo el mismo patrón entity/repo/service/controller)
-
-Módulo disciplinario (tabla `incidencia_disciplinaria` ya creada), módulo financiero
-(`rubro`, `obligacion_pago`, `pago`), mensajería interna (`mensaje`, `mensaje_destinatario`),
-generación de boletines PDF con iText (dependencia ya incluida en `pom.xml`) y envío de
-correos con `spring-boot-starter-mail` (configurado en `application.yml`).
 
 ---
 
@@ -98,17 +117,15 @@ pnpm install               # o npm install
 pnpm dev                   # http://localhost:5173
 ```
 
-La capa `src/api/` ya está lista para reemplazar los datos ficticios del prototipo:
+La capa `src/api/` conecta la SPA con el backend:
 
 - `client.ts` — fetch central con JWT en `sessionStorage`, manejo de 401 y errores uniformes.
 - `auth.ts` — `login()` / `logout()` contra `/api/auth/login`; devuelve nombre, roles y bandera `debeCambiarClave`.
-- `sagab.ts` — servicios tipados de calificaciones, asistencia y auditoría.
+- `sagab.ts` — servicios tipados de matrícula, calificaciones, asistencia, deberes, recursos,
+  calendario, asignaciones, mensajería, pagos, notificaciones y auditoría.
 
-**Integración en `App.tsx`:** sustituir `INIT_GRADES` por `calificaciones.porAsignacion(...)`,
-el guardado de `GradesView` por `calificaciones.registrarMasivo(...)`, y el login simulado
-por `auth.login(...)` mapeando los roles del backend (`ADMIN → admin`, `DOCENTE → teacher`,
-`REPRESENTANTE → parent`) a las pantallas existentes. Añadir una vista de auditoría para
-el rol `AUDITOR` consumiendo `auditoria.cambios()`.
+`App.tsx` ya usa autenticación real, reconstruye una sesión válida al recargar, aplica permisos
+por rol y carga las vistas principales de forma diferida.
 
 ---
 

@@ -24,8 +24,8 @@ public class MensajeController {
         return service.mias(auth);
     }
 
-    /** Envío de un mensaje interno a uno o varios usuarios. Acotado a ADMIN por ahora; se ampliará
-     * (DOCENTE, broadcast por curso/paralelo/rol) junto con el módulo de Notificaciones. */
+    /** Envío directo a ids ya resueltos. El canal docente usa /broadcast y el institucional
+     * usa /institucionales, de modo que cada flujo aplique sus propias reglas de alcance. */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public MensajeDtos.MensajeResponse enviar(@Valid @RequestBody MensajeDtos.EnviarMensajeRequest req, Authentication auth) {
@@ -45,6 +45,14 @@ public class MensajeController {
     public MensajeDtos.MensajeResponse enviarBroadcast(@Valid @RequestBody MensajeDtos.EnviarBroadcastRequest req,
                                                          Authentication auth) {
         return service.enviarBroadcast(req, auth);
+    }
+
+    /** Canal exclusivo del Administrador: privado a un docente o masivo a todo el cuerpo docente. */
+    @PostMapping("/institucionales")
+    @PreAuthorize("hasRole('ADMIN')")
+    public MensajeDtos.MensajeResponse enviarInstitucional(
+            @Valid @RequestBody MensajeDtos.EnviarInstitucionalRequest req, Authentication auth) {
+        return service.enviarInstitucional(req, auth);
     }
 
     @PostMapping("/{id}/leido")

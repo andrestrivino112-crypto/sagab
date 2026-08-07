@@ -7,6 +7,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -25,7 +28,7 @@ public class FileValidationService {
     public enum TipoArchivo {
         PDF, IMAGEN, ZIP_O_DOCX, DOC_ANTIGUO,
         // Usados solo por validarMaterialClase() — más tipos que un "deber" o "comprobante" admiten.
-        DOCX, PPTX, XLSX, ZIP_GENERICO, RAR, VIDEO, AUDIO
+        DOCX, PPTX, XLSX, ZIP_GENERICO, RAR, VIDEO, AUDIO, TEXTO
     }
 
     public record Resultado(TipoArchivo tipo, String mimeType, byte[] contenido, String hashSha256) {}
@@ -37,7 +40,9 @@ public class FileValidationService {
     /** Recursos de clase: bastante más permisivo — documentos de oficina, comprimidos, video y audio. */
     private static final Set<String> EXTENSIONES_MATERIAL = Set.of(
             ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar",
-            ".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mp3");
+            ".jpg", ".jpeg", ".png", ".webp", ".gif",
+            ".mp4", ".mov", ".webm", ".avi", ".mp3", ".m4a", ".wav", ".ogg",
+            ".txt", ".csv");
 
     public Resultado validarDeber(MultipartFile file, long maxBytes) {
         Resultado r = validarComun(file, maxBytes, EXTENSIONES_DEBER, this::detectarTipoReal);
@@ -115,8 +120,11 @@ public class FileValidationService {
         if (empieza(c, 0x25, 0x50, 0x44, 0x46)) return TipoArchivo.PDF;
         if (esImagen(c)) return TipoArchivo.IMAGEN;
         if (empieza(c, 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07)) return TipoArchivo.RAR; // "Rar!" + variantes 4.x/5.x
-        if (esMp4(c)) return TipoArchivo.VIDEO;
+        if (esMp4(c)) return extension.equals(".m4a") ? TipoArchivo.AUDIO : TipoArchivo.VIDEO;
+        if (esWebm(c) || esAvi(c)) return TipoArchivo.VIDEO;
         if (esMp3(c)) return TipoArchivo.AUDIO;
+        if (esWav(c) || esOgg(c)) return TipoArchivo.AUDIO;
+        if ((extension.equals(".txt") || extension.equals(".csv")) && esTextoUtf8(c)) return TipoArchivo.TEXTO;
         if (empieza(c, 0x50, 0x4B, 0x03, 0x04) || empieza(c, 0x50, 0x4B, 0x05, 0x06)) {
             return subtipoZip(c);
         }
@@ -162,6 +170,38 @@ public class FileValidationService {
         return c.length >= 2 && (c[0] & 0xFF) == 0xFF && (c[1] & 0xE0) == 0xE0;
     }
 
+    private boolean esWav(byte[] c) {
+        return c.length >= 12 && empieza(c, 0x52, 0x49, 0x46, 0x46)
+                && c[8] == 'W' && c[9] == 'A' && c[10] == 'V' && c[11] == 'E';
+    }
+
+    private boolean esAvi(byte[] c) {
+        return c.length >= 12 && empieza(c, 0x52, 0x49, 0x46, 0x46)
+                && c[8] == 'A' && c[9] == 'V' && c[10] == 'I' && c[11] == ' ';
+    }
+
+    private boolean esOgg(byte[] c) {
+        return empieza(c, 0x4F, 0x67, 0x67, 0x53); // OggS
+    }
+
+    private boolean esWebm(byte[] c) {
+        return empieza(c, 0x1A, 0x45, 0xDF, 0xA3); // EBML (WebM/Matroska)
+    }
+
+    /** Texto plano válido en UTF-8, sin bytes NUL ni controles binarios. */
+    private boolean esTextoUtf8(byte[] c) {
+        for (byte b : c) if (b == 0) return false;
+        try {
+            StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(c));
+            return true;
+        } catch (java.nio.charset.CharacterCodingException e) {
+            return false;
+        }
+    }
+
     private boolean contieneWebp(byte[] c) {
         return c.length >= 12 && c[8] == 'W' && c[9] == 'E' && c[10] == 'B' && c[11] == 'P';
     }
@@ -197,8 +237,19 @@ public class FileValidationService {
             case XLSX -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             case ZIP_GENERICO -> "application/zip";
             case RAR -> "application/vnd.rar";
-            case VIDEO -> "video/mp4";
-            case AUDIO -> "audio/mpeg";
+            case VIDEO -> switch (extension) {
+                case ".webm" -> "video/webm";
+                case ".avi" -> "video/x-msvideo";
+                case ".mov" -> "video/quicktime";
+                default -> "video/mp4";
+            };
+            case AUDIO -> switch (extension) {
+                case ".wav" -> "audio/wav";
+                case ".ogg" -> "audio/ogg";
+                case ".m4a" -> "audio/mp4";
+                default -> "audio/mpeg";
+            };
+            case TEXTO -> extension.equals(".csv") ? "text/csv; charset=utf-8" : "text/plain; charset=utf-8";
         };
     }
 

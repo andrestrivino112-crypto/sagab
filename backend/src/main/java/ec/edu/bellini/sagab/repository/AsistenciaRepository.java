@@ -87,11 +87,22 @@ public interface AsistenciaRepository extends JpaRepository<Asistencia, Long> {
               AND (CAST(:hasta AS DATE) IS NULL OR a.fecha <= :hasta)
               AND (CAST(:idParalelo AS INT) IS NULL OR a.id_paralelo = :idParalelo)
               AND (CAST(:curso AS TEXT) IS NULL OR p.nivel = :curso)
+              AND (CAST(:docenteEmail AS TEXT) IS NULL OR EXISTS (
+                    SELECT 1
+                    FROM sagab.asignacion_docente ad
+                    JOIN sagab.docente d ON d.id_docente = ad.id_docente
+                    JOIN sagab.usuario u ON u.id_usuario = d.id_usuario
+                    JOIN sagab.periodo_academico pe ON pe.id_periodo = ad.id_periodo
+                    WHERE ad.id_paralelo = a.id_paralelo
+                      AND pe.activo = true
+                      AND lower(u.email) = lower(:docenteEmail)
+              ))
             ORDER BY a.fecha DESC, e.apellidos, e.nombres
             LIMIT 500
             """, nativeQuery = true)
     List<AusenciaListadoProjection> reporteAusencias(@Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta,
-            @Param("idParalelo") Integer idParalelo, @Param("curso") String curso);
+            @Param("idParalelo") Integer idParalelo, @Param("curso") String curso,
+            @Param("docenteEmail") String docenteEmail);
 
     interface AusenciaListadoProjection {
         Long getIdAsistencia();

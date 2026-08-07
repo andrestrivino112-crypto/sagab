@@ -14,13 +14,15 @@ public class RecursoAcademicoDtos {
     public record RecursoResponse(
             Long idRecurso, String tipo, String nombre, String descripcion, Short semana,
             String urlExterna, String archivoNombreOriginal, String archivoMimeType, Long archivoTamanoBytes,
-            String autor, OffsetDateTime creadoEn) {}
+            String materia, String curso, String paralelo, String docente,
+            String autor, OffsetDateTime creadoEn, OffsetDateTime fechaLimite) {}
 
     public record CrearLinkRequest(
             @NotNull Long idAsignacion,
             @NotBlank @Size(max = 150) String nombre,
             @Size(max = 500) String descripcion,
             @Min(1) @Max(52) Short semana,
+            OffsetDateTime fechaLimite,
             @NotBlank @Size(max = 500) @Pattern(regexp = "^https?://.+", message = "Debe ser una URL http(s) válida")
             String urlExterna) {}
 
@@ -28,5 +30,6 @@ public class RecursoAcademicoDtos {
     public record EditarRecursoRequest(
             @NotBlank @Size(max = 150) String nombre,
             @Size(max = 500) String descripcion,
-            @Min(1) @Max(52) Short semana) {}
+            @Min(1) @Max(52) Short semana,
+            OffsetDateTime fechaLimite) {}
 }

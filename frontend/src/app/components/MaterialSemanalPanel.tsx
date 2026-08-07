@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Download, Edit2, ExternalLink, File, FileArchive, FileSpreadsheet, FileText,
+  Clock, Download, Edit2, ExternalLink, File, FileArchive, FileSpreadsheet, FileText,
   Film, Image as ImageIcon, Link2, Loader2, Music, Send, Trash2, Upload,
 } from "lucide-react";
 import { ApiError } from "../../api/client";
@@ -11,7 +11,7 @@ import { FileUpload } from "./FileUpload";
 import { Modal } from "./Modal";
 import type { useToast } from "./Toast";
 
-const ACCEPT_MATERIAL = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mp3";
+const ACCEPT_MATERIAL = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm,.avi,.mp3,.m4a,.wav,.ogg,.txt,.csv";
 
 function iconoDe(mime: string | null): React.ElementType {
   if (!mime) return Link2;
@@ -40,6 +40,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   const [semana, setSemana] = useState<number | "">("");
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [fechaLimite, setFechaLimite] = useState("");
   const [modoEnlace, setModoEnlace] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [urlEnlace, setUrlEnlace] = useState("");
@@ -49,6 +50,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   const [editNombre, setEditNombre] = useState("");
   const [editDescripcion, setEditDescripcion] = useState("");
   const [editSemana, setEditSemana] = useState<number | "">("");
+  const [editFechaLimite, setEditFechaLimite] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
@@ -68,7 +70,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   }, [materiales]);
 
   const limpiarFormulario = () => {
-    setNombre(""); setDescripcion(""); setArchivo(null); setUrlEnlace("");
+    setNombre(""); setDescripcion(""); setFechaLimite(""); setArchivo(null); setUrlEnlace("");
   };
 
   const publicar = async (e: React.FormEvent) => {
@@ -76,7 +78,8 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
     if (!nombre.trim() || (modoEnlace ? !urlEnlace.trim() : !archivo)) return;
     setPublicando(true);
     try {
-      const opciones = { descripcion: descripcion.trim() || undefined, semana: semana === "" ? undefined : semana };
+      const opciones = { descripcion: descripcion.trim() || undefined, semana: semana === "" ? undefined : semana,
+        fechaLimite: fechaLimite ? new Date(fechaLimite).toISOString() : undefined };
       if (modoEnlace) {
         await recursosApi.crearLink(idAsignacion, nombre.trim(), urlEnlace.trim(), opciones);
       } else {
@@ -110,6 +113,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
     setEditNombre(r.nombre);
     setEditDescripcion(r.descripcion ?? "");
     setEditSemana(r.semana ?? "");
+    setEditFechaLimite(r.fechaLimite ? toDatetimeLocal(r.fechaLimite) : "");
   };
 
   const guardarEdicion = async () => {
@@ -117,7 +121,8 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
     setGuardandoEdicion(true);
     try {
       await recursosApi.editar(editando.idRecurso, editNombre.trim(), editDescripcion.trim() || undefined,
-        editSemana === "" ? undefined : editSemana);
+        editSemana === "" ? undefined : editSemana,
+        editFechaLimite ? new Date(editFechaLimite).toISOString() : undefined);
       toast.success("Material actualizado");
       setEditando(null);
       onChanged();
@@ -165,6 +170,12 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
           <textarea id="material-descripcion" value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2} maxLength={500}
             className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] resize-none" />
         </div>
+        <div>
+          <label htmlFor="material-fecha" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Fecha límite (opcional)</label>
+          <input id="material-fecha" type="datetime-local" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+          <p className="mt-1 text-[11px] text-gray-500">Si se define, el recurso aparecerá automáticamente en el calendario.</p>
+        </div>
 
         <div className="flex gap-1.5 text-xs">
           <button type="button" onClick={() => setModoEnlace(false)}
@@ -177,8 +188,8 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
           <input type="url" value={urlEnlace} onChange={e => setUrlEnlace(e.target.value)} required placeholder="https://…"
             className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
         ) : (
-          <FileUpload accept={ACCEPT_MATERIAL} maxSizeMb={15} onFileSelected={setArchivo} disabled={publicando}
-            label="PDF, Word, PowerPoint, Excel, ZIP, RAR, imagen, video o audio" />
+          <FileUpload accept={ACCEPT_MATERIAL} maxSizeMb={100} onFileSelected={setArchivo} disabled={publicando}
+            label="PDF, Office, ZIP/RAR, imagen, video, audio, TXT o CSV (máx. 100 MB)" />
         )}
 
         <Btn disabled={publicando || !nombre.trim() || (modoEnlace ? !urlEnlace.trim() : !archivo)}>
@@ -209,9 +220,13 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
                         <p className="text-sm font-medium text-[#1A1A1A] truncate">{r.nombre}</p>
                         {r.descripcion && <p className="text-xs text-gray-600 truncate">{r.descripcion}</p>}
                         <p className="text-[11px] text-gray-500">
-                          {r.autor} · {new Date(r.creadoEn).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })}
+                          {r.materia} · {r.paralelo} · {r.docente}
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          {r.archivoMimeType ?? "Enlace"} · {r.autor} · {new Date(r.creadoEn).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })}
                           {r.archivoTamanoBytes ? ` · ${tamano(r.archivoTamanoBytes)}` : ""}
                         </p>
+                        {r.fechaLimite && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[#7B1FA2]"><Clock size={11} />Fecha límite: {new Date(r.fechaLimite).toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" })}</p>}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button type="button" title={r.tipo === "LINK_CLASE" ? "Abrir" : "Descargar"} onClick={() => descargar(r)}
@@ -255,6 +270,11 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
                 onChange={e => setEditSemana(e.target.value ? Number(e.target.value) : "")}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
             </div>
+            <div>
+              <label htmlFor="edit-fecha-limite" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Fecha límite (opcional)</label>
+              <input id="edit-fecha-limite" type="datetime-local" value={editFechaLimite} onChange={e => setEditFechaLimite(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
+            </div>
             <div className="flex items-center justify-end gap-2 pt-1">
               <Btn type="button" variant="secondary" onClick={() => setEditando(null)}>Cancelar</Btn>
               <Btn type="button" onClick={guardarEdicion} disabled={guardandoEdicion || !editNombre.trim()}>
@@ -266,6 +286,12 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
       )}
     </div>
   );
+}
+
+function toDatetimeLocal(value: string) {
+  const d = new Date(value);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /** Vista previa en miniatura: pide la URL prefirmada y renderiza la imagen directamente

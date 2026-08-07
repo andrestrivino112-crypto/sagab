@@ -5,6 +5,7 @@ import { NAV, NAV_POR_ROL, ROL_LABEL, Sidebar } from "./components/Sidebar";
 import { LoginScreen } from "./views/LoginScreen";
 import { CambiarClaveScreen } from "./views/CambiarClaveScreen";
 import type { Screen } from "./types";
+import { useInternalHistoryBoundary } from "./hooks/useInternalHistoryBoundary";
 
 // Cada vista es su propio chunk: solo se descarga la que el usuario visita.
 const DashboardView = lazy(() => import("./views/DashboardView").then(m => ({ default: m.DashboardView })));
@@ -15,9 +16,11 @@ const FinancialView = lazy(() => import("./views/FinancialView").then(m => ({ de
 const ParentPortal = lazy(() => import("./views/ParentPortal").then(m => ({ default: m.ParentPortal })));
 const TareasView = lazy(() => import("./views/TareasView").then(m => ({ default: m.TareasView })));
 const DeceAlertasView = lazy(() => import("./views/DeceAlertasView").then(m => ({ default: m.DeceAlertasView })));
+const DeceSeguimientoView = lazy(() => import("./views/DeceSeguimientoView").then(m => ({ default: m.DeceSeguimientoView })));
 const AuditoriaView = lazy(() => import("./views/AuditoriaView").then(m => ({ default: m.AuditoriaView })));
 const PersonalView = lazy(() => import("./views/PersonalView").then(m => ({ default: m.PersonalView })));
 const CalendarView = lazy(() => import("./views/CalendarView").then(m => ({ default: m.CalendarView })));
+const MensajesInstitucionalesView = lazy(() => import("./views/MensajesInstitucionalesView").then(m => ({ default: m.MensajesInstitucionalesView })));
 
 function ViewFallback() {
   return (
@@ -30,13 +33,14 @@ function ViewFallback() {
 
 /** A dónde aterriza cada rol justo después de iniciar sesión (o al recargar en "/"). */
 const pantallaInicial = (rol: RolSistema): string =>
-  rol === "REPRESENTANTE" || rol === "ESTUDIANTE" ? "/parent" : "/dashboard";
+  rol === "REPRESENTANTE" || rol === "ESTUDIANTE" ? "/parent" : rol === "DECE" ? "/deceSeguimiento" : "/dashboard";
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sesion, setSesion] = useState<Sesion | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
+  useInternalHistoryBoundary(Boolean(sesion));
 
   const logout = () => {
     apiLogout();
@@ -74,7 +78,8 @@ export default function App() {
     return (
       <LoginScreen onLogin={s => {
         setSesion(s);
-        navigate(pantallaInicial(s.roles[0]), { replace: true });
+        // Se agrega una entrada interna real: Atrás vuelve al límite protegido de SAGAB.
+        navigate(pantallaInicial(s.roles[0]));
       }} />
     );
   }
@@ -109,7 +114,7 @@ export default function App() {
   const activo = location.pathname.slice(1) as Screen;
 
   const conPermiso = (s: Screen, elemento: React.ReactNode) =>
-    permitido(s) ? elemento : <Navigate to="/dashboard" replace />;
+    permitido(s) ? elemento : <Navigate to={pantallaInicial(rolPrincipal)} replace />;
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ fontFamily:"'Inter', sans-serif" }}>
@@ -119,18 +124,20 @@ export default function App() {
         <Suspense fallback={<ViewFallback />}>
           <Routes>
             <Route path="/" element={<Navigate to={pantallaInicial(rolPrincipal)} replace />} />
-            <Route path="/dashboard" element={<DashboardView rol={rolPrincipal} />} />
+            <Route path="/dashboard" element={conPermiso("dashboard", <DashboardView rol={rolPrincipal} />)} />
             <Route path="/matricula" element={conPermiso("matricula", <MatriculaView />)} />
             <Route path="/grades" element={conPermiso("grades", <GradesView onNavigate={irA} />)} />
             <Route path="/attendance" element={conPermiso("attendance", <AttendanceView onNavigate={irA} />)} />
             <Route path="/calendar" element={conPermiso("calendar", <CalendarView rol={rolPrincipal} />)} />
+            <Route path="/messages" element={conPermiso("messages", <MensajesInstitucionalesView />)} />
+            <Route path="/deceSeguimiento" element={conPermiso("deceSeguimiento", <DeceSeguimientoView />)} />
             <Route path="/deceAlertas" element={conPermiso("deceAlertas", <DeceAlertasView />)} />
             <Route path="/tareas" element={conPermiso("tareas", <TareasView soloLectura={rolPrincipal !== "DOCENTE"} />)} />
             <Route path="/financial" element={conPermiso("financial", <FinancialView />)} />
             <Route path="/personal" element={conPermiso("personal", <PersonalView />)} />
             <Route path="/auditoria" element={conPermiso("auditoria", <AuditoriaView />)} />
             <Route path="/parent" element={conPermiso("parent", <ParentPortal onLogout={logout} embed nombre={sesion.nombre} />)} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to={pantallaInicial(rolPrincipal)} replace />} />
           </Routes>
         </Suspense>
       </main>

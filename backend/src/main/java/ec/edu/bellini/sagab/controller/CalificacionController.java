@@ -46,18 +46,16 @@ public class CalificacionController {
         return service.porEstudiante(idEstudiante, auth);
     }
 
-    /** Búsqueda avanzada por estudiante, curso, materia, período y/o docente. */
+    /** Búsqueda avanzada por estudiante, curso, materia y/o parcial. */
     @GetMapping("/buscar")
     @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
     public List<CalificacionDtos.NotaBusquedaResponse> buscar(
             @RequestParam(required = false) Long idEstudiante,
             @RequestParam(required = false) Integer idParalelo,
             @RequestParam(required = false) Integer idMateria,
-            @RequestParam(required = false) Integer idPeriodo,
-            @RequestParam(required = false) Long idDocente,
             @RequestParam(required = false) Short parcial,
             Authentication auth) {
-        return service.buscar(idEstudiante, idParalelo, idMateria, idPeriodo, idDocente, parcial, auth);
+        return service.buscar(idEstudiante, idParalelo, idMateria, parcial, auth);
     }
 
     /** Papeleta de calificaciones en PDF de un estudiante — botón "Generar Papeleta" de la búsqueda avanzada. */

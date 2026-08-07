@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.net.URI;
 
 /**
  * Sílabo, formatos de presentación y link de clase virtual de una asignación — sección
@@ -37,13 +38,13 @@ public class RecursoAcademicoService {
     private final EstudianteService estudianteService;
     private final StorageService storage;
     private final FileValidationService validacion;
-    private final long maxBytesDeber;
+    private final long maxBytesRecurso;
 
     public RecursoAcademicoService(RecursoAcademicoRepository recursos, AsignacionDocenteRepository asignaciones,
                                    EstudianteRepository estudiantes, UsuarioRepository usuarios,
                                    AsignacionDocenteService asignacionDocenteService, EstudianteService estudianteService,
                                    StorageService storage, FileValidationService validacion,
-                                   @Value("${sagab.uploads.max-mb-deberes}") long maxMbDeber) {
+                                   @Value("${sagab.uploads.max-mb-recursos}") long maxMbRecurso) {
         this.recursos = recursos;
         this.asignaciones = asignaciones;
         this.estudiantes = estudiantes;
@@ -52,7 +53,7 @@ public class RecursoAcademicoService {
         this.estudianteService = estudianteService;
         this.storage = storage;
         this.validacion = validacion;
-        this.maxBytesDeber = maxMbDeber * 1024 * 1024;
+        this.maxBytesRecurso = maxMbRecurso * 1024 * 1024;
     }
 
     /**
@@ -105,7 +106,8 @@ public class RecursoAcademicoService {
 
     @Transactional
     public RecursoAcademicoDtos.RecursoResponse subirArchivo(Long idAsignacion, RecursoAcademico.TipoRecurso tipo,
-            String nombre, String descripcion, Short semana, MultipartFile archivo, Authentication auth) {
+            String nombre, String descripcion, Short semana, java.time.OffsetDateTime fechaLimite,
+            MultipartFile archivo, Authentication auth) {
         if (tipo == RecursoAcademico.TipoRecurso.LINK_CLASE) {
             throw new IllegalArgumentException("LINK_CLASE no lleva archivo, use el endpoint de enlace");
         }
@@ -113,11 +115,9 @@ public class RecursoAcademicoService {
                 .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
         asignacionDocenteService.exigirDueñoDeAsignacion(asignacion, auth);
 
-        // MATERIAL (repositorio semanal) admite bastantes más formatos que sílabo/formato
-        // (video, audio, comprimidos, hojas de cálculo, presentaciones) — ver FileValidationService.
-        FileValidationService.Resultado r = tipo == RecursoAcademico.TipoRecurso.MATERIAL
-                ? validacion.validarMaterialClase(archivo, maxBytesDeber)
-                : validacion.validarDeber(archivo, maxBytesDeber);
+        // Todo recurso académico admite el catálogo seguro completo; el backend valida firma
+        // binaria/contenido real, no solo la extensión declarada por el navegador.
+        FileValidationService.Resultado r = validacion.validarMaterialClase(archivo, maxBytesRecurso);
         String clave = storage.generarClave("recursos/" + idAsignacion, archivo.getOriginalFilename());
         storage.subir(clave, r.contenido(), r.mimeType());
 
@@ -125,15 +125,21 @@ public class RecursoAcademicoService {
         RecursoAcademico rec = new RecursoAcademico();
         rec.setAsignacion(asignacion);
         rec.setTipo(tipo);
-        rec.setNombre(nombre);
-        rec.setDescripcion(descripcion);
+        rec.setNombre(nombre.trim());
+        rec.setDescripcion(descripcion == null || descripcion.isBlank() ? null : descripcion.trim());
         rec.setSemana(semana);
+        rec.setFechaLimite(fechaLimite);
         rec.setArchivoUrl(clave);
         rec.setArchivoNombreOriginal(archivo.getOriginalFilename());
         rec.setArchivoMimeType(r.mimeType());
         rec.setArchivoTamanoBytes((long) r.contenido().length);
         rec.setCreadoPor(idUsuario);
-        rec = recursos.save(rec);
+        try {
+            rec = recursos.saveAndFlush(rec);
+        } catch (RuntimeException e) {
+            storage.eliminar(clave);
+            throw e;
+        }
         return toResponse(rec);
     }
 
@@ -143,14 +149,16 @@ public class RecursoAcademicoService {
                 .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
         asignacionDocenteService.exigirDueñoDeAsignacion(asignacion, auth);
 
+        String url = urlHttpValida(req.urlExterna());
         Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
         RecursoAcademico rec = new RecursoAcademico();
         rec.setAsignacion(asignacion);
         rec.setTipo(RecursoAcademico.TipoRecurso.LINK_CLASE);
-        rec.setNombre(req.nombre());
-        rec.setDescripcion(req.descripcion());
+        rec.setNombre(req.nombre().trim());
+        rec.setDescripcion(req.descripcion() == null || req.descripcion().isBlank() ? null : req.descripcion().trim());
         rec.setSemana(req.semana());
-        rec.setUrlExterna(req.urlExterna());
+        rec.setFechaLimite(req.fechaLimite());
+        rec.setUrlExterna(url);
         rec.setCreadoPor(idUsuario);
         rec = recursos.save(rec);
         return toResponse(rec);
@@ -166,6 +174,7 @@ public class RecursoAcademicoService {
         rec.setNombre(req.nombre());
         rec.setDescripcion(req.descripcion());
         rec.setSemana(req.semana());
+        rec.setFechaLimite(req.fechaLimite());
         rec = recursos.save(rec);
         return toResponse(rec);
     }
@@ -187,6 +196,21 @@ public class RecursoAcademicoService {
         return new RecursoAcademicoDtos.RecursoResponse(
                 r.getId(), r.getTipo().name(), r.getNombre(), r.getDescripcion(), r.getSemana(),
                 r.getUrlExterna(), r.getArchivoNombreOriginal(), r.getArchivoMimeType(), r.getArchivoTamanoBytes(),
-                autor, r.getCreadoEn());
+                r.getAsignacion().getMateria().getNombre(), r.getAsignacion().getParalelo().getNivel(),
+                r.getAsignacion().getParalelo().etiqueta(), r.getAsignacion().getDocente().getUsuario().nombreCompleto(),
+                autor, r.getCreadoEn(), r.getFechaLimite());
+    }
+
+    private String urlHttpValida(String valor) {
+        try {
+            URI uri = URI.create(valor.trim());
+            boolean esquema = "http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme());
+            if (!esquema || uri.getHost() == null || uri.getUserInfo() != null) {
+                throw new IllegalArgumentException("Debe indicar una URL http(s) válida, sin credenciales incrustadas");
+            }
+            return uri.toASCIIString();
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Debe indicar una URL http(s) válida, sin credenciales incrustadas");
+        }
     }
 }

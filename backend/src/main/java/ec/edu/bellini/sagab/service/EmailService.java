@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Envío de correo por SMTP (spring.mail.*, ver application.yml — SAGAB_SMTP_HOST/USER/PASS).
- * Mismo patrón defensivo que StorageService.isConfigured(): si no hay credenciales SMTP
+ * Patrón defensivo de configuración opcional: si no hay credenciales SMTP
  * configuradas, la app arranca igual pero enviar() falla con un mensaje claro (400) en vez
  * de un 500 genérico.
  */

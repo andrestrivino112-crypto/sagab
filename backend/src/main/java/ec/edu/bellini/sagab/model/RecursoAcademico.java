@@ -55,6 +55,10 @@ public class RecursoAcademico {
     @Column(length = 500)
     private String descripcion;
 
+    /** Fecha límite opcional; si existe, aparece automáticamente en el calendario académico. */
+    @Column(name = "fecha_limite")
+    private OffsetDateTime fechaLimite;
+
     @Column(name = "creado_por", nullable = false)
     private Long creadoPor;
 

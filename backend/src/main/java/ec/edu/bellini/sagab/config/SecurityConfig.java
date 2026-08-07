@@ -50,6 +50,10 @@ public class SecurityConfig {
                 .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                // Descarga local firmada y de corta duración. El token HMAC sustituye al JWT
+                // porque window.open/img no pueden adjuntar Authorization; el permiso del
+                // recurso se verifica antes de emitir el enlace.
+                .requestMatchers(HttpMethod.GET, "/api/storage/local/**").permitAll()
                 .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
                 .requestMatchers("/api/personal/**").hasRole("ADMIN")
                 // Regla específica antes de la general de abajo: la cola de revisión es solo ADMIN

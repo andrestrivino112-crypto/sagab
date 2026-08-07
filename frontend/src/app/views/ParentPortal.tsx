@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle, AlertTriangle, BookOpen, CheckCircle2, Clock, DollarSign, FileUp as FileUpIcon,
-  GraduationCap, Home, Loader2, LogOut, Send, Smartphone, Upload, Users,
+  CalendarDays, GraduationCap, Home, Loader2, LogOut, Send, Smartphone, Upload, Users,
 } from "lucide-react";
 import { ApiError } from "../../api/client";
 import type { RolSistema } from "../../api/auth";
@@ -22,11 +22,12 @@ import { useToast } from "../components/Toast";
 import { initials } from "../helpers";
 import { PAYMENT_CFG, ESTADO_TO_STATUS } from "../paymentConfig";
 import { MisMateriasView } from "./MisMateriasView";
+import { CalendarView } from "./CalendarView";
 // Formulario de pago por transferencia en Bootstrap (a pedido explícito), escopado bajo
 // ".matricula-form" — mismo mecanismo que ya usa MatriculaView, ver scripts/scope-bootstrap.mjs.
 import "../../styles/bootstrap-scoped.css";
 
-type ParentTab = "home" | "grades" | "attendance" | "tareas" | "materias" | "payments";
+type ParentTab = "home" | "grades" | "attendance" | "tareas" | "materias" | "calendar" | "payments";
 
 const ESTADO_ENTREGA_BADGE: Record<EntregaResponse["estado"], { v: "success" | "warning" | "error" | "info"; label: string }> = {
   PENDIENTE: { v: "info", label: "Pendiente" },
@@ -55,6 +56,7 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
   const [obligaciones, setObligaciones] = useState<ObligacionResponse[]>([]);
   const [entregas, setEntregas] = useState<EntregaResponse[]>([]);
   const [inbox, setInbox] = useState<MensajeResponse[]>([]);
+  const [mensajeAbierto, setMensajeAbierto] = useState<MensajeResponse | null>(null);
   const [notifs, setNotifs] = useState<NotificacionResponse[]>([]);
   const [loading, setLoading] = useState(!embed);
   const [errorApi, setErrorApi] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
     { id:"attendance", label:"Asistencia", icon: Users },
     { id:"tareas",     label:"Deberes",    icon: FileUpIcon },
     { id:"materias",   label:"Mis materias", icon: GraduationCap },
+    { id:"calendar",   label:"Calendario",  icon: CalendarDays },
     { id:"payments",   label:"Pagos",      icon: DollarSign },
   ];
 
@@ -87,6 +90,18 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
       await notificacionesApi.marcarLeida(id);
     } catch {
       notificacionesApi.mias().then(setNotifs).catch(() => {});
+    }
+  };
+
+  const abrirMensaje = async (mensaje: MensajeResponse) => {
+    setMensajeAbierto(mensaje);
+    if (mensaje.leido) return;
+    setInbox(prev => prev.map(m => m.idMensaje === mensaje.idMensaje ? { ...m, leido: true } : m));
+    try {
+      await mensajesApi.marcarLeido(mensaje.idMensaje);
+      window.dispatchEvent(new CustomEvent("sagab:mensajes-actualizados"));
+    } catch {
+      mensajesApi.mias().then(setInbox).catch(() => {});
     }
   };
 
@@ -285,13 +300,21 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                  <p className="text-sm font-semibold text-[#1A1A1A] mb-3">Mensajes institucionales</p>
-                  {inbox.length === 0 ? (
+                  <div className="mb-3 flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#1A1A1A]">Mensajes institucionales</p>{inbox.some(m => !m.leido) && <span className="rounded-full bg-[#C62828] px-2 py-0.5 text-[10px] font-bold text-white">{inbox.filter(m => !m.leido).length} sin leer</span>}</div>
+                  {mensajeAbierto ? (
+                    <div>
+                      <button type="button" onClick={() => setMensajeAbierto(null)} className="mb-2 text-[11px] font-medium text-[#2E75B6] hover:underline">← Volver al historial</button>
+                      <p className="text-sm font-semibold text-[#1A1A1A]">{mensajeAbierto.asunto}</p>
+                      <p className="mt-0.5 text-[11px] text-gray-500">De: {mensajeAbierto.remitente}</p>
+                      <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-gray-700">{mensajeAbierto.cuerpo}</p>
+                    </div>
+                  ) : inbox.length === 0 ? (
                     <p className="text-xs text-gray-600">Aún no tiene mensajes.</p>
                   ) : (
                     <ul className="space-y-3">
                       {inbox.slice(0, 5).map(m => (
-                        <li key={m.idMensaje} className="flex items-start gap-2.5">
+                        <li key={m.idMensaje}>
+                          <button type="button" onClick={() => void abrirMensaje(m)} className="flex w-full items-start gap-2.5 rounded-lg p-1.5 text-left hover:bg-[#EAF2FB]">
                           <span aria-hidden="true" className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!m.leido ? "bg-[#2E75B6]" : "bg-transparent"}`} />
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs font-semibold ${!m.leido ? "text-[#1A1A1A]" : "text-gray-500"}`}>
@@ -302,6 +325,7 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
                           <span className="text-[10px] text-gray-600 whitespace-nowrap">
                             {new Date(m.enviadoEn).toLocaleDateString("es-EC", { day:"2-digit", month:"short" })}
                           </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -380,6 +404,10 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
 
           {!embed && !loading && hijoActivo && tab === "materias" && (
             <MisMateriasView idEstudiante={idEstudiante!} />
+          )}
+
+          {!embed && !loading && hijoActivo && tab === "calendar" && (
+            <CalendarView rol={rol} embed onOpenRelated={item => setTab(item.tipo === "RECURSO" ? "materias" : "tareas")} />
           )}
 
           {!embed && !loading && hijoActivo && tab === "payments" && <>

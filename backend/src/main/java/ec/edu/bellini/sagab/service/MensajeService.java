@@ -31,13 +31,16 @@ public class MensajeService {
     private final MensajeDestinatarioRepository destinatarios;
     private final UsuarioRepository usuarios;
     private final EstudianteRepository estudiantes;
+    private final AsignacionDocenteService asignacionDocenteService;
 
     public MensajeService(MensajeRepository mensajes, MensajeDestinatarioRepository destinatarios,
-                           UsuarioRepository usuarios, EstudianteRepository estudiantes) {
+                           UsuarioRepository usuarios, EstudianteRepository estudiantes,
+                           AsignacionDocenteService asignacionDocenteService) {
         this.mensajes = mensajes;
         this.destinatarios = destinatarios;
         this.usuarios = usuarios;
         this.estudiantes = estudiantes;
+        this.asignacionDocenteService = asignacionDocenteService;
     }
 
     /**
@@ -79,13 +82,14 @@ public class MensajeService {
      */
     @Transactional
     public MensajeDtos.MensajeResponse enviarBroadcast(MensajeDtos.EnviarBroadcastRequest req, Authentication auth) {
-        boolean esDocente = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"));
-        boolean gruposDeEstudiantes = switch (req.grupo()) {
-            case ESTUDIANTES, TODO_PARALELO, TODO_CURSO -> true;
-            case TODOS_REPRESENTANTES, TODOS_DOCENTES, TODO_COLEGIO -> false;
+        boolean esDocente = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+                && !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean gruposPermitidosDocente = switch (req.grupo()) {
+            case ESTUDIANTES, TODO_PARALELO -> true;
+            case TODO_CURSO, TODOS_REPRESENTANTES, TODOS_DOCENTES, TODO_COLEGIO -> false;
         };
-        if (esDocente && !gruposDeEstudiantes) {
-            throw new IllegalArgumentException("Un docente solo puede enviar mensajes a estudiantes.");
+        if (esDocente && !gruposPermitidosDocente) {
+            throw new IllegalArgumentException("Un docente solo puede enviar mensajes a estudiantes de sus paralelos asignados.");
         }
 
         List<Long> idsDestinatarios = switch (req.grupo()) {
@@ -93,10 +97,22 @@ public class MensajeService {
                 if (req.idsEstudiantes() == null || req.idsEstudiantes().isEmpty()) {
                     throw new IllegalArgumentException("Debe indicar al menos un estudiante.");
                 }
+                if (esDocente) {
+                    var seleccionados = estudiantes.findAllById(req.idsEstudiantes());
+                    if (seleccionados.size() != req.idsEstudiantes().stream().distinct().count()) {
+                        throw new IllegalArgumentException("Uno de los estudiantes no existe.");
+                    }
+                    seleccionados.stream().map(e -> e.getParalelo() != null ? e.getParalelo().getId() : null)
+                            .distinct().forEach(idParalelo -> {
+                                if (idParalelo == null) throw new IllegalArgumentException("Un estudiante no tiene paralelo asignado.");
+                                asignacionDocenteService.exigirDocenteDelParalelo(idParalelo, auth);
+                            });
+                }
                 yield estudiantes.idsUsuariosDestinatarios(req.idsEstudiantes());
             }
             case TODO_PARALELO -> {
                 if (req.idParalelo() == null) throw new IllegalArgumentException("Debe indicar el paralelo.");
+                if (esDocente) asignacionDocenteService.exigirDocenteDelParalelo(req.idParalelo(), auth);
                 yield estudiantes.idsUsuariosDestinatariosPorParalelo(req.idParalelo());
             }
             case TODO_CURSO -> {
@@ -113,6 +129,23 @@ public class MensajeService {
             throw new IllegalArgumentException("No se encontró ningún destinatario para ese grupo.");
         }
         return enviar(new MensajeDtos.EnviarMensajeRequest(idsDestinatarios, req.asunto(), req.cuerpo()), auth);
+    }
+
+    /** Reutiliza el mismo modelo de mensajes/copias/lecturas, limitando los destinatarios a docentes activos. */
+    @Transactional
+    public MensajeDtos.MensajeResponse enviarInstitucional(MensajeDtos.EnviarInstitucionalRequest req, Authentication auth) {
+        List<Usuario> docentesActivos = usuarios.findByRoles_CodigoInOrderByApellidosAscNombresAsc(List.of("DOCENTE"))
+                .stream().filter(u -> u.getEstado() == Usuario.EstadoUsuario.ACTIVO).toList();
+        List<Long> ids;
+        if (req.idDocenteUsuario() == null) {
+            ids = docentesActivos.stream().map(Usuario::getId).toList();
+        } else {
+            boolean esDocente = docentesActivos.stream().anyMatch(u -> u.getId().equals(req.idDocenteUsuario()));
+            if (!esDocente) throw new IllegalArgumentException("El destinatario no es un docente activo");
+            ids = List.of(req.idDocenteUsuario());
+        }
+        if (ids.isEmpty()) throw new IllegalArgumentException("No hay docentes activos registrados");
+        return enviar(new MensajeDtos.EnviarMensajeRequest(ids, req.asunto(), req.cuerpo()), auth);
     }
 
     /** Mensajes enviados por el usuario actual, con el conteo de lectura de cada uno. */
@@ -140,8 +173,15 @@ public class MensajeService {
     @Transactional(readOnly = true)
     public List<MensajeDtos.MensajeResponse> mias(Authentication auth) {
         Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
-        return destinatarios.bandejaDeEntrada(idUsuario, PageRequest.of(0, MAX_MENSAJES)).stream()
-                .map(this::toResponse)
+        boolean esDocente = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"));
+        List<MensajeDestinatario> bandeja = esDocente
+                ? destinatarios.bandejaDocenteDesdeAdmin(idUsuario, PageRequest.of(0, MAX_MENSAJES))
+                : destinatarios.bandejaDeEntrada(idUsuario, PageRequest.of(0, MAX_MENSAJES));
+        Map<Long, String> remitentes = usuarios.findAllById(bandeja.stream()
+                        .map(md -> md.getMensaje().getIdRemitente()).distinct().toList()).stream()
+                .collect(Collectors.toMap(Usuario::getId, Usuario::nombreCompleto));
+        return bandeja.stream()
+                .map(md -> toResponse(md, remitentes))
                 .toList();
     }
 
@@ -154,10 +194,8 @@ public class MensajeService {
         }
     }
 
-    private MensajeDtos.MensajeResponse toResponse(MensajeDestinatario md) {
-        String remitente = usuarios.findById(md.getMensaje().getIdRemitente())
-                .map(Usuario::nombreCompleto)
-                .orElse("—");
+    private MensajeDtos.MensajeResponse toResponse(MensajeDestinatario md, Map<Long, String> remitentes) {
+        String remitente = remitentes.getOrDefault(md.getMensaje().getIdRemitente(), "—");
         return new MensajeDtos.MensajeResponse(
                 md.getMensaje().getId(), md.getMensaje().getAsunto(), md.getMensaje().getCuerpo(),
                 md.getMensaje().isEsCircular(), remitente, md.getMensaje().getEnviadoEn(),

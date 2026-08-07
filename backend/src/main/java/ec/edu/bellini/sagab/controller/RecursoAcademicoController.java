@@ -43,9 +43,10 @@ public class RecursoAcademicoController {
             @RequestParam @Size(max = 150) String nombre,
             @RequestParam(required = false) @Size(max = 500) String descripcion,
             @RequestParam(required = false) Short semana,
+            @RequestParam(required = false) java.time.OffsetDateTime fechaLimite,
             @RequestParam("archivo") MultipartFile archivo,
             Authentication auth) {
-        return service.subirArchivo(idAsignacion, tipo, nombre, descripcion, semana, archivo, auth);
+        return service.subirArchivo(idAsignacion, tipo, nombre, descripcion, semana, fechaLimite, archivo, auth);
     }
 
     /** Publica el link de la clase virtual (o un enlace de la semana) — exclusivo del docente dueño. */

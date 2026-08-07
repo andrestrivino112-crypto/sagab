@@ -242,7 +242,7 @@ A pedido explícito tuyo ("continúa y arregla todo") se aplicaron todas las cor
 |---|---|---|
 | BE-18 | `config/SecurityConfig.java` | Eliminada la regla fantasma `/api/admin/**`; agregada una regla específica para `GET /api/finanzas/pagos/revision` (documenta la restricción real, ya aplicada por `@PreAuthorize`). |
 | BE-19 | `controller/EstudianteController.java` | `q` de `/api/estudiantes/buscar` ahora exige `@NotBlank` (clase anotada `@Validated`). |
-| BE-21 | `repository/EntregaTareaRepository.java`, `CalificacionRepository.java`, `PeriodoAcademicoRepository.java` | Eliminados los 3 métodos sin ninguna referencia real (`findByEstudianteIn`, `findByEstudianteIdAndIdAsignacionAndParcial`, `findByActivoTrue()`). `StorageService.isConfigured()` se revisó y **no** se tocó: sí tiene un uso interno real (`exigirConfigurado()`), el hallazgo original era impreciso. |
+| BE-21 | `repository/EntregaTareaRepository.java`, `CalificacionRepository.java`, `PeriodoAcademicoRepository.java` | Eliminados los 3 métodos sin ninguna referencia real (`findByEstudianteIn`, `findByEstudianteIdAndIdAsignacionAndParcial`, `findByActivoTrue()`). La Parte 2 también retiró `StorageService.isConfigured()` al sustituir el bloqueo único por selección S3/local y validación explícita de configuración parcial. |
 | FE-10 | `frontend/src/app/views/MatriculaView.tsx` | `maxLength` agregado a los 8 campos de texto libre que no lo tenían, igual que los límites `@Size` del backend. |
 | FE-12 | `frontend/src/app/types.ts` | Quitado el literal `"login"` de `Screen` (nunca se usaba). |
 | FE-13 | — | Resuelto automáticamente por FE-02: `asistencia.porParalelo` ya se invoca desde `AttendanceView`. |
@@ -250,9 +250,9 @@ A pedido explícito tuyo ("continúa y arregla todo") se aplicaron todas las cor
 ### 9.5 No se tocó / se descartó tras verificar
 
 - **BE-10** (rango de notas `0.0` vs `1.0` en `CalificacionDtos`): al revisar `database/09_estudiante_usuario.sql:52-60` se confirmó que el `CHECK` real ya fue corregido a `BETWEEN 0 AND 10` en esa migración (con justificación documentada: una nota de 0 es válida en la escala LOEI). El DTO ya estaba correcto — era un falso positivo del hallazgo original, que solo había mirado `01_schema.sql` sin ver la migración posterior.
-- **`StorageService.isConfigured()`**: revisado, tiene uso interno real, no es código muerto (ver 9.4).
+- **`StorageService.isConfigured()`**: retirado en la Parte 2; el proveedor se resuelve ahora mediante `isS3Configured()` y la ruta local configurada.
 - **Flyway/Liquibase, tests automatizados**: fuera de alcance de esta sesión — son cambios estructurales mayores, señalados ya en `INFORME_AUDITORIA.md` como diferidos a una fase dedicada.
-- **Subida real de archivos a S3**: sigue bloqueada por falta de credenciales `SAGAB_S3_*` (dato ya conocido, sección 12 de `INFORME_AUDITORIA.md`), no depende de código.
+- **Subida real de archivos**: resuelta en la Parte 2 con proveedor local persistente configurable y enlaces HMAC; S3/R2 sigue disponible y tiene prioridad cuando se configura el conjunto completo `SAGAB_S3_*`.
 
 ### 9.6 Verificación final
 

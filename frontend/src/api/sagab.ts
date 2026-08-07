@@ -40,8 +40,6 @@ export interface NotaBusquedaResponse {
   estudiante: string;
   curso: string;
   materia: string;
-  periodo: string;
-  docente: string;
   parcial: number;
   notaTarea: number;
   notaClase: number;
@@ -54,8 +52,6 @@ export interface BusquedaCalificacionesFiltros {
   idEstudiante?: number;
   idParalelo?: number;
   idMateria?: number;
-  idPeriodo?: number;
-  idDocente?: number;
   parcial?: number;
 }
 
@@ -154,6 +150,9 @@ export interface AsignacionOpcion {
   idAsignacion: number;
   idParalelo: number;
   paralelo: string;
+  nivel: string;
+  seccion: string;
+  anioLectivo: string;
   idMateria: number;
   materia: string;
   idPeriodo: number;
@@ -163,8 +162,21 @@ export interface AsignacionOpcion {
   docente: string;
 }
 
+export interface AsignacionCatalogos {
+  docentes: { idDocente: number; idUsuario: number; nombre: string; email: string }[];
+  materias: { idMateria: number; codigo: string; nombre: string; area: string | null }[];
+  paralelos: { idParalelo: number; nivel: string; seccion: string; anioLectivo: string; etiqueta: string }[];
+  periodos: { idPeriodo: number; nombre: string; anioLectivo: string; etiqueta: string; activo: boolean }[];
+}
+
 export const asignaciones = {
   mias: () => api<AsignacionOpcion[]>("/api/asignaciones/mias"),
+  catalogos: () => api<AsignacionCatalogos>("/api/asignaciones/catalogos"),
+  crear: (req: { idDocente: number; idsMaterias: number[]; idParalelo: number; idPeriodo: number }) =>
+    api<AsignacionOpcion[]>("/api/asignaciones", { method: "POST", body: req }),
+  editar: (id: number, req: { idDocente: number; idMateria: number; idParalelo: number; idPeriodo: number }) =>
+    api<AsignacionOpcion>(`/api/asignaciones/${id}`, { method: "PUT", body: req }),
+  eliminar: (id: number) => api<void>(`/api/asignaciones/${id}`, { method: "DELETE" }),
 };
 
 // ── Estudiantes (nómina por paralelo, para Notas y Asistencia) ─────────
@@ -401,13 +413,15 @@ export const mensajes = {
   mias: () => api<MensajeResponse[]>("/api/mensajes/mias"),
   marcarLeido: (idMensaje: number) =>
     api<void>(`/api/mensajes/${idMensaje}/leido`, { method: "POST" }),
-  /** Envío de un mensaje interno a uno o varios usuarios (solo ADMIN por ahora). */
+  /** Envío directo a ids ya resueltos (ADMIN); docentes utilizan enviarBroadcast(). */
   enviar: (idsDestinatarios: number[], asunto: string, cuerpo: string) =>
     api<MensajeResponse>("/api/mensajes", { method: "POST", body: { idsDestinatarios, asunto, cuerpo } }),
   enviados: () => api<MensajeEnviadoResponse[]>("/api/mensajes/enviados"),
   /** Envío masivo por grupo — el backend resuelve el grupo a destinatarios concretos. */
   enviarBroadcast: (req: EnviarBroadcastRequest) =>
     api<MensajeResponse>("/api/mensajes/broadcast", { method: "POST", body: req }),
+  enviarInstitucional: (req: { idDocenteUsuario?: number; asunto: string; cuerpo: string }) =>
+    api<MensajeResponse>("/api/mensajes/institucionales", { method: "POST", body: req }),
 };
 
 export type GrupoDestinatario =
@@ -450,6 +464,66 @@ export const notificaciones = {
   mias: () => api<NotificacionResponse[]>("/api/notificaciones/mias"),
   marcarLeida: (idNotificacion: number) =>
     api<void>(`/api/notificaciones/${idNotificacion}/leida`, { method: "POST" }),
+};
+
+// ── Calendario institucional unificado ─────────────────────────────────
+export type EstadoEventoCalendario = "BORRADOR" | "PUBLICADO" | "OCULTO" | "PROGRAMADO" | "CANCELADO";
+export type CategoriaEventoCalendario = "INSTITUCIONAL" | "ACADEMICO" | "REUNION" | "CAPACITACION" | "EVALUACION" | "DEPORTIVO" | "CULTURAL" | "OTRO";
+
+export interface CalendarioItemResponse {
+  id: string;
+  idEvento: number | null;
+  tipo: "INSTITUCIONAL" | "FERIADO" | "FECHA_IMPORTANTE" | "TAREA" | "RECURSO";
+  titulo: string;
+  descripcion: string | null;
+  inicio: string;
+  fin: string;
+  lugar: string | null;
+  categoria: string;
+  color: string;
+  estado: EstadoEventoCalendario | "PUBLICADO";
+  publicarEn: string | null;
+  creador: string;
+  creadoEn: string | null;
+  materia: string | null;
+  docente: string | null;
+  idRelacionado: number | null;
+  rutaRelacionada: string | null;
+  adjuntos: { idAdjunto: number | null; nombre: string; url: string }[];
+}
+
+export interface GuardarEventoCalendario {
+  titulo: string;
+  descripcion?: string;
+  inicio: string;
+  fin: string;
+  lugar?: string;
+  categoria: CategoriaEventoCalendario;
+  color: string;
+  estado: EstadoEventoCalendario;
+  publicarEn?: string;
+  adjuntoNombre?: string;
+  adjuntoUrl?: string;
+}
+
+export const calendario = {
+  listar: (desde: string, hasta: string) =>
+    api<CalendarioItemResponse[]>(`/api/calendario?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`),
+  crear: (req: GuardarEventoCalendario) =>
+    api<CalendarioItemResponse>("/api/calendario", { method: "POST", body: req }),
+  editar: (id: number, req: GuardarEventoCalendario) =>
+    api<CalendarioItemResponse>(`/api/calendario/${id}`, { method: "PUT", body: req }),
+  duplicar: (id: number) =>
+    api<CalendarioItemResponse>(`/api/calendario/${id}/duplicar`, { method: "POST" }),
+  eliminar: (id: number) => api<void>(`/api/calendario/${id}`, { method: "DELETE" }),
+  subirAdjunto: (id: number, archivo: File, nombre?: string) => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    if (nombre) fd.append("nombre", nombre);
+    return apiForm<{ idAdjunto: number; nombre: string; url: string }>(`/api/calendario/${id}/adjuntos`, fd);
+  },
+  eliminarAdjunto: (idAdjunto: number) =>
+    api<void>(`/api/calendario/adjuntos/${idAdjunto}`, { method: "DELETE" }),
 };
 
 // ── Deberes (tareas y entregas con archivo adjunto) ──────────────────────
@@ -556,8 +630,13 @@ export interface RecursoAcademicoResponse {
   archivoNombreOriginal: string | null;
   archivoMimeType: string | null;
   archivoTamanoBytes: number | null;
+  materia: string;
+  curso: string;
+  paralelo: string;
+  docente: string;
   autor: string;
   creadoEn: string;
+  fechaLimite: string | null;
 }
 
 export const recursosAcademicos = {
@@ -565,30 +644,111 @@ export const recursosAcademicos = {
     api<RecursoAcademicoResponse[]>(
       `/api/recursos-academicos/asignacion/${idAsignacion}${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
   subirArchivo: (idAsignacion: number, tipo: Exclude<TipoRecursoAcademico, "LINK_CLASE">, nombre: string, archivo: File,
-                 opciones: { descripcion?: string; semana?: number } = {}) => {
+                 opciones: { descripcion?: string; semana?: number; fechaLimite?: string } = {}) => {
     const fd = new FormData();
     fd.append("idAsignacion", String(idAsignacion));
     fd.append("tipo", tipo);
     fd.append("nombre", nombre);
     if (opciones.descripcion) fd.append("descripcion", opciones.descripcion);
     if (opciones.semana != null) fd.append("semana", String(opciones.semana));
+    if (opciones.fechaLimite) fd.append("fechaLimite", opciones.fechaLimite);
     fd.append("archivo", archivo);
     return apiForm<RecursoAcademicoResponse>("/api/recursos-academicos/archivo", fd);
   },
   crearLink: (idAsignacion: number, nombre: string, urlExterna: string,
-              opciones: { descripcion?: string; semana?: number } = {}) =>
+              opciones: { descripcion?: string; semana?: number; fechaLimite?: string } = {}) =>
     api<RecursoAcademicoResponse>("/api/recursos-academicos/link", {
-      method: "POST", body: { idAsignacion, nombre, urlExterna, descripcion: opciones.descripcion, semana: opciones.semana },
+      method: "POST", body: { idAsignacion, nombre, urlExterna, descripcion: opciones.descripcion, semana: opciones.semana, fechaLimite: opciones.fechaLimite },
     }),
-  editar: (idRecurso: number, nombre: string, descripcion: string | undefined, semana: number | undefined) =>
+  editar: (idRecurso: number, nombre: string, descripcion: string | undefined, semana: number | undefined, fechaLimite?: string) =>
     api<RecursoAcademicoResponse>(`/api/recursos-academicos/${idRecurso}`, {
-      method: "PATCH", body: { nombre, descripcion, semana },
+      method: "PATCH", body: { nombre, descripcion, semana, fechaLimite },
     }),
   eliminar: (idRecurso: number) =>
     api<void>(`/api/recursos-academicos/${idRecurso}`, { method: "DELETE" }),
   urlDescarga: (idRecurso: number, idEstudiante?: number) =>
     api<{ url: string }>(
       `/api/recursos-academicos/${idRecurso}/descarga${idEstudiante != null ? `?idEstudiante=${idEstudiante}` : ""}`),
+};
+
+// ── Consejería DECE: estudiantes en seguimiento ───────────────────────
+export type EstadoSeguimientoDece = "ACTIVO" | "EN_OBSERVACION" | "INTERVENCION" | "RESUELTO" | "ARCHIVADO";
+
+export interface EstudianteBusquedaDece {
+  idEstudiante: number;
+  codigo: string;
+  estudiante: string;
+  curso: string | null;
+  paralelo: string | null;
+  email: string | null;
+  enSeguimiento: boolean;
+  idSeguimiento: number | null;
+}
+
+export interface SeguimientoDeceResponse {
+  idSeguimiento: number;
+  idEstudiante: number;
+  codigo: string;
+  estudiante: string;
+  cedula: string | null;
+  email: string | null;
+  fechaNacimiento: string;
+  genero: string | null;
+  telefono: string | null;
+  tipoSangre: string | null;
+  condicionMedica: string | null;
+  contactoEmergencia: string | null;
+  curso: string | null;
+  paralelo: string | null;
+  promedioGeneral: number | null;
+  totalCalificaciones: number;
+  ausenciasInjustificadas: number;
+  fechaInicio: string;
+  estado: EstadoSeguimientoDece;
+  observacion: string | null;
+  registradoPor: string;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface HistorialSeguimientoDece {
+  idHistorial: number;
+  estadoAnterior: EstadoSeguimientoDece | null;
+  estadoNuevo: EstadoSeguimientoDece;
+  observacion: string | null;
+  cambiadoPor: string;
+  cambiadoEn: string;
+}
+
+export interface MensajeSeguimientoDece {
+  idMensaje: number;
+  asunto: string;
+  cuerpo: string;
+  remitente: string;
+  enviadoEn: string;
+  leidoEn: string | null;
+  leido: boolean;
+}
+
+export const seguimientoDece = {
+  buscarEstudiantes: (q: string) =>
+    api<EstudianteBusquedaDece[]>(`/api/dece/seguimientos/estudiantes?q=${encodeURIComponent(q)}`),
+  listar: (filtros: { q?: string; estado?: EstadoSeguimientoDece } = {}) => {
+    const q = new URLSearchParams();
+    if (filtros.q) q.set("q", filtros.q);
+    if (filtros.estado) q.set("estado", filtros.estado);
+    return api<SeguimientoDeceResponse[]>(`/api/dece/seguimientos${q.size ? `?${q}` : ""}`);
+  },
+  detalle: (id: number) => api<SeguimientoDeceResponse>(`/api/dece/seguimientos/${id}`),
+  crear: (req: { idEstudiante: number; fechaInicio: string; estado: EstadoSeguimientoDece; observacion?: string }) =>
+    api<SeguimientoDeceResponse>("/api/dece/seguimientos", { method: "POST", body: req }),
+  editar: (id: number, req: { fechaInicio: string; estado: EstadoSeguimientoDece; observacion?: string }) =>
+    api<SeguimientoDeceResponse>(`/api/dece/seguimientos/${id}`, { method: "PUT", body: req }),
+  eliminar: (id: number) => api<void>(`/api/dece/seguimientos/${id}`, { method: "DELETE" }),
+  historial: (id: number) => api<HistorialSeguimientoDece[]>(`/api/dece/seguimientos/${id}/historial`),
+  mensajes: (id: number) => api<MensajeSeguimientoDece[]>(`/api/dece/seguimientos/${id}/mensajes`),
+  enviarMensaje: (id: number, asunto: string, cuerpo: string) =>
+    api<MensajeSeguimientoDece>(`/api/dece/seguimientos/${id}/mensajes`, { method: "POST", body: { asunto, cuerpo } }),
 };
 
 // ── Auditoría (solo roles AUDITOR / ADMIN) ─────────────────────────────

@@ -9,7 +9,12 @@ public class AuthDtos {
 
     public record LoginRequest(
             @NotBlank String usuario,
-            @NotBlank String password) {}
+            @NotBlank String password) {
+        @Override
+        public String toString() {
+            return "LoginRequest[usuario=" + usuario + ", password=***]";
+        }
+    }
 
     public record TokenResponse(
             String accessToken,
@@ -17,7 +22,16 @@ public class AuthDtos {
             long expiraEnMinutos,
             String nombre,
             List<String> roles,
-            boolean debeCambiarClave) {}
+            boolean debeCambiarClave) {
+        @Override
+        public String toString() {
+            return "TokenResponse[accessToken=***, tokenType=" + tokenType
+                    + ", expiraEnMinutos=" + expiraEnMinutos
+                    + ", nombre=" + nombre
+                    + ", roles=" + roles
+                    + ", debeCambiarClave=" + debeCambiarClave + "]";
+        }
+    }
 
     /** Igual que TokenResponse sin el token (no se emite uno nuevo) — usado por /auth/me para
      * reconstruir la sesión del frontend a partir de un access token ya válido, p. ej. al recargar
@@ -26,5 +40,10 @@ public class AuthDtos {
 
     public record CambiarClaveRequest(
             @NotBlank String claveActual,
-            @NotBlank @Size(min = 8, max = 72, message = "La nueva contraseña debe tener al menos 8 caracteres") String claveNueva) {}
+            @NotBlank @Size(min = 8, max = 72, message = "La nueva contraseña debe tener al menos 8 caracteres") String claveNueva) {
+        @Override
+        public String toString() {
+            return "CambiarClaveRequest[claveActual=***, claveNueva=***]";
+        }
+    }
 }

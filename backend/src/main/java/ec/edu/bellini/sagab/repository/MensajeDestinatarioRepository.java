@@ -16,7 +16,36 @@ public interface MensajeDestinatarioRepository extends JpaRepository<MensajeDest
            "WHERE md.idDestinatario = :idUsuario ORDER BY m.enviadoEn DESC")
     List<MensajeDestinatario> bandejaDeEntrada(@Param("idUsuario") Long idUsuario, Pageable pageable);
 
+    /** La bandeja del docente es un canal institucional unidireccional: únicamente mensajes
+     * cuyo remitente tenga rol ADMIN. Se aplica en SQL para que no pueda eludirse desde la API. */
+    @Query(value = """
+            SELECT md.*
+            FROM sagab.mensaje_destinatario md
+            JOIN sagab.mensaje m ON m.id_mensaje = md.id_mensaje
+            WHERE md.id_destinatario = :idUsuario
+              AND EXISTS (
+                  SELECT 1 FROM sagab.usuario_rol ur
+                  JOIN sagab.rol r ON r.id_rol = ur.id_rol
+                  WHERE ur.id_usuario = m.id_remitente AND r.codigo = 'ADMIN'
+              )
+            ORDER BY m.enviado_en DESC
+            """, nativeQuery = true)
+    List<MensajeDestinatario> bandejaDocenteDesdeAdmin(@Param("idUsuario") Long idUsuario, Pageable pageable);
+
     long countByIdDestinatarioAndLeidoEnIsNull(Long idDestinatario);
+
+    @Query(value = """
+            SELECT count(*)
+            FROM sagab.mensaje_destinatario md
+            JOIN sagab.mensaje m ON m.id_mensaje = md.id_mensaje
+            WHERE md.id_destinatario = :idUsuario AND md.leido_en IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM sagab.usuario_rol ur
+                  JOIN sagab.rol r ON r.id_rol = ur.id_rol
+                  WHERE ur.id_usuario = m.id_remitente AND r.codigo = 'ADMIN'
+              )
+            """, nativeQuery = true)
+    long countNoLeidosDocenteDesdeAdmin(@Param("idUsuario") Long idUsuario);
 
     @Modifying
     @Query("UPDATE MensajeDestinatario md SET md.leidoEn = CURRENT_TIMESTAMP " +

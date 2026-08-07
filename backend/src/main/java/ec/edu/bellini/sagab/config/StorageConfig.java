@@ -15,7 +15,8 @@ import java.net.URI;
 /**
  * Cliente S3 para el almacenamiento de archivos (deberes, comprobantes de pago).
  * Se construye siempre, incluso sin credenciales configuradas, para no impedir que el resto
- * de la aplicación arranque; StorageService.isConfigured() es quien decide si puede usarse.
+ * de la aplicación arranque; StorageService selecciona S3 solo cuando el conjunto de variables
+ * está completo y, en ausencia total, usa el proveedor local.
  */
 @Configuration
 public class StorageConfig {
@@ -27,7 +28,7 @@ public class StorageConfig {
                               @Value("${sagab.storage.secret-key}") String secretKey) {
         // AwsBasicCredentials exige valores no vacíos incluso solo para construirse (aunque
         // nunca lleguen a usarse): si SAGAB_S3_* todavía no está configurado, se pasa un
-        // placeholder — StorageService.isConfigured() es quien de verdad bloquea su uso real.
+        // placeholder — StorageService nunca usa este cliente si la configuración está vacía.
         var credenciales = AwsBasicCredentials.create(
                 notBlank(accessKey) ? accessKey : "sin-configurar",
                 notBlank(secretKey) ? secretKey : "sin-configurar");

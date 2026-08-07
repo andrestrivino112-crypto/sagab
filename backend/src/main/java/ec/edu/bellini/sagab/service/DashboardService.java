@@ -10,6 +10,7 @@ import ec.edu.bellini.sagab.repository.MensajeDestinatarioRepository;
 import ec.edu.bellini.sagab.repository.ObligacionPagoRepository;
 import ec.edu.bellini.sagab.repository.UsuarioRepository;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +43,11 @@ public class DashboardService {
         long ausenciasHoy = asistencias.countByFechaAndEstadoIn(LocalDate.now(),
                 List.of(Asistencia.EstadoAsistencia.AUSENCIA_JUSTIFICADA, Asistencia.EstadoAsistencia.AUSENCIA_INJUSTIFICADA));
         long estudiantesEnMora = obligaciones.contarEstudiantesPorEstado(ObligacionPago.EstadoPago.VENCIDO);
-        long mensajesPendientes = destinatarios.countByIdDestinatarioAndLeidoEnIsNull(idUsuario);
+        boolean soloDocente = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+                && !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        long mensajesPendientes = soloDocente
+                ? destinatarios.countNoLeidosDocenteDesdeAdmin(idUsuario)
+                : destinatarios.countByIdDestinatarioAndLeidoEnIsNull(idUsuario);
 
         List<DashboardDtos.RendimientoParalelo> rendimiento = calificaciones.rendimientoPorParalelo().stream()
                 .map(p -> new DashboardDtos.RendimientoParalelo(p.getParalelo(), p.getPromedio()))

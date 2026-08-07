@@ -34,10 +34,10 @@ public class CalificacionDtos {
             BigDecimal notaTarea, BigDecimal notaClase, BigDecimal notaExamen,
             BigDecimal promedio, boolean enRiesgo) {}
 
-    /** Fila de la búsqueda avanzada (ADMIN/DOCENTE): cruza estudiante, curso, materia, período y docente. */
+    /** Fila de la búsqueda avanzada (ADMIN/DOCENTE): cruza estudiante, curso y materia. */
     public record NotaBusquedaResponse(
             Long idCalificacion, Long idEstudiante, String estudiante, String curso,
-            String materia, String periodo, String docente, short parcial,
+            String materia, short parcial,
             BigDecimal notaTarea, BigDecimal notaClase, BigDecimal notaExamen,
             BigDecimal promedio, boolean enRiesgo) {}
 }

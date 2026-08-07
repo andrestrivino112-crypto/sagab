@@ -17,7 +17,13 @@ public class MensajeDtos {
     public record EnviarMensajeRequest(
             @NotEmpty List<Long> idsDestinatarios,
             @NotBlank @Size(max = 150) String asunto,
-            @NotBlank String cuerpo) {}
+            @NotBlank @Size(max = 10000) String cuerpo) {}
+
+    /** Mensaje administrativo a un docente concreto, o a todos si idDocenteUsuario es null. */
+    public record EnviarInstitucionalRequest(
+            Long idDocenteUsuario,
+            @NotBlank @Size(max = 150) String asunto,
+            @NotBlank @Size(max = 10000) String cuerpo) {}
 
     /** A quién apunta un envío masivo — el backend resuelve el grupo a ids de usuario concretos. */
     public enum GrupoDestinatario {
@@ -40,7 +46,7 @@ public class MensajeDtos {
             Integer idParalelo,
             String curso,
             @NotBlank @Size(max = 150) String asunto,
-            @NotBlank String cuerpo) {}
+            @NotBlank @Size(max = 10000) String cuerpo) {}
 
     /** Fila de la pestaña "Enviados" — incluye cuántos de los destinatarios ya lo leyeron. */
     public record MensajeEnviadoResponse(

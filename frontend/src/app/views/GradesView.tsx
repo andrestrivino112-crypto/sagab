@@ -20,6 +20,14 @@ import type { Screen } from "../types";
 interface NotaRow { idEstudiante: number; nombre: string; tarea: string; clase: string; examen: string; }
 type NotaSortKey = "nombre" | "promedio";
 const FILAS_POR_PAGINA = 15;
+const ACCEPT_RECURSOS = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm,.avi,.mp3,.m4a,.wav,.ogg,.txt,.csv";
+
+function tamanoArchivo(bytes: number | null): string {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function GradesView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
@@ -377,7 +385,7 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="space-y-4">
         <form onSubmit={subirArchivo} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Publicar sílabo o formato</p>
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Publicar recurso académico</p>
           <div className="flex gap-3">
             <div className="flex-1">
               <label htmlFor="recurso-tipo" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Tipo</label>
@@ -394,8 +402,8 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
             </div>
           </div>
-          <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15} onFileSelected={setArchivo}
-            disabled={subiendoArchivo} label="Adjuntar archivo (PDF, Word, ZIP o imagen)" />
+          <FileUpload accept={ACCEPT_RECURSOS} maxSizeMb={100} onFileSelected={setArchivo}
+            disabled={subiendoArchivo} label="PDF, Office, imagen, video, audio, ZIP/RAR, TXT o CSV (máx. 100 MB)" />
           <Btn disabled={subiendoArchivo || !archivo || !nombreArchivo.trim()}>
             {subiendoArchivo ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
             Publicar
@@ -431,19 +439,23 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
           </div>
         )}
         {loading && <div className="px-4 pb-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…</div>}
-        {!loading && recursos.length === 0 && !error && (
+        {!loading && recursos.filter(r => r.tipo !== "MATERIAL").length === 0 && !error && (
           <div className="px-4 pb-4"><EmptyState icon={FileText} title="Todavía no hay recursos publicados para esta asignación." /></div>
         )}
-        {!loading && recursos.length > 0 && (
+        {!loading && recursos.some(r => r.tipo !== "MATERIAL") && (
           <ul className="divide-y divide-gray-100">
-            {recursos.map(r => (
-              <li key={r.idRecurso} className="px-4 py-3 flex items-center justify-between gap-3">
+            {recursos.filter(r => r.tipo !== "MATERIAL").map(r => (
+              <li key={r.idRecurso} className="px-4 py-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[#1A1A1A] truncate">{r.nombre}</p>
                   <p className="text-[11px] text-gray-500">
                     {r.tipo === "SILABO" ? "Sílabo" : r.tipo === "FORMATO" ? "Formato" : "Link de clase"}
                     {" · "}{new Date(r.creadoEn).toLocaleDateString("es-EC", { day:"2-digit", month:"short", year:"numeric" })}
                   </p>
+                  <p className="text-[11px] text-gray-500">{r.materia} · {r.paralelo} · {r.docente}</p>
+                  {r.tipo !== "LINK_CLASE" && (
+                    <p className="text-[11px] text-gray-500 truncate">{r.archivoNombreOriginal ?? r.nombre} · {r.archivoMimeType ?? "Tipo no disponible"} · {tamanoArchivo(r.archivoTamanoBytes)}</p>
+                  )}
                 </div>
                 {r.tipo === "LINK_CLASE" && r.urlExterna ? (
                   <a href={r.urlExterna} target="_blank" rel="noopener noreferrer"
@@ -472,7 +484,7 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
   );
 }
 
-// ── Búsqueda avanzada (estudiante, curso, materia, período, docente) ────────
+// ── Búsqueda avanzada (estudiante, curso, materia, parcial) ────────────────
 function BusquedaCalificaciones({ asignaciones, toast }: {
   asignaciones: AsignacionOpcion[]; toast: ReturnType<typeof useToast>;
 }) {
@@ -483,13 +495,9 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
   };
   const paralelosOp = dedupe(asignaciones.map(a => ({ id: a.idParalelo, label: a.paralelo })));
   const materiasOp = dedupe(asignaciones.map(a => ({ id: a.idMateria, label: a.materia })));
-  const periodosOp = dedupe(asignaciones.map(a => ({ id: a.idPeriodo, label: a.periodo })));
-  const docentesOp = dedupe(asignaciones.map(a => ({ id: a.idDocente, label: a.docente })));
 
   const [idParalelo, setIdParalelo] = useState<number | "">("");
   const [idMateria, setIdMateria] = useState<number | "">("");
-  const [idPeriodo, setIdPeriodo] = useState<number | "">("");
-  const [idDocente, setIdDocente] = useState<number | "">("");
   const [parcial, setParcial] = useState<number | "">("");
   const [queryEstudiante, setQueryEstudiante] = useState("");
   const [estudianteSel, setEstudianteSel] = useState<EstudianteConParalelo | null>(null);
@@ -511,8 +519,6 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
         idEstudiante: estudianteSel?.id,
         idParalelo: idParalelo || undefined,
         idMateria: idMateria || undefined,
-        idPeriodo: idPeriodo || undefined,
-        idDocente: idDocente || undefined,
         parcial: parcial || undefined,
       });
       setResultados(r);
@@ -575,7 +581,7 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
   return (
     <div>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
           <div className="flex flex-col gap-1 relative">
             <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Estudiante</label>
             <input value={estudianteSel ? estudianteSel.nombreCompleto : queryEstudiante}
@@ -604,20 +610,6 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
             <select value={idMateria} onChange={e => setIdMateria(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
               <option value="">Todas</option>
               {materiasOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Período</label>
-            <select value={idPeriodo} onChange={e => setIdPeriodo(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
-              <option value="">Todos</option>
-              {periodosOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Docente</label>
-            <select value={idDocente} onChange={e => setIdDocente(e.target.value ? Number(e.target.value) : "")} className={selectCls}>
-              <option value="">Todos</option>
-              {docentesOp.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
@@ -657,8 +649,6 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
                 </th>
                 <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Curso</th>
                 <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Materia</th>
-                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Período</th>
-                <th scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Docente</th>
                 <th scope="col" className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Parcial</th>
                 <th scope="col" aria-sort={orden.campo === "promedio" ? (orden.asc ? "ascending" : "descending") : "none"}
                   className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
@@ -676,8 +666,6 @@ function BusquedaCalificaciones({ asignaciones, toast }: {
                   <td className="px-4 py-3 font-medium text-[#1A1A1A] whitespace-nowrap">{r.estudiante}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.curso}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.materia}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.periodo}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.docente}</td>
                   <td className="px-4 py-3 text-center">{r.parcial}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-flex items-center justify-center w-14 h-7 rounded-lg text-sm font-bold

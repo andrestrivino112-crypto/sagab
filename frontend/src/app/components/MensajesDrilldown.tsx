@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Loader2, Mail, MailOpen, Megaphone, Plus, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Mail, MailOpen, Megaphone, Plus, Send, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import type { RolSistema } from "../../api/auth";
 import {
-  estudiantes as estudiantesApi, mensajes as mensajesApi, paralelos as paralelosApi,
+  asignaciones as asignacionesApi, estudiantes as estudiantesApi, mensajes as mensajesApi, paralelos as paralelosApi,
   type EstudianteConParalelo, type EstudianteResumen, type GrupoDestinatario, type MensajeEnviadoResponse,
   type MensajeResponse, type ParaleloOpcion,
 } from "../../api/sagab";
@@ -29,6 +29,10 @@ function fecha(iso: string) {
   return new Date(iso).toLocaleString("es-EC", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+const ordenarParalelos = (a: ParaleloOpcion, b: ParaleloOpcion) =>
+  a.nivel.localeCompare(b.nivel, "es", { numeric: true })
+  || a.seccion.localeCompare(b.seccion, "es", { numeric: true });
+
 export function MensajesDrilldown({ onClose, rol }: { onClose: () => void; rol: RolSistema }) {
   const toast = useToast();
   const [mensajes, setMensajes] = useState<MensajeResponse[]>([]);
@@ -37,6 +41,7 @@ export function MensajesDrilldown({ onClose, rol }: { onClose: () => void; rol: 
   const [errorApi, setErrorApi] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("no_leidos");
   const [componiendo, setComponiendo] = useState(false);
+  const [mensajeAbierto, setMensajeAbierto] = useState<MensajeResponse | null>(null);
 
   useEffect(() => {
     Promise.all([mensajesApi.mias(), mensajesApi.enviados().catch(() => [])])
@@ -52,15 +57,21 @@ export function MensajesDrilldown({ onClose, rol }: { onClose: () => void; rol: 
     try {
       await mensajesApi.marcarLeido(idMensaje);
       setMensajes(prev => prev.map(m => m.idMensaje === idMensaje ? { ...m, leido: true } : m));
+      window.dispatchEvent(new CustomEvent("sagab:mensajes-actualizados"));
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo marcar como leído.");
     }
   };
 
+  const abrirMensaje = (mensaje: MensajeResponse) => {
+    setMensajeAbierto(mensaje);
+    if (!mensaje.leido) void marcarLeido(mensaje.idMensaje);
+  };
+
   const TABS: { id: Tab; label: string; count: number }[] = [
     { id: "no_leidos", label: "No leídos", count: noLeidos.length },
     { id: "leidos", label: "Leídos", count: leidos.length },
-    { id: "enviados", label: "Enviados", count: enviados.length },
+    { id: "enviados", label: "Historial", count: enviados.length },
   ];
 
   return (
@@ -81,7 +92,7 @@ export function MensajesDrilldown({ onClose, rol }: { onClose: () => void; rol: 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Bandeja de mensajes">
                 {TABS.map(t => (
-                  <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
+                  <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); setMensajeAbierto(null); }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
                       tab === t.id ? "bg-[#1F4E79] text-white" : "bg-[#F5F7FA] text-gray-600 hover:bg-[#EAF2FB]"}`}>
                     {t.label}
@@ -98,47 +109,59 @@ export function MensajesDrilldown({ onClose, rol }: { onClose: () => void; rol: 
               </Btn>
             </div>
 
-            {tab === "no_leidos" && (
+            {mensajeAbierto && (
+              <article className="rounded-xl border border-blue-100 bg-[#F8FAFC] p-4" aria-live="polite">
+                <button type="button" onClick={() => setMensajeAbierto(null)}
+                  className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline">
+                  <ArrowLeft size={13} aria-hidden="true" />Volver a la bandeja
+                </button>
+                <h3 className="text-base font-semibold text-[#1A1A1A]">{mensajeAbierto.asunto}</h3>
+                <p className="mt-1 text-xs text-gray-500">De: {mensajeAbierto.remitente} · {fecha(mensajeAbierto.enviadoEn)}</p>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{mensajeAbierto.cuerpo}</p>
+              </article>
+            )}
+
+            {!mensajeAbierto && tab === "no_leidos" && (
               noLeidos.length === 0 ? <EmptyState icon={MailOpen} title="No hay mensajes pendientes." /> : (
                 <ul className="space-y-2 max-h-[55vh] overflow-y-auto">
                   {noLeidos.map(m => (
-                    <li key={m.idMensaje} className="rounded-xl border border-red-200 bg-red-50 p-3">
+                    <li key={m.idMensaje} className="rounded-xl border border-red-200 bg-red-50">
+                      <button type="button" onClick={() => abrirMensaje(m)} className="w-full p-3 text-left hover:bg-red-100/60 rounded-xl">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-[#1A1A1A] flex items-center gap-1.5">
                             {m.esCircular && <Megaphone size={12} className="text-gray-500 flex-shrink-0" aria-hidden="true" />}{m.asunto}
                           </p>
                           <p className="text-xs text-gray-600 mt-0.5">De: {m.remitente} · {fecha(m.enviadoEn)}</p>
-                          <p className="text-xs text-gray-700 mt-1.5">{m.cuerpo}</p>
+                          <p className="text-xs text-[#2E75B6] mt-1.5">Abrir mensaje</p>
                         </div>
-                        <button type="button" onClick={() => marcarLeido(m.idMensaje)} title="Marcar como leído"
-                          className="flex-shrink-0 p-1.5 rounded-md text-[#2E75B6] hover:bg-white focus:outline-none">
-                          <Check size={14} aria-hidden="true" />
-                        </button>
                       </div>
+                      </button>
                     </li>
                   ))}
                 </ul>
               )
             )}
 
-            {tab === "leidos" && (
+            {!mensajeAbierto && tab === "leidos" && (
               leidos.length === 0 ? <EmptyState icon={Mail} title="No hay mensajes leídos todavía." /> : (
                 <ul className="space-y-2 max-h-[55vh] overflow-y-auto">
                   {leidos.map(m => (
-                    <li key={m.idMensaje} className="rounded-xl border border-gray-100 p-3">
+                    <li key={m.idMensaje} className="rounded-xl border border-gray-100">
+                      <button type="button" onClick={() => abrirMensaje(m)} className="w-full p-3 text-left hover:bg-gray-50 rounded-xl">
                       <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                         {m.esCircular && <Megaphone size={12} className="text-gray-400 flex-shrink-0" aria-hidden="true" />}{m.asunto}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">De: {m.remitente} · {fecha(m.enviadoEn)}</p>
-                      <p className="text-xs text-gray-600 mt-1.5">{m.cuerpo}</p>
+                      <p className="text-xs text-[#2E75B6] mt-1.5">Abrir mensaje</p>
+                      </button>
                     </li>
                   ))}
                 </ul>
               )
             )}
 
-            {tab === "enviados" && (
+            {!mensajeAbierto && tab === "enviados" && (
               enviados.length === 0 ? <EmptyState icon={Send} title="No has enviado mensajes." /> : (
                 <ul className="space-y-2 max-h-[55vh] overflow-y-auto">
                   {enviados.map(m => (
@@ -194,6 +217,8 @@ function ComponerMensajeModal({ rol, onClose, onEnviado, toast }: {
   const resultados = useDebouncedSearch(query, estudiantesApi.buscar);
   const [seleccionados, setSeleccionados] = useState<EstudianteResumen[]>([]);
   const [paralelosDisponibles, setParalelosDisponibles] = useState<ParaleloOpcion[]>([]);
+  const [cargandoParalelos, setCargandoParalelos] = useState(true);
+  const [errorParalelos, setErrorParalelos] = useState<string | null>(null);
   const [idParalelo, setIdParalelo] = useState<number | "">("");
   const [curso, setCurso] = useState("");
   const [asunto, setAsunto] = useState("");
@@ -202,23 +227,55 @@ function ComponerMensajeModal({ rol, onClose, onEnviado, toast }: {
 
   const [estudiantesDelParalelo, setEstudiantesDelParalelo] = useState<EstudianteResumen[]>([]);
   const [cargandoEstudiantes, setCargandoEstudiantes] = useState(false);
+  const [errorEstudiantes, setErrorEstudiantes] = useState<string | null>(null);
 
-  useEffect(() => { paralelosApi.listar().then(setParalelosDisponibles).catch(() => {}); }, []);
-  const cursos = useMemo(() => [...new Set(paralelosDisponibles.map(p => p.nivel))], [paralelosDisponibles]);
+  useEffect(() => {
+    let vigente = true;
+    setCargandoParalelos(true);
+    setErrorParalelos(null);
+
+    const solicitud = !esDocente
+      ? paralelosApi.listar()
+      : asignacionesApi.mias().then(asignaciones => {
+          // Un docente solo recibe sus cursos/paralelos asignados; no depende del catálogo global.
+          const unicos = new Map<number, ParaleloOpcion>();
+          asignaciones.filter(a => a.periodoActivo).forEach(a => unicos.set(a.idParalelo, {
+            id: a.idParalelo, nivel: a.nivel, seccion: a.seccion,
+            anioLectivo: a.anioLectivo, etiqueta: a.paralelo,
+          }));
+          return [...unicos.values()];
+        });
+
+    solicitud
+      .then(opciones => { if (vigente) setParalelosDisponibles([...opciones].sort(ordenarParalelos)); })
+      .catch(e => {
+        if (vigente) setErrorParalelos(e instanceof ApiError ? e.message : "No se pudieron cargar los cursos asignados.");
+      })
+      .finally(() => { if (vigente) setCargandoParalelos(false); });
+
+    return () => { vigente = false; };
+  }, [esDocente]);
+  const cursos = useMemo(() => [...new Set(paralelosDisponibles.map(p => p.nivel))]
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true })), [paralelosDisponibles]);
   const paralelosDelCurso = useMemo(
     () => (curso ? paralelosDisponibles.filter(p => p.nivel === curso) : []),
     [paralelosDisponibles, curso]);
 
   // Flujo del docente: Curso -> Paralelo -> lista de estudiantes de ese paralelo (no de otros).
   useEffect(() => {
-    if (!esDocente || idParalelo === "") { setEstudiantesDelParalelo([]); return; }
+    if (!esDocente || idParalelo === "") {
+      setEstudiantesDelParalelo([]);
+      setErrorEstudiantes(null);
+      return;
+    }
     setCargandoEstudiantes(true);
+    setErrorEstudiantes(null);
     setSeleccionados([]);
     estudiantesApi.porParalelo(idParalelo)
       .then(setEstudiantesDelParalelo)
-      .catch(() => toast.error("No se pudo cargar la lista de estudiantes del paralelo."))
+      .catch(e => setErrorEstudiantes(e instanceof ApiError ? e.message : "No se pudo cargar la lista de estudiantes del paralelo."))
       .finally(() => setCargandoEstudiantes(false));
-  }, [esDocente, idParalelo, toast]);
+  }, [esDocente, idParalelo]);
 
   const toggleEstudianteParalelo = (e: EstudianteResumen) => {
     setSeleccionados(prev => prev.some(s => s.id === e.id) ? prev.filter(s => s.id !== e.id) : [...prev, e]);
@@ -270,16 +327,16 @@ function ComponerMensajeModal({ rol, onClose, onEnviado, toast }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="msg-curso-docente" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Curso</label>
-                <select id="msg-curso-docente" value={curso}
+                <select id="msg-curso-docente" value={curso} disabled={cargandoParalelos || cursos.length === 0}
                   onChange={e => { setCurso(e.target.value); setIdParalelo(""); }}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
-                  <option value="">Seleccione…</option>
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white disabled:bg-gray-50 disabled:text-gray-400">
+                  <option value="">{cargandoParalelos ? "Cargando…" : cursos.length === 0 ? "Sin cursos asignados" : "Seleccione…"}</option>
                   {cursos.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="msg-paralelo-docente" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Paralelo</label>
-                <select id="msg-paralelo-docente" value={idParalelo} disabled={!curso}
+                <select id="msg-paralelo-docente" value={idParalelo} disabled={!curso || cargandoParalelos}
                   onChange={e => setIdParalelo(e.target.value ? Number(e.target.value) : "")}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white disabled:bg-gray-50 disabled:text-gray-400">
                   <option value="">Seleccione…</option>
@@ -287,6 +344,12 @@ function ComponerMensajeModal({ rol, onClose, onEnviado, toast }: {
                 </select>
               </div>
             </div>
+
+            {errorParalelos && (
+              <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorParalelos}
+              </div>
+            )}
 
             {idParalelo !== "" && (
               <div>
@@ -302,6 +365,8 @@ function ComponerMensajeModal({ rol, onClose, onEnviado, toast }: {
                   <div className="py-4 text-center text-sm text-gray-500">
                     <Loader2 size={14} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…
                   </div>
+                ) : errorEstudiantes ? (
+                  <p role="alert" className="text-sm text-[#C62828] py-2">{errorEstudiantes}</p>
                 ) : estudiantesDelParalelo.length === 0 ? (
                   <p className="text-sm text-gray-500 py-2">Este paralelo no tiene estudiantes matriculados.</p>
                 ) : (

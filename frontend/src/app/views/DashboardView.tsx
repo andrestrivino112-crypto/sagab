@@ -66,6 +66,15 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
     }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const actualizarMensajes = () => {
+      dashboardApi.resumen().then(setResumen).catch(() => {});
+      mensajesApi.mias().then(lista => setMensajesRecientes(lista.slice(0, 4))).catch(() => {});
+    };
+    window.addEventListener("sagab:mensajes-actualizados", actualizarMensajes);
+    return () => window.removeEventListener("sagab:mensajes-actualizados", actualizarMensajes);
+  }, []);
+
   const rendimiento = resumen?.rendimientoPorParalelo ?? [];
   const accionesRapidas = {
     ADMIN: [
@@ -272,7 +281,7 @@ export function DashboardView({ rol }: { rol: RolSistema }) {
 
       {moraAbierta && <MoraDrilldown onClose={() => setMoraAbierta(false)} />}
       {promedioAbierto && <PromedioDrilldown onClose={() => setPromedioAbierto(false)} />}
-      {ausenciasAbiertas && <AusenciasDrilldown onClose={() => setAusenciasAbiertas(false)} />}
+      {ausenciasAbiertas && <AusenciasDrilldown onClose={() => setAusenciasAbiertas(false)} rol={rol} />}
       {mensajesAbiertos && <MensajesDrilldown onClose={() => setMensajesAbiertos(false)} rol={rol} />}
     </div>
   );

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell } from "lucide-react";
+import { ArrowLeft, Bell } from "lucide-react";
 import { mensajes, type MensajeResponse } from "../../api/sagab";
 
 export function TopBar({ title, subtitle }: { title: string; subtitle?: string }) {
   const [noLeidos, setNoLeidos] = useState<MensajeResponse[]>([]);
   const [abierto, setAbierto] = useState(false);
+  const [detalle, setDetalle] = useState<MensajeResponse | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const cargar = () => {
@@ -12,6 +13,11 @@ export function TopBar({ title, subtitle }: { title: string; subtitle?: string }
   };
 
   useEffect(cargar, []);
+
+  useEffect(() => {
+    window.addEventListener("sagab:mensajes-actualizados", cargar);
+    return () => window.removeEventListener("sagab:mensajes-actualizados", cargar);
+  }, []);
 
   useEffect(() => {
     if (!abierto) return;
@@ -26,9 +32,15 @@ export function TopBar({ title, subtitle }: { title: string; subtitle?: string }
     setNoLeidos(prev => prev.filter(m => m.idMensaje !== id));
     try {
       await mensajes.marcarLeido(id);
+      window.dispatchEvent(new CustomEvent("sagab:mensajes-actualizados"));
     } catch {
       cargar(); // si falló en el servidor, recuperamos el estado real
     }
+  };
+
+  const abrirMensaje = (mensaje: MensajeResponse) => {
+    setDetalle(mensaje);
+    void marcarLeido(mensaje.idMensaje);
   };
 
   return (
@@ -51,18 +63,27 @@ export function TopBar({ title, subtitle }: { title: string; subtitle?: string }
 
         {abierto && (
           <div role="menu" className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-20">
-            <p className="px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Mensajes sin leer</p>
+            {detalle ? (
+              <div className="px-4 py-2">
+                <button type="button" onClick={() => setDetalle(null)} className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline">
+                  <ArrowLeft size={12} aria-hidden="true" />Volver
+                </button>
+                <p className="text-sm font-semibold text-[#1A1A1A]">{detalle.asunto}</p>
+                <p className="mt-0.5 text-xs text-gray-500">De: {detalle.remitente}</p>
+                <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-gray-700">{detalle.cuerpo}</p>
+              </div>
+            ) : <><p className="px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Mensajes sin leer</p>
             {noLeidos.length === 0 ? (
               <p className="px-4 py-3 text-sm text-gray-500">No tiene mensajes sin leer.</p>
             ) : (
               noLeidos.map(m => (
-                <button key={m.idMensaje} type="button" onClick={() => marcarLeido(m.idMensaje)}
+                <button key={m.idMensaje} type="button" onClick={() => abrirMensaje(m)}
                   className="w-full text-left px-4 py-2.5 hover:bg-[#EAF2FB] transition-colors cursor-pointer">
                   <p className="text-sm font-medium text-[#1A1A1A] truncate">{m.asunto}</p>
                   <p className="text-xs text-gray-500 truncate">{m.remitente}</p>
                 </button>
               ))
-            )}
+            )}</>}
           </div>
         )}
       </div>

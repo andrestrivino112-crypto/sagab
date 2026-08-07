@@ -1,6 +1,6 @@
 import {
   BookOpen, Users, DollarSign, Home, LogOut,
-  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp, AlertTriangle, History, IdCard, CalendarDays,
+  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp, AlertTriangle, History, IdCard, CalendarDays, MessagesSquare, UserRoundSearch,
 } from "lucide-react";
 import type { RolSistema } from "../../api/auth";
 import type { Screen } from "../types";
@@ -12,6 +12,8 @@ export const NAV = [
   { id:"grades"       as Screen, label:"Académico",           icon: BookOpen },
   { id:"attendance"   as Screen, label:"Asistencia",          icon: Users },
   { id:"calendar"      as Screen, label:"Calendario",          icon: CalendarDays },
+  { id:"messages"      as Screen, label:"Mensajes institucionales", icon: MessagesSquare },
+  { id:"deceSeguimiento" as Screen, label:"Estudiantes en seguimiento", icon: UserRoundSearch },
   { id:"deceAlertas"  as Screen, label:"Alertas de Asistencia", icon: AlertTriangle },
   { id:"tareas"       as Screen, label:"Deberes",             icon: FileUp },
   { id:"financial"    as Screen, label:"Financiero",          icon: DollarSign },
@@ -22,9 +24,9 @@ export const NAV = [
 
 /** Qué módulos ve cada rol — el docente no debe ver Matrícula ni Financiero. */
 export const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
-  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "calendar", "tareas", "financial", "personal", "parent"],
+  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "calendar", "messages", "financial", "personal"],
   DOCENTE:       ["dashboard", "grades", "attendance", "calendar", "tareas"],
-  DECE:          ["dashboard", "calendar", "deceAlertas"],
+  DECE:          ["deceSeguimiento", "deceAlertas", "calendar"],
   AUDITOR:       ["dashboard", "auditoria"],
   REPRESENTANTE: [],
   // El estudiante usa el Portal Familiar (mismo componente que el representante, viendo sus
