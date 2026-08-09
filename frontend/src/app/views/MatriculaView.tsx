@@ -149,11 +149,29 @@ export function MatriculaView() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<{ codigo: string; usuarioEstudiante: string; usuarioRepresentante: string; representanteNuevo: boolean } | null>(null);
   const [paralelosOpciones, setParalelosOpciones] = useState<ParaleloOpcion[]>([]);
-  const [paraleloTexto, setParaleloTexto] = useState("");
+  const [loadingParalelos, setLoadingParalelos] = useState(true);
+  const [errorParalelos, setErrorParalelos] = useState<string | null>(null);
 
-  useEffect(() => {
-    paralelosApi.listar().then(setParalelosOpciones).catch(() => setParalelosOpciones([]));
-  }, []);
+  const cargarParalelos = async () => {
+    setLoadingParalelos(true);
+    setErrorParalelos(null);
+    try {
+      const opciones = await paralelosApi.listar();
+      setParalelosOpciones(opciones);
+      setForm(prev => prev.idParalelo !== "" && !opciones.some(p => p.id === prev.idParalelo)
+        ? { ...prev, idParalelo: "" }
+        : prev);
+    } catch (e) {
+      setParalelosOpciones([]);
+      setErrorParalelos(e instanceof ApiError
+        ? e.message
+        : "No se pudieron cargar los períodos y paralelos disponibles.");
+    } finally {
+      setLoadingParalelos(false);
+    }
+  };
+
+  useEffect(() => { void cargarParalelos(); }, []);
 
   const set = <K extends FieldKey>(key: K, value: MatriculaData[K]) => {
     setForm(p => ({ ...p, [key]: value }));
@@ -225,7 +243,6 @@ export function MatriculaView() {
       toast.success(`Usuario creado correctamente: ${resp.usuarioEstudiante}`);
       setForm(MATRICULA_EMPTY);
       setTouchedFields({});
-      setParaleloTexto("");
       setAttempted(false);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo registrar la matrícula. Intente nuevamente.");
@@ -318,19 +335,48 @@ export function MatriculaView() {
                 {GENEROS.map(g => <option key={g.v} value={g.v}>{g.l}</option>)}
               </select>
             </FormField>
-            <FormField label="Paralelo a matricular" error={err("idParalelo")} hint={paralelosOpciones.length === 0 ? "Cargando paralelos…" : "Escriba para buscar (autocompletado)"}>
-              <input list="paralelos-datalist" className={cls("idParalelo", "form-control")}
-                value={paraleloSeleccionado ? `${paraleloSeleccionado.etiqueta} · ${paraleloSeleccionado.anioLectivo}` : paraleloTexto}
-                onChange={e => {
-                  const val = e.target.value;
-                  setParaleloTexto(val);
-                  const match = paralelosOpciones.find(p => `${p.etiqueta} · ${p.anioLectivo}` === val);
-                  set("idParalelo", match ? match.id : "");
-                }}
-                placeholder="Ej. 2° BGU · 2025-2026" autoComplete="off" />
-              <datalist id="paralelos-datalist">
-                {paralelosOpciones.map(p => <option key={p.id} value={`${p.etiqueta} · ${p.anioLectivo}`} />)}
-              </datalist>
+            <FormField
+              label="Período y paralelo a matricular"
+              error={err("idParalelo")}
+              hint={!loadingParalelos && !errorParalelos && paralelosOpciones.length > 0
+                ? "Seleccione el curso correspondiente al período lectivo."
+                : undefined}
+            >
+              <select
+                className={cls("idParalelo", "form-select")}
+                value={form.idParalelo}
+                onChange={e => set("idParalelo", e.target.value ? Number(e.target.value) : "")}
+                disabled={loadingParalelos || errorParalelos !== null || paralelosOpciones.length === 0}
+              >
+                <option value="">
+                  {loadingParalelos
+                    ? "Cargando períodos y paralelos…"
+                    : errorParalelos
+                      ? "No se pudieron cargar las opciones"
+                      : paralelosOpciones.length === 0
+                        ? "No hay períodos y paralelos configurados"
+                        : "Seleccione…"}
+                </option>
+                {paralelosOpciones.map(p => (
+                  <option key={p.id} value={p.id}>{p.nivel} · {p.anioLectivo} · {p.seccion}</option>
+                ))}
+              </select>
+              {errorParalelos && (
+                <div role="alert" className="alert alert-danger d-flex align-items-center justify-content-between gap-2 py-2 px-3 mt-2 mb-0 small">
+                  <span><AlertCircle size={14} className="me-1" style={{ verticalAlign: "-2px" }} aria-hidden="true" />{errorParalelos}</span>
+                  <button type="button" className="btn btn-sm btn-outline-danger flex-shrink-0" onClick={() => void cargarParalelos()} disabled={loadingParalelos}>
+                    Reintentar
+                  </button>
+                </div>
+              )}
+              {!loadingParalelos && !errorParalelos && paralelosOpciones.length === 0 && (
+                <div role="status" className="alert alert-warning d-flex align-items-center justify-content-between gap-2 py-2 px-3 mt-2 mb-0 small">
+                  <span>No hay estructura académica disponible para matricular.</span>
+                  <button type="button" className="btn btn-sm btn-outline-secondary flex-shrink-0" onClick={() => void cargarParalelos()}>
+                    Actualizar
+                  </button>
+                </div>
+              )}
             </FormField>
             <FormField label="Dirección domiciliaria" error={err("direccion")}>
               <input className={cls("direccion", "form-control")} value={form.direccion} onChange={e => set("direccion", e.target.value)} placeholder="Calle, número, sector" autoComplete="street-address" maxLength={150} />
@@ -433,7 +479,7 @@ export function MatriculaView() {
           </div>
         )}
         <div className="d-flex align-items-center justify-content-end gap-3 pb-4">
-          <button type="button" disabled={saving}
+          <button type="button" disabled={saving || loadingParalelos || errorParalelos !== null || paralelosOpciones.length === 0}
             className={`btn ${attempted && !allOk ? "btn-danger" : "btn-primary"} d-flex align-items-center gap-2`} onClick={submit}>
             {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
             {saving ? "Registrando…" : attempted && !allOk ? "Corrija los campos marcados" : "Registrar matrícula"}

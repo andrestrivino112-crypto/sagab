@@ -30,7 +30,7 @@ docker compose up --build
 ```
 
 La aplicación queda disponible en <http://localhost:8088>. En el primer arranque se crea un
-volumen PostgreSQL y se aplican automáticamente los 25 scripts estructurales. Los siguientes
+volumen PostgreSQL y se aplican automáticamente los 26 scripts estructurales. Los siguientes
 arranques reutilizan esa base. Este modo usa credenciales locales de demostración: no debe
 publicarse como entorno de producción sin rotarlas.
 
@@ -48,13 +48,14 @@ docker compose down
 bash database/setup_db.sh
 ```
 
-El inicializador ejecuta los 25 scripts estructurales en su orden real de dependencias. Los datos
-de demostración y las cuentas nominales se mantienen fuera de la ejecución automática. En una base
-existente que ya tenga las migraciones 01–27, aplicar:
+El inicializador ejecuta los 26 scripts estructurales en su orden real de dependencias. Los datos
+de demostración y las cuentas nominales se mantienen fuera de la ejecución automática. No vuelvas
+a ejecutar el inicializador completo sobre una base existente. Si esa base ya llega hasta la
+migración 31, aplica únicamente el catálogo nuevo y vuelve a sembrar los rubros del período activo:
 
 ```bash
-sudo -u postgres psql -d sagab -v ON_ERROR_STOP=1 -f database/28_calendario_institucional.sql
-sudo -u postgres psql -d sagab -v ON_ERROR_STOP=1 -f database/29_seguimiento_dece.sql
+psql -X -h localhost -U postgres -d sagab -v ON_ERROR_STOP=1 -f database/32_catalogo_academico_2025_2026.sql
+psql -X -h localhost -U postgres -d sagab -v ON_ERROR_STOP=1 -f database/18_rubros_motivos_pago.sql
 ```
 
 ### Diseño de seguridad en la BD (defensa en profundidad)

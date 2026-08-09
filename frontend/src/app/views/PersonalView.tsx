@@ -30,6 +30,7 @@ export function PersonalView() {
   const [lista, setLista] = useState<PersonalResumen[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
+  const [catalogRevision, setCatalogRevision] = useState(0);
 
   const cargar = () => {
     setLoading(true);
@@ -63,6 +64,7 @@ export function PersonalView() {
       toast.success("Cuenta creada correctamente");
       setForm(VACIO);
       cargar();
+      if (resp.rol === "DOCENTE") setCatalogRevision(revision => revision + 1);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo crear la cuenta.");
     } finally {
@@ -179,14 +181,20 @@ export function PersonalView() {
           )}
         </div>
       </div>
-      <div className="px-6 pb-8"><AsignacionesPanel /></div>
+      <div className="px-6 pb-8"><AsignacionesPanel catalogRevision={catalogRevision} /></div>
     </div>
   );
 }
 
 const ASIGNACION_VACIA = { idDocente: "" as number | "", idsMaterias: [] as number[], idParalelo: "" as number | "", idPeriodo: "" as number | "" };
 
-function AsignacionesPanel() {
+const etiquetaPeriodo = (periodo: AsignacionCatalogos["periodos"][number]) =>
+  periodo.nombre.includes(periodo.anioLectivo) ? periodo.nombre : `${periodo.nombre} · ${periodo.anioLectivo}`;
+
+const etiquetaParalelo = (paralelo: AsignacionCatalogos["paralelos"][number]) =>
+  `${paralelo.nivel} · ${paralelo.anioLectivo} · ${paralelo.seccion}`;
+
+function AsignacionesPanel({ catalogRevision }: { catalogRevision: number }) {
   const toast = useToast();
   const [catalogos, setCatalogos] = useState<AsignacionCatalogos | null>(null);
   const [lista, setLista] = useState<AsignacionOpcion[]>([]);
@@ -213,7 +221,14 @@ function AsignacionesPanel() {
       const c = catalogosResult.value;
       setCatalogos(c);
       const activo = c.periodos.find(p => p.activo) ?? c.periodos[0];
-      setForm(prev => prev.idPeriodo === "" && activo ? { ...prev, idPeriodo: activo.idPeriodo } : prev);
+      setForm(prev => {
+        const periodoActual = c.periodos.find(p => p.idPeriodo === prev.idPeriodo);
+        const idPeriodo = periodoActual?.idPeriodo ?? activo?.idPeriodo ?? "";
+        const anioLectivo = c.periodos.find(p => p.idPeriodo === idPeriodo)?.anioLectivo;
+        const conservaParalelo = prev.idParalelo !== "" && c.paralelos.some(p =>
+          p.idParalelo === prev.idParalelo && (!anioLectivo || p.anioLectivo === anioLectivo));
+        return { ...prev, idPeriodo, idParalelo: conservaParalelo ? prev.idParalelo : "" };
+      });
     } else {
       setCatalogos(null);
       errores.push(`Catálogos: ${mensajeError(catalogosResult.reason, "no se pudieron cargar docentes, materias, cursos y períodos")}`);
@@ -227,10 +242,25 @@ function AsignacionesPanel() {
     setError(errores.length > 0 ? errores.join(" · ") : null);
     setLoading(false);
   };
-  useEffect(() => { void cargar(); }, []);
+  useEffect(() => { void cargar(); }, [catalogRevision]);
 
   const periodo = catalogos?.periodos.find(p => p.idPeriodo === form.idPeriodo);
   const paralelos = catalogos?.paralelos.filter(p => !periodo || p.anioLectivo === periodo.anioLectivo) ?? [];
+  const catalogosVacios = catalogos ? [
+    catalogos.docentes.length === 0 ? "docentes activos" : null,
+    catalogos.periodos.length === 0 ? "períodos académicos" : null,
+    catalogos.paralelos.length === 0 ? "cursos y paralelos" : null,
+    catalogos.materias.length === 0 ? "materias" : null,
+  ].filter((item): item is string => item !== null) : [];
+  const formularioCompleto = catalogos !== null
+    && form.idDocente !== ""
+    && catalogos.docentes.some(d => d.idDocente === form.idDocente)
+    && form.idPeriodo !== ""
+    && catalogos.periodos.some(p => p.idPeriodo === form.idPeriodo)
+    && form.idParalelo !== ""
+    && paralelos.some(p => p.idParalelo === form.idParalelo)
+    && form.idsMaterias.length > 0
+    && form.idsMaterias.every(id => catalogos.materias.some(m => m.idMateria === id));
   const filtered = lista.filter(a => {
     const text = `${a.docente} ${a.materia} ${a.paralelo} ${a.periodo}`.toLowerCase();
     return text.includes(query.toLowerCase())
@@ -245,7 +275,10 @@ function AsignacionesPanel() {
   const toggleMateria = (id: number) => setForm(p => ({ ...p, idsMaterias: p.idsMaterias.includes(id) ? p.idsMaterias.filter(x => x !== id) : [...p.idsMaterias, id] }));
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (form.idDocente === "" || form.idParalelo === "" || form.idPeriodo === "" || form.idsMaterias.length === 0) return;
+    if (!formularioCompleto) {
+      setError("Seleccione un docente, un período, un curso y al menos una materia válida.");
+      return;
+    }
     setSaving(true); setError(null);
     try {
       if (editing) {
@@ -282,17 +315,57 @@ function AsignacionesPanel() {
   return <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
     <div className="border-b border-gray-100 px-5 py-4"><div className="flex items-center gap-2"><BookOpen size={18} className="text-[#2E75B6]" /><h2 className="font-semibold text-[#1A1A1A]">Asignación de materias</h2></div><p className="mt-1 text-xs text-gray-500">Una misma persona puede dictar varias materias. Estas asignaciones alimentan Notas, Asistencia, Recursos, Reportes y Mensajes.</p></div>
     {error && <div role="alert" className="m-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[#C62828]"><span className="flex min-w-0 items-start gap-2"><AlertCircle size={15} className="mt-0.5 flex-shrink-0" />{error}</span><Btn type="button" variant="secondary" size="sm" onClick={() => void cargar()} disabled={loading}>Reintentar</Btn></div>}
+    {!loading && catalogos && catalogosVacios.length > 0 && (
+      <div role="status" className="m-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <span>Falta configurar: {catalogosVacios.join(", ")}.</span>
+        <Btn type="button" variant="secondary" size="sm" onClick={() => void cargar()}>Actualizar catálogos</Btn>
+      </div>
+    )}
     {loading ? <div className="p-8 text-center text-sm text-gray-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Cargando estructura académica…</div> : catalogos && <div className="grid gap-0 xl:grid-cols-[0.8fr,1.2fr]">
       <form id="asignacion-form" onSubmit={guardar} className="space-y-4 border-b border-gray-100 p-5 xl:border-b-0 xl:border-r">
         <div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{editing ? "Editar asignación" : "Nueva asignación"}</p>{editing && <button type="button" onClick={reset} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><X size={13} />Cancelar edición</button>}</div>
-        <div><label htmlFor="asg-docente" className="mb-1 block text-xs font-semibold text-gray-600">Docente</label><select id="asg-docente" required value={form.idDocente} onChange={e => setForm({ ...form, idDocente: e.target.value ? Number(e.target.value) : "" })} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Seleccione…</option>{catalogos.docentes.map(d => <option key={d.idDocente} value={d.idDocente}>{d.nombre} · {d.email}</option>)}</select></div>
-        <div className="grid gap-3 sm:grid-cols-2"><div><label htmlFor="asg-periodo" className="mb-1 block text-xs font-semibold text-gray-600">Período</label><select id="asg-periodo" required value={form.idPeriodo} onChange={e => setForm({ ...form, idPeriodo: e.target.value ? Number(e.target.value) : "", idParalelo: "" })} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Seleccione…</option>{catalogos.periodos.map(p => <option key={p.idPeriodo} value={p.idPeriodo}>{p.etiqueta}{p.activo ? " · Activo" : ""}</option>)}</select></div><div><label htmlFor="asg-paralelo" className="mb-1 block text-xs font-semibold text-gray-600">Curso y paralelo</label><select id="asg-paralelo" required value={form.idParalelo} onChange={e => setForm({ ...form, idParalelo: e.target.value ? Number(e.target.value) : "" })} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Seleccione…</option>{paralelos.map(p => <option key={p.idParalelo} value={p.idParalelo}>{p.etiqueta}</option>)}</select></div></div>
-        <fieldset><legend className="mb-2 text-xs font-semibold text-gray-600">Materia{editing ? "" : "s (puede seleccionar varias)"}</legend><div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">{catalogos.materias.map(m => <label key={m.idMateria} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#EAF2FB]"><input type={editing ? "radio" : "checkbox"} name={editing ? "materia" : undefined} checked={form.idsMaterias.includes(m.idMateria)} onChange={() => editing ? setForm({ ...form, idsMaterias: [m.idMateria] }) : toggleMateria(m.idMateria)} /> <span>{m.nombre}</span><span className="ml-auto text-[10px] text-gray-400">{m.codigo}</span></label>)}</div></fieldset>
-        <Btn disabled={saving || form.idsMaterias.length === 0}>{saving ? <Loader2 size={14} className="animate-spin" /> : editing ? <Pencil size={14} /> : <CheckCircle2 size={14} />}{editing ? "Guardar cambios" : `Crear ${form.idsMaterias.length || ""} asignación(es)`}</Btn>
+        <div>
+          <label htmlFor="asg-docente" className="mb-1 block text-xs font-semibold text-gray-600">Docente</label>
+          <select id="asg-docente" required value={form.idDocente} disabled={catalogos.docentes.length === 0}
+            onChange={e => setForm({ ...form, idDocente: e.target.value ? Number(e.target.value) : "" })}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500">
+            <option value="">{catalogos.docentes.length === 0 ? "No hay docentes activos" : "Seleccione…"}</option>
+            {catalogos.docentes.map(d => <option key={d.idDocente} value={d.idDocente}>{d.nombre} · {d.email}</option>)}
+          </select>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="asg-periodo" className="mb-1 block text-xs font-semibold text-gray-600">Período</label>
+            <select id="asg-periodo" required value={form.idPeriodo} disabled={catalogos.periodos.length === 0}
+              onChange={e => setForm({ ...form, idPeriodo: e.target.value ? Number(e.target.value) : "", idParalelo: "" })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500">
+              <option value="">{catalogos.periodos.length === 0 ? "No hay períodos configurados" : "Seleccione…"}</option>
+              {catalogos.periodos.map(p => <option key={p.idPeriodo} value={p.idPeriodo}>{etiquetaPeriodo(p)}{p.activo ? " · Activo" : ""}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="asg-paralelo" className="mb-1 block text-xs font-semibold text-gray-600">Curso y paralelo</label>
+            <select id="asg-paralelo" required value={form.idParalelo} disabled={form.idPeriodo === "" || paralelos.length === 0}
+              onChange={e => setForm({ ...form, idParalelo: e.target.value ? Number(e.target.value) : "" })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500">
+              <option value="">{form.idPeriodo === "" ? "Seleccione primero un período" : paralelos.length === 0 ? "No hay paralelos para este período" : "Seleccione…"}</option>
+              {paralelos.map(p => <option key={p.idParalelo} value={p.idParalelo}>{etiquetaParalelo(p)}</option>)}
+            </select>
+          </div>
+        </div>
+        <fieldset>
+          <legend className="mb-2 text-xs font-semibold text-gray-600">Materia{editing ? "" : "s (puede seleccionar varias)"}</legend>
+          <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
+            {catalogos.materias.length === 0
+              ? <p className="px-2 py-3 text-sm text-gray-500">No hay materias configuradas.</p>
+              : catalogos.materias.map(m => <label key={m.idMateria} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#EAF2FB]"><input type={editing ? "radio" : "checkbox"} name={editing ? "materia" : undefined} checked={form.idsMaterias.includes(m.idMateria)} onChange={() => editing ? setForm({ ...form, idsMaterias: [m.idMateria] }) : toggleMateria(m.idMateria)} /> <span>{m.nombre}</span><span className="ml-auto text-[10px] text-gray-400">{m.codigo}</span></label>)}
+          </div>
+        </fieldset>
+        <Btn disabled={saving || !formularioCompleto}>{saving ? <Loader2 size={14} className="animate-spin" /> : editing ? <Pencil size={14} /> : <CheckCircle2 size={14} />}{editing ? "Guardar cambios" : `Crear ${form.idsMaterias.length || ""} asignación(es)`}</Btn>
       </form>
 
       <div className="min-w-0 p-5">
-        <div className="grid gap-2 sm:grid-cols-[1fr,auto,auto]"><label className="relative"><span className="sr-only">Buscar asignación</span><Search size={15} className="absolute left-3 top-2.5 text-gray-400" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar docente, materia o curso" className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm" /></label><select aria-label="Filtrar por docente" value={filtroDocente} onChange={e => setFiltroDocente(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Todos los docentes</option>{catalogos.docentes.map(d => <option key={d.idDocente} value={d.idDocente}>{d.nombre}</option>)}</select><select aria-label="Filtrar por período" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Todos los períodos</option>{catalogos.periodos.map(p => <option key={p.idPeriodo} value={p.idPeriodo}>{p.etiqueta}</option>)}</select></div>
+        <div className="grid gap-2 sm:grid-cols-[1fr,auto,auto]"><label className="relative"><span className="sr-only">Buscar asignación</span><Search size={15} className="absolute left-3 top-2.5 text-gray-400" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar docente, materia o curso" className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm" /></label><select aria-label="Filtrar por docente" value={filtroDocente} onChange={e => setFiltroDocente(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Todos los docentes</option>{catalogos.docentes.map(d => <option key={d.idDocente} value={d.idDocente}>{d.nombre}</option>)}</select><select aria-label="Filtrar por período" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Todos los períodos</option>{catalogos.periodos.map(p => <option key={p.idPeriodo} value={p.idPeriodo}>{etiquetaPeriodo(p)}</option>)}</select></div>
         <p className="my-3 text-xs text-gray-500">{filtered.length} de {lista.length} asignaciones</p>
         {filtered.length === 0 ? <EmptyState icon={BookOpen} title="No hay asignaciones para los filtros seleccionados." /> : <div className="overflow-x-auto rounded-xl border border-gray-200"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500"><tr><th className="px-3 py-2">Docente</th><th className="px-3 py-2">Materia</th><th className="px-3 py-2">Curso / paralelo</th><th className="px-3 py-2">Período</th><th className="px-3 py-2 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-gray-100">{filtered.map(a => <tr key={a.idAsignacion} className="hover:bg-gray-50"><td className="px-3 py-3 font-medium text-gray-800">{a.docente}</td><td className="px-3 py-3">{a.materia}</td><td className="px-3 py-3">{a.paralelo}</td><td className="px-3 py-3"><span className={a.periodoActivo ? "font-medium text-[#2E7D32]" : "text-gray-500"}>{a.periodo}</span></td><td className="px-3 py-3"><div className="flex justify-end gap-1"><button type="button" onClick={() => editar(a)} aria-label={`Editar ${a.materia}`} className="rounded-lg p-2 text-[#2E75B6] hover:bg-[#EAF2FB]"><Pencil size={15} /></button><button type="button" onClick={() => void eliminar(a)} aria-label={`Eliminar ${a.materia}`} className="rounded-lg p-2 text-[#C62828] hover:bg-red-50"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>}
       </div>

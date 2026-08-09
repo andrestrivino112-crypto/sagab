@@ -20,14 +20,16 @@ fi
 # numérico literal. 09_estudiante_usuario.sql debe correr antes que 07_usuario_username.sql
 # pese a que 09 se numeró después — 09 solo depende de 01-04/06, no de 07/08. Todos los
 # scripts de este bloque son estructurales (tablas, triggers, funciones), salvo 31, que crea
-# de forma idempotente las dos cuentas SUPER_ADMIN iniciales expresamente solicitadas.
+# las cuentas SUPER_ADMIN iniciales, y 32, que crea el catálogo académico mínimo. El catálogo
+# debe preceder a 18 para que ese script pueda sembrar los rubros del período activo.
 echo "Ejecutando scripts de esquema, roles, módulos y cuentas SUPER_ADMIN iniciales..."
 for script in \
   01_schema.sql 02_indices.sql 03_auditoria.sql 04_roles_bd.sql \
   06_matricula_campos.sql 09_estudiante_usuario.sql \
   12_indice_check_pagos.sql 13_particion_auditoria_automatica.sql \
   14_notificaciones.sql 15_deberes.sql 16_pagos_transferencia.sql \
-  17_pago_asunto.sql 18_rubros_motivos_pago.sql 19_tarea_parcial.sql \
+  17_pago_asunto.sql 32_catalogo_academico_2025_2026.sql \
+  18_rubros_motivos_pago.sql 19_tarea_parcial.sql \
   20_recursos_academicos.sql 21_entrega_tarea_nota.sql 22_audit_notificacion.sql \
   23_indice_asistencia_dashboard.sql 25_notificacion_generica.sql \
   26_recursos_clase_semanal.sql 27_tarea_puntaje_adjuntos.sql \
@@ -38,7 +40,7 @@ for script in \
 done
 
 echo ""
-echo "Base de datos estructural inicializada (25 scripts). Quedan pendientes de tu decisión,"
+echo "Base de datos estructural inicializada (26 scripts). Quedan pendientes de tu decisión,"
 echo "en este orden si los ejecutas, porque contienen datos de prueba o cuentas de personas reales:"
 echo ""
 echo "  Solo desarrollo (datos ficticios, NO producción):"

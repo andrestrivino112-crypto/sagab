@@ -10,7 +10,8 @@ for script in \
   06_matricula_campos.sql 09_estudiante_usuario.sql \
   12_indice_check_pagos.sql 13_particion_auditoria_automatica.sql \
   14_notificaciones.sql 15_deberes.sql 16_pagos_transferencia.sql \
-  17_pago_asunto.sql 18_rubros_motivos_pago.sql 19_tarea_parcial.sql \
+  17_pago_asunto.sql 32_catalogo_academico_2025_2026.sql \
+  18_rubros_motivos_pago.sql 19_tarea_parcial.sql \
   20_recursos_academicos.sql 21_entrega_tarea_nota.sql 22_audit_notificacion.sql \
   23_indice_asistencia_dashboard.sql 25_notificacion_generica.sql \
   26_recursos_clase_semanal.sql 27_tarea_puntaje_adjuntos.sql \
