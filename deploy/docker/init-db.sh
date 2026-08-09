@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+SAGAB_SQL_DIR="${SAGAB_SQL_DIR:-/database}"
+
 # Orden verificado de dependencias del esquema. PostgreSQL ejecuta este archivo únicamente al
 # crear el volumen por primera vez; los reinicios posteriores conservan la base existente.
 for script in \
@@ -19,5 +21,5 @@ do
   psql -v ON_ERROR_STOP=1 \
     --username "$POSTGRES_USER" \
     --dbname "$POSTGRES_DB" \
-    --file "/database/$script"
+    --file "$SAGAB_SQL_DIR/$script"
 done
