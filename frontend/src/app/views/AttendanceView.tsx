@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle, Clock, Loader2, Save, UserPlus, Users } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
@@ -14,9 +14,12 @@ import { useAsignaciones } from "../hooks/useAsignaciones";
 import { initials } from "../helpers";
 import type { AttendanceStatus, Screen } from "../types";
 
-function AttToggle({ status, onChange, studentName }: { status: AttendanceStatus; onChange: (s: AttendanceStatus) => void; studentName: string }) {
-  const opts: { id: AttendanceStatus; short: string; title: string }[] = [
+type AttendanceUiStatus = AttendanceStatus | "late";
+
+function AttToggle({ status, onChange, studentName }: { status: AttendanceUiStatus; onChange: (s: AttendanceUiStatus) => void; studentName: string }) {
+  const opts: { id: AttendanceUiStatus; short: string; title: string }[] = [
     { id:"present",     short:"P",  title:"Presente" },
+    { id:"late",        short:"A",  title:"Atraso" },
     { id:"justified",   short:"AJ", title:"Ausente justificada" },
     { id:"unjustified", short:"AI", title:"Ausente injustificada" },
   ];
@@ -27,6 +30,7 @@ function AttToggle({ status, onChange, studentName }: { status: AttendanceStatus
           className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/50
             ${status === o.id
               ? o.id === "present"     ? "bg-[#2E7D32] text-white shadow-sm"
+              : o.id === "late"        ? "bg-[#2E75B6] text-white shadow-sm"
               : o.id === "justified"   ? "bg-amber-500 text-white shadow-sm"
               :                          "bg-[#C62828] text-white shadow-sm"
               : "text-gray-500 hover:text-gray-700"}`}>
@@ -37,68 +41,117 @@ function AttToggle({ status, onChange, studentName }: { status: AttendanceStatus
   );
 }
 
-const ATT_STATUS_TO_API: Record<AttendanceStatus, EstadoAsistencia> = {
-  present: "PRESENTE", justified: "AUSENCIA_JUSTIFICADA", unjustified: "AUSENCIA_INJUSTIFICADA",
+const ATT_STATUS_TO_API: Record<AttendanceUiStatus, EstadoAsistencia> = {
+  present: "PRESENTE", late: "ATRASO", justified: "AUSENCIA_JUSTIFICADA", unjustified: "AUSENCIA_INJUSTIFICADA",
 };
 
-// ATRASO no tiene equivalente en el toggle de esta pantalla (solo P/AJ/AI); se trata como
-// "presente" si llegara a existir un registro así por otra vía, para no perder el dato al re-guardar.
-const API_STATUS_TO_ATT: Record<EstadoAsistencia, AttendanceStatus> = {
-  PRESENTE: "present", AUSENCIA_JUSTIFICADA: "justified", AUSENCIA_INJUSTIFICADA: "unjustified", ATRASO: "present",
+const API_STATUS_TO_ATT: Record<EstadoAsistencia, AttendanceUiStatus> = {
+  PRESENTE: "present", ATRASO: "late", AUSENCIA_JUSTIFICADA: "justified", AUSENCIA_INJUSTIFICADA: "unjustified",
 };
 
-const hoyIso = () => new Date().toISOString().slice(0, 10);
+const fechaLocalIso = (fecha = new Date()) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
+};
 
 export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const toast = useToast();
-  const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
-  const [fecha, setFecha] = useState(hoyIso);
+  const {
+    opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion,
+    error: errorAsignaciones, loading: loadingAsignaciones, recargar: recargarAsignaciones,
+  } = useAsignaciones();
+  const [fecha, setFecha] = useState(fechaLocalIso);
   const [roster, setRoster] = useState<EstudianteResumen[]>([]);
-  const [estado, setEstado] = useState<Record<number, AttendanceStatus>>({});
+  const [estado, setEstado] = useState<Record<number, AttendanceUiStatus>>({});
   const [consecutivas, setConsecutivas] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
+  const [advertenciaApi, setAdvertenciaApi] = useState<string | null>(null);
+  const [ultimoGuardado, setUltimoGuardado] = useState<{ fecha: string; hora: string } | null>(null);
+  const [hayCambios, setHayCambios] = useState(false);
+  const solicitudActual = useRef(0);
 
-  useEffect(() => {
-    if (!asignacion) { setRoster([]); return; }
-    setLoading(true);
+  const cargarDatos = useCallback(async () => {
+    const solicitud = ++solicitudActual.current;
+    setRoster([]);
+    setEstado({});
+    setConsecutivas({});
+    setHayCambios(false);
     setErrorApi(null);
-    Promise.all([
-      estudiantesApi.porParalelo(asignacion.idParalelo),
-      asistenciaApi.consecutivasPorParalelo(asignacion.idParalelo),
-      asistenciaApi.porParalelo(asignacion.idParalelo, fecha),
-    ]).then(([lista, cons, registrosDelDia]) => {
+    setAdvertenciaApi(null);
+    if (!asignacion) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const resultados = await Promise.allSettled([
+        estudiantesApi.porParalelo(asignacion.idParalelo),
+        asistenciaApi.consecutivasPorParalelo(asignacion.idParalelo),
+        asistenciaApi.porParalelo(asignacion.idParalelo, fecha),
+      ] as const);
+      if (solicitud !== solicitudActual.current) return;
+      const [listaResultado, consecutivasResultado, registrosResultado] = resultados;
+      if (listaResultado.status === "rejected") throw listaResultado.reason;
+      if (registrosResultado.status === "rejected") throw registrosResultado.reason;
+      const lista = listaResultado.value;
+      const registrosDelDia = registrosResultado.value;
       setRoster(lista);
-      setConsecutivas(cons);
+      if (consecutivasResultado.status === "fulfilled") {
+        setConsecutivas(consecutivasResultado.value);
+      } else {
+        setAdvertenciaApi("La nómina se cargó, pero no fue posible consultar las ausencias consecutivas.");
+      }
       // Precarga lo ya registrado en la fecha seleccionada para este paralelo; solo asume
       // "Presente" para quien todavía no tiene ningún registro ese día. Sin esto, volver a
       // guardar sobrescribía en silencio las ausencias ya guardadas de todos los demás estudiantes.
       const yaRegistrado = new Map(registrosDelDia.map(r => [r.idEstudiante, API_STATUS_TO_ATT[r.estado]]));
       setEstado(Object.fromEntries(lista.map(e => [e.id, yaRegistrado.get(e.id) ?? "present"])));
-    }).catch(() => setErrorApi("No se pudieron cargar los estudiantes de esta asignación."))
-      .finally(() => setLoading(false));
+    } catch (e) {
+      if (solicitud !== solicitudActual.current) return;
+      setErrorApi(e instanceof ApiError ? e.message : "No se pudieron cargar los estudiantes de esta asignación.");
+    } finally {
+      if (solicitud === solicitudActual.current) setLoading(false);
+    }
   }, [asignacion?.idParalelo, fecha]);
 
-  const update = (id: number, s: AttendanceStatus) => {
+  useEffect(() => {
+    void cargarDatos();
+    return () => { solicitudActual.current++; };
+  }, [cargarDatos]);
+
+  useEffect(() => {
+    setUltimoGuardado(null);
+  }, [asignacion?.idParalelo, fecha]);
+
+  const update = (id: number, s: AttendanceUiStatus) => {
     setEstado(p => ({ ...p, [id]: s }));
+    setHayCambios(true);
   };
 
   const counts = {
     present:     Object.values(estado).filter(s => s === "present").length,
+    late:        Object.values(estado).filter(s => s === "late").length,
     justified:   Object.values(estado).filter(s => s === "justified").length,
     unjustified: Object.values(estado).filter(s => s === "unjustified").length,
   };
 
   const guardar = async () => {
-    if (!asignacion || roster.length === 0) return;
+    if (!asignacion || loading || roster.length === 0) return;
     setSaving(true);
     try {
       await asistenciaApi.registrar(asignacion.idParalelo, roster.map(e => ({
         idEstudiante: e.id,
         estado: ATT_STATUS_TO_API[estado[e.id] ?? "present"],
       })), fecha);
+      setUltimoGuardado({
+        fecha,
+        hora: new Date().toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      });
+      setHayCambios(false);
       toast.success("Asistencia guardada correctamente");
+      await cargarDatos();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo guardar la asistencia.");
     } finally {
@@ -115,28 +168,34 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-center gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
             <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
-            <select value={idAsignacion} onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
+            <select value={idAsignacion} disabled={loadingAsignaciones || saving}
+              onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
-              {asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
+              {loadingAsignaciones && <option value="">Cargando asignaciones…</option>}
+              {!loadingAsignaciones && asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
               {asignacionesOpciones.map(a => (
-                <option key={a.idAsignacion} value={a.idAsignacion}>{a.paralelo} · {a.materia}</option>
+                <option key={a.idAsignacion} value={a.idAsignacion}>
+                  {a.paralelo} · {a.materia} · {a.periodo}{a.periodoActivo ? " · Activo" : ""}
+                </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="asistencia-fecha" className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Fecha</label>
-            <input id="asistencia-fecha" type="date" value={fecha} max={hoyIso()} onChange={e => setFecha(e.target.value)}
+            <input id="asistencia-fecha" type="date" value={fecha} max={fechaLocalIso()} disabled={saving}
+              onChange={e => setFecha(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white" />
           </div>
           {roster.length > 0 && (
             <div className="flex items-center gap-2.5 ml-4">
               <Badge v="success"><CheckCircle size={11} aria-hidden="true" />{counts.present} Presentes</Badge>
+              <Badge v="info"><Clock size={11} aria-hidden="true" />{counts.late} Atrasos</Badge>
               <Badge v="warning"><Clock size={11} aria-hidden="true" />{counts.justified} A. Justificada</Badge>
               <Badge v="error"><AlertTriangle size={11} aria-hidden="true" />{counts.unjustified} A. Injustificada</Badge>
             </div>
           )}
           <div className="ml-auto flex items-center gap-3">
-            <Btn onClick={guardar} disabled={saving || roster.length === 0}>
+            <Btn onClick={guardar} disabled={loadingAsignaciones || loading || saving || roster.length === 0}>
               {saving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
               {saving ? "Guardando…" : "Guardar asistencia"}
             </Btn>
@@ -145,11 +204,32 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
 
         {(errorApi || errorAsignaciones) && (
           <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi ?? errorAsignaciones}
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span className="flex-1">{errorApi ?? errorAsignaciones}</span>
+            <Btn type="button" size="sm" variant="secondary" disabled={loadingAsignaciones || loading}
+              onClick={() => { if (errorAsignaciones) void recargarAsignaciones(); else void cargarDatos(); }}>
+              Reintentar
+            </Btn>
           </div>
         )}
 
-        {!asignacion && !loading && asignacionesOpciones.length === 0 && !errorApi && !errorAsignaciones && (
+        {advertenciaApi && (
+          <div role="status" className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+            <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{advertenciaApi}
+          </div>
+        )}
+
+        {ultimoGuardado && (
+          <div role="status" className="mb-4 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-[#2E7D32]">
+            <CheckCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span>
+              Asistencia del {new Date(`${ultimoGuardado.fecha}T00:00:00`).toLocaleDateString("es-EC")} guardada a las {ultimoGuardado.hora}.
+              {hayCambios && " Hay cambios posteriores pendientes de guardar."}
+            </span>
+          </div>
+        )}
+
+        {!asignacion && !loadingAsignaciones && !loading && asignacionesOpciones.length === 0 && !errorApi && !errorAsignaciones && (
           <EmptyState icon={Users} title="No tiene asignaciones de materias registradas todavía." />
         )}
 
@@ -160,7 +240,7 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
               <Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…
             </div>
           )}
-          {!loading && roster.length === 0 && (
+          {!loading && !errorApi && roster.length === 0 && (
             <div className="p-4">
               <EmptyState icon={UserPlus} title="No existen estudiantes matriculados en esta asignación."
                 action={{ label: "Ir a Matrículas", onClick: () => onNavigate("matricula") }} />
@@ -202,7 +282,7 @@ export function AttendanceView({ onNavigate }: { onNavigate: (s: Screen) => void
           </ul>
           </div>
           <div className="px-4 py-3 bg-[#F5F7FA] border-t border-gray-200 text-xs text-gray-600">
-            {roster.length} estudiantes · {asignacion.paralelo} · P = Presente · AJ = Ausente justificada · AI = Ausente injustificada
+            {roster.length} estudiantes · {asignacion.paralelo} · P = Presente · A = Atraso · AJ = Ausente justificada · AI = Ausente injustificada
           </div>
           </>
           )}

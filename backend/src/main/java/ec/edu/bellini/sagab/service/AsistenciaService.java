@@ -14,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,12 +44,29 @@ public class AsistenciaService {
     @Transactional
     public Map<String, Object> registrar(AsistenciaDtos.RegistroDiarioRequest req, Authentication auth) {
         asignacionDocenteService.exigirDocenteDelParalelo(req.idParalelo(), auth);
-        Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
         LocalDate fecha = req.fecha() != null ? req.fecha() : LocalDate.now();
+        if (fecha.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("No se puede registrar asistencia en una fecha futura");
+        }
 
         List<Long> idsEstudiantes = req.marcas().stream().map(AsistenciaDtos.MarcaRequest::idEstudiante).toList();
+        if (new HashSet<>(idsEstudiantes).size() != idsEstudiantes.size()) {
+            throw new IllegalArgumentException("No se puede registrar dos veces al mismo estudiante en una fecha");
+        }
         Map<Long, Estudiante> estudiantesPorId = estudiantes.findAllById(idsEstudiantes).stream()
                 .collect(Collectors.toMap(Estudiante::getId, e -> e));
+        for (Long idEstudiante : idsEstudiantes) {
+            Estudiante est = estudiantesPorId.get(idEstudiante);
+            if (est == null) {
+                throw new NoSuchElementException("Estudiante no existe: " + idEstudiante);
+            }
+            if (est.getParalelo() == null || !Objects.equals(est.getParalelo().getId(), req.idParalelo())) {
+                throw new IllegalArgumentException(
+                        "El estudiante " + idEstudiante + " no pertenece al paralelo indicado");
+            }
+        }
+
+        Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
         Map<Long, Asistencia> existentesPorEstudiante = asistencias.findByIdParaleloAndFecha(req.idParalelo(), fecha)
                 .stream()
                 .collect(Collectors.toMap(x -> x.getEstudiante().getId(), x -> x));
@@ -56,9 +75,6 @@ public class AsistenciaService {
         List<Asistencia> paraGuardar = new ArrayList<>();
         for (AsistenciaDtos.MarcaRequest m : req.marcas()) {
             Estudiante est = estudiantesPorId.get(m.idEstudiante());
-            if (est == null) {
-                throw new NoSuchElementException("Estudiante no existe: " + m.idEstudiante());
-            }
             Asistencia a = existentesPorEstudiante.getOrDefault(m.idEstudiante(), new Asistencia());
             a.setEstudiante(est);
             a.setIdParalelo(req.idParalelo());

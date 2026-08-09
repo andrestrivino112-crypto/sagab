@@ -33,6 +33,28 @@ class StorageServiceTest {
     }
 
     @Test
+    void generaRutaRelativaCuandoNoHayUrlPublicaConfigurada() {
+        StorageService storage = local("");
+        String key = storage.generarClave("recursos/42", "guia.txt");
+        storage.subir(key, "contenido".getBytes(StandardCharsets.UTF_8), "text/plain");
+
+        String url = storage.urlDescargaTemporal(key);
+
+        assertTrue(url.startsWith("/api/storage/local/"));
+        assertFalse(url.contains("localhost"));
+    }
+
+    @Test
+    void conservaUrlAbsolutaCuandoSeConfiguraExplicitamente() {
+        StorageService storage = local("https://api.ejemplo.test///");
+        String key = storage.generarClave("recursos/42", "guia.txt");
+        storage.subir(key, "contenido".getBytes(StandardCharsets.UTF_8), "text/plain");
+
+        assertTrue(storage.urlDescargaTemporal(key)
+                .startsWith("https://api.ejemplo.test/api/storage/local/"));
+    }
+
+    @Test
     void rechazaTokenManipulado() {
         StorageService storage = local();
         assertThrows(IllegalArgumentException.class,
@@ -48,7 +70,11 @@ class StorageServiceTest {
     }
 
     private StorageService local() {
+        return local("http://localhost:8080");
+    }
+
+    private StorageService local(String publicBaseUrl) {
         return new StorageService(null, "", "", "auto", "", "", temporal.toString(),
-                "http://localhost:8080", "secreto-de-prueba-con-mas-de-32-bytes");
+                publicBaseUrl, "secreto-de-prueba-con-mas-de-32-bytes");
     }
 }

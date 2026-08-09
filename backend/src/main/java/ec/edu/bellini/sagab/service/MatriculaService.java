@@ -10,6 +10,7 @@ import ec.edu.bellini.sagab.model.Representante;
 import ec.edu.bellini.sagab.model.Rol;
 import ec.edu.bellini.sagab.model.Usuario;
 import ec.edu.bellini.sagab.repository.EstudianteRepository;
+import ec.edu.bellini.sagab.repository.EntregaTareaRepository;
 import ec.edu.bellini.sagab.repository.ParaleloRepository;
 import ec.edu.bellini.sagab.repository.RepresentanteRepository;
 import ec.edu.bellini.sagab.repository.RolRepository;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.List;
+import java.time.OffsetDateTime;
 
 /**
  * Alta de matrícula (RF de admisión): crea al estudiante y su cuenta de acceso
@@ -41,16 +43,18 @@ public class MatriculaService {
     private final UsuarioRepository usuarios;
     private final RolRepository roles;
     private final ParaleloRepository paralelos;
+    private final EntregaTareaRepository entregas;
     private final PasswordEncoder encoder;
 
     public MatriculaService(EstudianteRepository estudiantes, RepresentanteRepository representantes,
                             UsuarioRepository usuarios, RolRepository roles, ParaleloRepository paralelos,
-                            PasswordEncoder encoder) {
+                            EntregaTareaRepository entregas, PasswordEncoder encoder) {
         this.estudiantes = estudiantes;
         this.representantes = representantes;
         this.usuarios = usuarios;
         this.roles = roles;
         this.paralelos = paralelos;
+        this.entregas = entregas;
         this.encoder = encoder;
     }
 
@@ -184,7 +188,10 @@ public class MatriculaService {
         est.setContactoEmergencia(req.contactoEmergencia());
         est.setDocumentosEntregados(String.join(",", DOCUMENTOS_REQUERIDOS));
         est.setActivo(true);
-        est = estudiantes.save(est);
+        // El IDENTITY insert se fuerza antes del INSERT nativo de entregas para que la FK del
+        // estudiante exista. El ON CONFLICT del repositorio hace seguro cualquier reintento.
+        est = estudiantes.saveAndFlush(est);
+        entregas.crearPendientesParaTareasAbiertas(est.getId(), paralelo.getId(), OffsetDateTime.now());
 
         return new MatriculaDtos.MatriculaResponse(est.getId(), est.getCodigo(), usernameEstudiante,
                 representanteNuevo, usuarioRep.getUsername());

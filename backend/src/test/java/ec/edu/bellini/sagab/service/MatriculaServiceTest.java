@@ -7,6 +7,7 @@ import ec.edu.bellini.sagab.model.Representante;
 import ec.edu.bellini.sagab.model.Rol;
 import ec.edu.bellini.sagab.model.Usuario;
 import ec.edu.bellini.sagab.repository.EstudianteRepository;
+import ec.edu.bellini.sagab.repository.EntregaTareaRepository;
 import ec.edu.bellini.sagab.repository.ParaleloRepository;
 import ec.edu.bellini.sagab.repository.RepresentanteRepository;
 import ec.edu.bellini.sagab.repository.RolRepository;
@@ -41,9 +42,10 @@ class MatriculaServiceTest {
         var usuarios = mock(UsuarioRepository.class);
         var roles = mock(RolRepository.class);
         var paralelos = mock(ParaleloRepository.class);
+        var entregas = mock(EntregaTareaRepository.class);
         var encoder = mock(PasswordEncoder.class);
         var service = new MatriculaService(
-                estudiantes, representantes, usuarios, roles, paralelos, encoder);
+                estudiantes, representantes, usuarios, roles, paralelos, entregas, encoder);
 
         Paralelo paralelo = new Paralelo();
         ReflectionTestUtils.setField(paralelo, "id", 13);
@@ -79,7 +81,7 @@ class MatriculaServiceTest {
             return representante;
         });
         when(estudiantes.siguienteCodigoSecuencial()).thenReturn(7L);
-        when(estudiantes.save(any(Estudiante.class))).thenAnswer(invocacion -> {
+        when(estudiantes.saveAndFlush(any(Estudiante.class))).thenAnswer(invocacion -> {
             Estudiante estudiante = invocacion.getArgument(0);
             estudiante.setId(301L);
             return estudiante;
@@ -88,7 +90,7 @@ class MatriculaServiceTest {
         MatriculaDtos.MatriculaResponse resultado = service.crear(solicitudCompleta());
 
         ArgumentCaptor<Estudiante> estudianteCaptor = ArgumentCaptor.forClass(Estudiante.class);
-        verify(estudiantes).save(estudianteCaptor.capture());
+        verify(estudiantes).saveAndFlush(estudianteCaptor.capture());
         Estudiante guardado = estudianteCaptor.getValue();
         ArgumentCaptor<Usuario> usuarioCaptor = ArgumentCaptor.forClass(Usuario.class);
         verify(usuarios, times(2)).save(usuarioCaptor.capture());
@@ -108,6 +110,9 @@ class MatriculaServiceTest {
                 () -> assertEquals("cedula_est,partida,foto,conducta", guardado.getDocumentosEntregados()),
                 () -> assertTrue(guardado.isActivo()));
         verify(paralelos).findByNivelAndSeccionAndAnioLectivo("2° BGU", "A", "2025-2026");
+        verify(entregas).crearPendientesParaTareasAbiertas(
+                org.mockito.ArgumentMatchers.eq(301L), org.mockito.ArgumentMatchers.eq(13),
+                any(java.time.OffsetDateTime.class));
     }
 
     @Test
@@ -117,9 +122,10 @@ class MatriculaServiceTest {
         var usuarios = mock(UsuarioRepository.class);
         var roles = mock(RolRepository.class);
         var paralelos = mock(ParaleloRepository.class);
+        var entregas = mock(EntregaTareaRepository.class);
         var encoder = mock(PasswordEncoder.class);
         var service = new MatriculaService(
-                estudiantes, representantes, usuarios, roles, paralelos, encoder);
+                estudiantes, representantes, usuarios, roles, paralelos, entregas, encoder);
 
         assertAll(
                 () -> assertThrows(IllegalArgumentException.class,
@@ -129,7 +135,7 @@ class MatriculaServiceTest {
                 () -> assertThrows(IllegalArgumentException.class,
                         () -> service.crear(solicitud(List.of("cedula_est", "partida", "foto", "otro")))));
 
-        verifyNoInteractions(estudiantes, representantes, usuarios, roles, paralelos, encoder);
+        verifyNoInteractions(estudiantes, representantes, usuarios, roles, paralelos, entregas, encoder);
     }
 
     private MatriculaDtos.MatriculaRequest solicitud(List<String> documentos) {

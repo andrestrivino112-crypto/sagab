@@ -719,9 +719,11 @@ export const recursosAcademicos = {
     return apiForm<RecursoAcademicoResponse>("/api/recursos-academicos/archivo", fd);
   },
   crearLink: (idAsignacion: number, nombre: string, urlExterna: string,
-              opciones: { descripcion?: string; semana?: number; fechaLimite?: string } = {}) =>
+              opciones: { tipo?: Extract<TipoRecursoAcademico, "LINK_CLASE" | "MATERIAL">;
+                descripcion?: string; semana?: number; fechaLimite?: string } = {}) =>
     api<RecursoAcademicoResponse>("/api/recursos-academicos/link", {
-      method: "POST", body: { idAsignacion, nombre, urlExterna, descripcion: opciones.descripcion, semana: opciones.semana, fechaLimite: opciones.fechaLimite },
+      method: "POST", body: { idAsignacion, nombre, urlExterna, tipo: opciones.tipo,
+        descripcion: opciones.descripcion, semana: opciones.semana, fechaLimite: opciones.fechaLimite },
     }),
   editar: (idRecurso: number, nombre: string, descripcion: string | undefined, semana: number | undefined, fechaLimite?: string) =>
     api<RecursoAcademicoResponse>(`/api/recursos-academicos/${idRecurso}`, {

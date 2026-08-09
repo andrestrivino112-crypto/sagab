@@ -4,6 +4,7 @@ import ec.edu.bellini.sagab.model.Asistencia;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -12,7 +13,7 @@ public class AsistenciaDtos {
 
     public record MarcaRequest(@NotNull Long idEstudiante,
                                @NotNull Asistencia.EstadoAsistencia estado,
-                               String justificacion) {}
+                               @Size(max = 300) String justificacion) {}
 
     /** {@code @Valid} en marcas es necesario para que Bean Validation aplique las restricciones de
      * cada MarcaRequest (idEstudiante/estado no nulos) — sin él, @NotEmpty solo valida que la lista

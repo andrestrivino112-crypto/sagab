@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,7 @@ public class TareaService {
 
     @Transactional
     public TareaDtos.TareaResponse crear(TareaDtos.CrearTareaRequest req, Authentication auth) {
+        validarPublicacion(req.fechaLimite(), req.puntaje());
         AsignacionDocente asignacion = asignaciones.findById(req.idAsignacion())
                 .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
         asignacionDocenteService.exigirDueñoDeAsignacion(asignacion, auth);
@@ -82,7 +84,7 @@ public class TareaService {
         t.setDescripcion(req.descripcion());
         t.setFechaLimite(req.fechaLimite());
         t.setParcial(req.parcial());
-        t.setPuntaje(req.puntaje() != null ? req.puntaje() : new BigDecimal("10.00"));
+        t.setPuntaje(req.puntaje());
         t.setCreadoPor(idUsuario);
         t = tareas.save(t);
         // creado_en es DEFAULT now() en la BD (columna insertable=false/updatable=false en la
@@ -109,6 +111,7 @@ public class TareaService {
      * puntaje) — la asignación no se puede cambiar. Solo el docente dueño de la asignación. */
     @Transactional
     public TareaDtos.TareaResponse editar(Long idTarea, TareaDtos.EditarTareaRequest req, Authentication auth) {
+        validarPublicacion(req.fechaLimite(), req.puntaje());
         Tarea t = tareas.findById(idTarea).orElseThrow(() -> new NoSuchElementException("La tarea no existe"));
         asignacionDocenteService.exigirDueñoDeAsignacion(t.getAsignacion(), auth);
 
@@ -119,6 +122,21 @@ public class TareaService {
         t.setPuntaje(req.puntaje());
         t = tareas.save(t);
         return toTareaResponse(t);
+    }
+
+    private void validarPublicacion(OffsetDateTime fechaLimite, BigDecimal puntaje) {
+        if (fechaLimite == null || !fechaLimite.isAfter(OffsetDateTime.now())) {
+            throw new IllegalArgumentException("La fecha límite del deber debe estar en el futuro");
+        }
+        if (puntaje == null || puntaje.compareTo(new BigDecimal("0.01")) < 0
+                || puntaje.compareTo(new BigDecimal("999.99")) > 0) {
+            throw new IllegalArgumentException("El puntaje debe estar entre 0.01 y 999.99");
+        }
+        try {
+            puntaje.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("El puntaje admite como máximo dos decimales");
+        }
     }
 
     /**

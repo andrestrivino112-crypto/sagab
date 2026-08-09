@@ -5,6 +5,9 @@ import ec.edu.bellini.sagab.model.RecursoAcademico;
 import ec.edu.bellini.sagab.service.RecursoAcademicoService;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,9 +43,9 @@ public class RecursoAcademicoController {
     public RecursoAcademicoDtos.RecursoResponse subirArchivo(
             @RequestParam Long idAsignacion,
             @RequestParam RecursoAcademico.TipoRecurso tipo,
-            @RequestParam @Size(max = 150) String nombre,
+            @RequestParam @NotBlank @Size(max = 150) String nombre,
             @RequestParam(required = false) @Size(max = 500) String descripcion,
-            @RequestParam(required = false) Short semana,
+            @RequestParam(required = false) @Min(1) @Max(52) Short semana,
             @RequestParam(required = false) java.time.OffsetDateTime fechaLimite,
             @RequestParam("archivo") MultipartFile archivo,
             Authentication auth) {

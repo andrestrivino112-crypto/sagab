@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Clock, Download, Edit2, ExternalLink, File, FileArchive, FileSpreadsheet, FileText,
+  CheckCircle2, Clock, Download, Edit2, ExternalLink, File, FileArchive, FileSpreadsheet, FileText,
   Film, Image as ImageIcon, Link2, Loader2, Music, Send, Trash2, Upload,
 } from "lucide-react";
 import { ApiError } from "../../api/client";
@@ -34,7 +34,7 @@ function tamano(bytes: number | null): string {
 export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toast }: {
   idAsignacion: number;
   materiales: RecursoAcademicoResponse[];
-  onChanged: () => void;
+  onChanged: () => Promise<boolean>;
   toast: ReturnType<typeof useToast>;
 }) {
   const [semana, setSemana] = useState<number | "">("");
@@ -45,6 +45,9 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   const [archivo, setArchivo] = useState<File | null>(null);
   const [urlEnlace, setUrlEnlace] = useState("");
   const [publicando, setPublicando] = useState(false);
+  const [confirmacion, setConfirmacion] = useState<string | null>(null);
+  const asignacionActual = useRef(idAsignacion);
+  asignacionActual.current = idAsignacion;
 
   const [editando, setEditando] = useState<RecursoAcademicoResponse | null>(null);
   const [editNombre, setEditNombre] = useState("");
@@ -70,7 +73,19 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   }, [materiales]);
 
   const limpiarFormulario = () => {
-    setNombre(""); setDescripcion(""); setFechaLimite(""); setArchivo(null); setUrlEnlace("");
+    setSemana(""); setNombre(""); setDescripcion(""); setFechaLimite(""); setArchivo(null); setUrlEnlace("");
+  };
+
+  useEffect(() => {
+    limpiarFormulario();
+    setModoEnlace(false);
+    setConfirmacion(null);
+    setEditando(null);
+  }, [idAsignacion]);
+
+  const refrescarTrasCambio = async (asignacionObjetivo: number, mensajeError: string) => {
+    const actualizado = await onChanged();
+    if (!actualizado && asignacionActual.current === asignacionObjetivo) toast.error(mensajeError);
   };
 
   const publicar = async (e: React.FormEvent) => {
@@ -78,16 +93,21 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
     if (!nombre.trim() || (modoEnlace ? !urlEnlace.trim() : !archivo)) return;
     setPublicando(true);
     try {
+      const asignacionObjetivo = idAsignacion;
+      const nombreGuardado = nombre.trim();
       const opciones = { descripcion: descripcion.trim() || undefined, semana: semana === "" ? undefined : semana,
         fechaLimite: fechaLimite ? new Date(fechaLimite).toISOString() : undefined };
       if (modoEnlace) {
-        await recursosApi.crearLink(idAsignacion, nombre.trim(), urlEnlace.trim(), opciones);
+        await recursosApi.crearLink(asignacionObjetivo, nombreGuardado, urlEnlace.trim(), { ...opciones, tipo: "MATERIAL" });
       } else {
-        await recursosApi.subirArchivo(idAsignacion, "MATERIAL", nombre.trim(), archivo as File, opciones);
+        await recursosApi.subirArchivo(asignacionObjetivo, "MATERIAL", nombreGuardado, archivo as File, opciones);
       }
+      if (asignacionActual.current !== asignacionObjetivo) return;
       toast.success("Material publicado correctamente");
+      setConfirmacion(`“${nombreGuardado}” quedó publicado en el material de la materia.`);
       limpiarFormulario();
-      onChanged();
+      await refrescarTrasCambio(asignacionObjetivo,
+        "El material se publicó, pero no se pudo actualizar el listado. Reintente la carga antes de volver a publicarlo.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el material.");
     } finally {
@@ -96,7 +116,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   };
 
   const descargar = async (r: RecursoAcademicoResponse) => {
-    if (r.tipo === "LINK_CLASE" && r.urlExterna) {
+    if (r.urlExterna) {
       window.open(r.urlExterna, "_blank", "noopener,noreferrer");
       return;
     }
@@ -120,12 +140,15 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
     if (!editando || !editNombre.trim()) return;
     setGuardandoEdicion(true);
     try {
+      const asignacionObjetivo = idAsignacion;
       await recursosApi.editar(editando.idRecurso, editNombre.trim(), editDescripcion.trim() || undefined,
         editSemana === "" ? undefined : editSemana,
         editFechaLimite ? new Date(editFechaLimite).toISOString() : undefined);
+      if (asignacionActual.current !== asignacionObjetivo) return;
       toast.success("Material actualizado");
+      setConfirmacion(`“${editNombre.trim()}” quedó actualizado correctamente.`);
       setEditando(null);
-      onChanged();
+      await refrescarTrasCambio(asignacionObjetivo, "El material se actualizó, pero no se pudo refrescar el listado.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo actualizar el material.");
     } finally {
@@ -136,9 +159,12 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
   const eliminar = async (r: RecursoAcademicoResponse) => {
     setEliminandoId(r.idRecurso);
     try {
+      const asignacionObjetivo = idAsignacion;
       await recursosApi.eliminar(r.idRecurso);
+      if (asignacionActual.current !== asignacionObjetivo) return;
       toast.success("Material eliminado");
-      onChanged();
+      setConfirmacion(`“${r.nombre}” quedó eliminado correctamente.`);
+      await refrescarTrasCambio(asignacionObjetivo, "El material se eliminó, pero no se pudo refrescar el listado.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo eliminar el material.");
     } finally {
@@ -148,6 +174,11 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
 
   return (
     <div className="space-y-4">
+      {confirmacion && (
+        <div role="status" className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-[#2E7D32]">
+          <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{confirmacion}
+        </div>
+      )}
       <form onSubmit={publicar} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest">Publicar material de la semana</p>
         <div className="flex gap-3">
@@ -188,7 +219,7 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
           <input type="url" value={urlEnlace} onChange={e => setUrlEnlace(e.target.value)} required placeholder="https://…"
             className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
         ) : (
-          <FileUpload accept={ACCEPT_MATERIAL} maxSizeMb={100} onFileSelected={setArchivo} disabled={publicando}
+          <FileUpload accept={ACCEPT_MATERIAL} maxSizeMb={100} value={archivo} onFileSelected={setArchivo} disabled={publicando}
             label="PDF, Office, ZIP/RAR, imagen, video, audio, TXT o CSV (máx. 100 MB)" />
         )}
 
@@ -229,9 +260,9 @@ export function MaterialSemanalPanel({ idAsignacion, materiales, onChanged, toas
                         {r.fechaLimite && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[#7B1FA2]"><Clock size={11} />Fecha límite: {new Date(r.fechaLimite).toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" })}</p>}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" title={r.tipo === "LINK_CLASE" ? "Abrir" : "Descargar"} onClick={() => descargar(r)}
+                        <button type="button" title={r.urlExterna ? "Abrir" : "Descargar"} onClick={() => descargar(r)}
                           className="p-1.5 rounded-md text-gray-500 hover:bg-[#EAF2FB] hover:text-[#1F4E79] focus:outline-none">
-                          {r.tipo === "LINK_CLASE" ? <ExternalLink size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
+                          {r.urlExterna ? <ExternalLink size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
                         </button>
                         <button type="button" title="Editar" onClick={() => abrirEdicion(r)}
                           className="p-1.5 rounded-md text-gray-500 hover:bg-[#EAF2FB] hover:text-[#1F4E79] focus:outline-none">

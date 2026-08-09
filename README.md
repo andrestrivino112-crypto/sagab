@@ -117,7 +117,9 @@ mvn spring-boot:run                      # http://localhost:8080
 
 - Sin variables S3, SAGAB usa almacenamiento local real en `./data/uploads`.
 - En producción local, monte `SAGAB_STORAGE_LOCAL_DIR` sobre un volumen persistente.
-- Configure `SAGAB_PUBLIC_API_URL` con el origen público del backend para los enlaces firmados.
+- Por defecto, los enlaces firmados usan una ruta relativa al mismo origen del frontend; esto
+  funciona tanto en localhost como detrás de un proxy o túnel. Configure `SAGAB_PUBLIC_API_URL`
+  únicamente si frontend y backend se publican en orígenes distintos.
 - Para S3/R2 defina el conjunto completo `SAGAB_S3_ENDPOINT`, `SAGAB_S3_REGION`,
   `SAGAB_S3_BUCKET`, `SAGAB_S3_ACCESS_KEY` y `SAGAB_S3_SECRET_KEY`.
 - Una configuración S3 parcial se rechaza expresamente para evitar una caída silenciosa a disco.

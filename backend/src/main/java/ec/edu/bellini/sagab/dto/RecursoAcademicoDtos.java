@@ -1,5 +1,6 @@
 package ec.edu.bellini.sagab.dto;
 
+import ec.edu.bellini.sagab.model.RecursoAcademico;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +20,7 @@ public class RecursoAcademicoDtos {
 
     public record CrearLinkRequest(
             @NotNull Long idAsignacion,
+            RecursoAcademico.TipoRecurso tipo,
             @NotBlank @Size(max = 150) String nombre,
             @Size(max = 500) String descripcion,
             @Min(1) @Max(52) Short semana,

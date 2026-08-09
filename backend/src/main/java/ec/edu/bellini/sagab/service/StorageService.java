@@ -63,7 +63,7 @@ public class StorageService {
         this.accessKey = accessKey;
         this.secretKey = secretKey;
         this.localDir = Path.of(localDir).toAbsolutePath().normalize();
-        this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
+        this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim().replaceAll("/+$", "");
         this.downloadSecret = downloadSecret.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -143,6 +143,9 @@ public class StorageService {
         String datos = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString((expira + "\n" + key).getBytes(StandardCharsets.UTF_8));
         String firma = Base64.getUrlEncoder().withoutPadding().encodeToString(hmac(datos));
+        // Sin una URL pública explícita devolvemos una ruta relativa: el navegador conserva el
+        // mismo origen (localhost, túnel Cloudflare o dominio real) en vez de apuntar siempre al
+        // localhost de quien abrió la página.
         return publicBaseUrl + "/api/storage/local/" + datos + "." + firma;
     }
 

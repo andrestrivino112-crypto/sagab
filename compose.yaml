@@ -28,7 +28,6 @@ services:
       SAGAB_DB_PASSWORD: CAMBIAR_EN_PRODUCCION_app
       SAGAB_JWT_SECRET: SAGAB-demo-local-2026-cambiar-antes-de-produccion
       SAGAB_CORS: http://localhost:8088
-      SAGAB_PUBLIC_API_URL: http://localhost:8088
     depends_on:
       database:
         condition: service_healthy

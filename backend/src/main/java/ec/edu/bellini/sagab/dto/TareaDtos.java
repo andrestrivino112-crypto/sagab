@@ -2,6 +2,8 @@ package ec.edu.bellini.sagab.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -17,18 +19,20 @@ public class TareaDtos {
             @NotNull Long idAsignacion,
             @NotBlank @Size(max = 150) String titulo,
             @Size(max = 1000) String descripcion,
-            @NotNull OffsetDateTime fechaLimite,
+            @NotNull @Future OffsetDateTime fechaLimite,
             @Min(1) @Max(3) short parcial,
-            @DecimalMin("0.01") BigDecimal puntaje) {}
+            @NotNull @DecimalMin("0.01") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2)
+            BigDecimal puntaje) {}
 
     /** Igual que CrearTareaRequest pero sin idAsignacion: la asignación de un deber ya publicado
      * no se puede mover (las entregas ya se generaron para el paralelo original). */
     public record EditarTareaRequest(
             @NotBlank @Size(max = 150) String titulo,
             @Size(max = 1000) String descripcion,
-            @NotNull OffsetDateTime fechaLimite,
+            @NotNull @Future OffsetDateTime fechaLimite,
             @Min(1) @Max(3) short parcial,
-            @DecimalMin("0.01") BigDecimal puntaje) {}
+            @NotNull @DecimalMin("0.01") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2)
+            BigDecimal puntaje) {}
 
     public record TareaResponse(
             Long idTarea, String titulo, String descripcion, OffsetDateTime fechaLimite,

@@ -14,9 +14,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -86,6 +89,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> cuerpoInvalido(HttpMessageNotReadableException e) {
         return error(HttpStatus.BAD_REQUEST, "El cuerpo de la solicitud no es válido");
+    }
+
+    /** Parámetros multipart/RequestParam ausentes o con un tipo/enum/fecha que no se puede convertir. */
+    @ExceptionHandler({MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
+    public ResponseEntity<Map<String, Object>> parametroSolicitudInvalido(Exception e) {
+        return error(HttpStatus.BAD_REQUEST, "Falta un parámetro requerido o su formato no es válido");
     }
 
     /** Archivo más grande que spring.servlet.multipart.max-file-size — se dispara antes de llegar a FileValidationService. */

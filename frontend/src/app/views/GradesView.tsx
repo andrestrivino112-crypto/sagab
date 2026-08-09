@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertCircle, BookOpen, Download, ExternalLink, FileDown, FileText, Link2, Loader2, Save, Search, Send, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, BookOpen, CheckCircle2, Download, ExternalLink, FileDown, FileText, Link2, Loader2, Save, Search, Send, UserPlus } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
   estudiantes as estudiantesApi, calificaciones as calificacionesApi, recursosAcademicos as recursosApi,
@@ -49,13 +49,25 @@ export function GradesView({ onNavigate, rol }: { onNavigate: (s: Screen) => voi
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
-    if (!asignacion) { setRows([]); return; }
+    if (!asignacion) {
+      setRows([]);
+      setLoading(false);
+      setErrorApi(null);
+      return;
+    }
+    let vigente = true;
+    setRows([]);
     setLoading(true);
     setErrorApi(null);
-    Promise.all([
+    void Promise.allSettled([
       estudiantesApi.porParalelo(asignacion.idParalelo),
       calificacionesApi.porAsignacion(asignacion.idAsignacion, parcial),
-    ]).then(([roster, notas]) => {
+    ]).then(([rosterResult, notasResult]) => {
+      if (!vigente) return;
+      const notas = notasResult.status === "fulfilled" ? notasResult.value : [];
+      const roster = rosterResult.status === "fulfilled"
+        ? rosterResult.value
+        : notas.map(n => ({ id: n.idEstudiante, nombreCompleto: n.estudiante }));
       setRows(roster.map(e => {
         const n = notas.find(x => x.idEstudiante === e.id);
         return {
@@ -63,8 +75,13 @@ export function GradesView({ onNavigate, rol }: { onNavigate: (s: Screen) => voi
           tarea: n ? String(n.notaTarea) : "", clase: n ? String(n.notaClase) : "", examen: n ? String(n.notaExamen) : "",
         };
       }));
-    }).catch(() => setErrorApi("No se pudieron cargar los estudiantes o las notas de esta asignación."))
-      .finally(() => setLoading(false));
+      const errores = [
+        rosterResult.status === "rejected" ? "No se pudo cargar la nómina de estudiantes." : null,
+        notasResult.status === "rejected" ? "No se pudieron cargar las notas existentes; puede continuar viendo la nómina." : null,
+      ].filter((mensaje): mensaje is string => mensaje != null);
+      setErrorApi(errores.length > 0 ? errores.join(" ") : null);
+    }).finally(() => { if (vigente) setLoading(false); });
+    return () => { vigente = false; };
   }, [asignacion?.idAsignacion, asignacion?.idParalelo, parcial]);
 
   useEffect(() => { setPagina(1); }, [busqueda, idAsignacion, parcial]);
@@ -323,6 +340,10 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
   const [recursos, setRecursos] = useState<RecursoAcademicoResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmacion, setConfirmacion] = useState<string | null>(null);
+  const cargaActual = useRef(0);
+  const asignacionActual = useRef(idAsignacion);
+  asignacionActual.current = idAsignacion;
 
   const [tipoArchivo, setTipoArchivo] = useState<Exclude<TipoRecursoAcademico, "LINK_CLASE">>("SILABO");
   const [nombreArchivo, setNombreArchivo] = useState("");
@@ -333,26 +354,58 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
   const [urlLink, setUrlLink] = useState("");
   const [publicandoLink, setPublicandoLink] = useState(false);
 
-  const cargar = () => {
+  const cargar = async (): Promise<boolean> => {
+    const numeroCarga = ++cargaActual.current;
     setLoading(true);
     setError(null);
-    recursosApi.porAsignacion(idAsignacion)
-      .then(setRecursos)
-      .catch(e => setError(e instanceof ApiError ? e.message : "No se pudieron cargar los recursos de esta asignación."))
-      .finally(() => setLoading(false));
+    try {
+      const lista = await recursosApi.porAsignacion(idAsignacion);
+      if (numeroCarga !== cargaActual.current) return false;
+      setRecursos(lista);
+      return true;
+    } catch (e) {
+      if (numeroCarga !== cargaActual.current) return false;
+      setError(e instanceof ApiError ? e.message : "No se pudieron cargar los recursos de esta asignación.");
+      return false;
+    } finally {
+      if (numeroCarga === cargaActual.current) setLoading(false);
+    }
   };
 
-  useEffect(cargar, [idAsignacion]);
+  useEffect(() => {
+    ++cargaActual.current;
+    setRecursos([]);
+    setError(null);
+    setConfirmacion(null);
+    setTipoArchivo("SILABO");
+    setNombreArchivo("");
+    setArchivo(null);
+    setNombreLink("");
+    setUrlLink("");
+    void cargar();
+    return () => { ++cargaActual.current; };
+  }, [idAsignacion]);
+
+  const refrescarTrasGuardar = async (asignacionObjetivo: number, mensaje: string) => {
+    const actualizado = await cargar();
+    if (!actualizado && asignacionActual.current === asignacionObjetivo) toast.error(mensaje);
+  };
 
   const subirArchivo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!archivo || !nombreArchivo.trim()) return;
     setSubiendoArchivo(true);
     try {
-      await recursosApi.subirArchivo(idAsignacion, tipoArchivo, nombreArchivo.trim(), archivo);
+      const asignacionObjetivo = idAsignacion;
+      const nombreGuardado = nombreArchivo.trim();
+      const publicado = await recursosApi.subirArchivo(asignacionObjetivo, tipoArchivo, nombreGuardado, archivo);
+      if (asignacionActual.current !== asignacionObjetivo) return;
+      setRecursos(prev => [publicado, ...prev.filter(r => r.idRecurso !== publicado.idRecurso)]);
       toast.success("Recurso publicado correctamente");
+      setConfirmacion(`“${nombreGuardado}” quedó publicado correctamente.`);
       setNombreArchivo(""); setArchivo(null);
-      cargar();
+      await refrescarTrasGuardar(asignacionObjetivo,
+        "El recurso se publicó, pero no se pudo actualizar el listado. No vuelva a publicarlo; reintente la carga.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el recurso.");
     } finally {
@@ -365,10 +418,16 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
     if (!nombreLink.trim() || !urlLink.trim()) return;
     setPublicandoLink(true);
     try {
-      await recursosApi.crearLink(idAsignacion, nombreLink.trim(), urlLink.trim());
+      const asignacionObjetivo = idAsignacion;
+      const nombreGuardado = nombreLink.trim();
+      const publicado = await recursosApi.crearLink(asignacionObjetivo, nombreGuardado, urlLink.trim());
+      if (asignacionActual.current !== asignacionObjetivo) return;
+      setRecursos(prev => [publicado, ...prev.filter(r => r.idRecurso !== publicado.idRecurso)]);
       toast.success("Link de clase publicado correctamente");
+      setConfirmacion(`“${nombreGuardado}” quedó publicado correctamente.`);
       setNombreLink(""); setUrlLink("");
-      cargar();
+      await refrescarTrasGuardar(asignacionObjetivo,
+        "El enlace se publicó, pero no se pudo actualizar el listado. No vuelva a publicarlo; reintente la carga.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el link.");
     } finally {
@@ -387,6 +446,11 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
 
   return (
     <div className="space-y-6">
+    {confirmacion && (
+      <div role="status" className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-[#2E7D32]">
+        <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{confirmacion}
+      </div>
+    )}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="space-y-4">
         <form onSubmit={subirArchivo} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
@@ -407,7 +471,7 @@ function RecursosAcademicosTab({ idAsignacion, toast }: { idAsignacion: number; 
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
             </div>
           </div>
-          <FileUpload accept={ACCEPT_RECURSOS} maxSizeMb={100} onFileSelected={setArchivo}
+          <FileUpload accept={ACCEPT_RECURSOS} maxSizeMb={100} value={archivo} onFileSelected={setArchivo}
             disabled={subiendoArchivo} label="PDF, Office, imagen, video, audio, ZIP/RAR, TXT o CSV (máx. 100 MB)" />
           <Btn disabled={subiendoArchivo || !archivo || !nombreArchivo.trim()}>
             {subiendoArchivo ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}

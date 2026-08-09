@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Clock, Download, FileUp, Loader2, Paperclip, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { ApiError } from "../../api/client";
 import {
@@ -29,12 +29,20 @@ function toDatetimeLocalValue(iso: string): string {
 
 export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
   const toast = useToast();
-  const { opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion, error: errorAsignaciones } = useAsignaciones();
+  const {
+    opciones: asignacionesOpciones, idAsignacion, setIdAsignacion, asignacion,
+    error: errorAsignaciones, loading: loadingAsignaciones, recargar: recargarAsignaciones,
+  } = useAsignaciones();
   const [tareas, setTareas] = useState<TareaResponse[]>([]);
   const [idTareaSel, setIdTareaSel] = useState<number | null>(null);
   const [entregas, setEntregas] = useState<EntregaResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingEntregas, setLoadingEntregas] = useState(false);
+  const [loadingAdjuntos, setLoadingAdjuntos] = useState(false);
   const [errorApi, setErrorApi] = useState<string | null>(null);
+  const [errorEntregas, setErrorEntregas] = useState<string | null>(null);
+  const [errorAdjuntos, setErrorAdjuntos] = useState<string | null>(null);
+  const [confirmacion, setConfirmacion] = useState<string | null>(null);
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [titulo, setTitulo] = useState("");
@@ -60,48 +68,133 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
   const [archivoAdjunto, setArchivoAdjunto] = useState<File | null>(null);
   const [subiendoAdjunto, setSubiendoAdjunto] = useState(false);
   const [eliminandoAdjuntoId, setEliminandoAdjuntoId] = useState<number | null>(null);
+  const [adjuntoUploadKey, setAdjuntoUploadKey] = useState(0);
 
   const [calificando, setCalificando] = useState<EntregaResponse | null>(null);
   const [notaInput, setNotaInput] = useState("");
   const [observacionInput, setObservacionInput] = useState("");
   const [guardandoRevision, setGuardandoRevision] = useState(false);
+  const solicitudTareas = useRef(0);
+  const solicitudEntregas = useRef(0);
+  const solicitudAdjuntos = useRef(0);
 
-  const cargarTareas = () => {
-    if (!asignacion) { setTareas([]); return; }
+  const limpiarCreacion = () => {
+    setTitulo(""); setDescripcion(""); setFechaLimite(""); setParcial(1); setPuntaje("10"); setMostrarForm(false);
+  };
+
+  const cargarTareas = useCallback(async (idPreferida?: number) => {
+    if (!asignacion) return;
+    const solicitud = ++solicitudTareas.current;
     setLoading(true);
     setErrorApi(null);
-    tareasApi.porAsignacion(asignacion.idAsignacion)
-      .then(lista => { setTareas(lista); setIdTareaSel(lista[0]?.idTarea ?? null); })
-      .catch(e => setErrorApi(e instanceof ApiError ? e.message : "No se pudieron cargar los deberes."))
-      .finally(() => setLoading(false));
-  };
+    try {
+      const lista = await tareasApi.porAsignacion(asignacion.idAsignacion);
+      if (solicitud !== solicitudTareas.current) return;
+      setTareas(lista);
+      const seleccion = idPreferida != null && lista.some(t => t.idTarea === idPreferida)
+        ? idPreferida : lista[0]?.idTarea ?? null;
+      setIdTareaSel(seleccion);
+    } catch (e) {
+      if (solicitud !== solicitudTareas.current) return;
+      setTareas([]);
+      setIdTareaSel(null);
+      setErrorApi(e instanceof ApiError ? e.message : "No se pudieron cargar los deberes.");
+    } finally {
+      if (solicitud === solicitudTareas.current) setLoading(false);
+    }
+  }, [asignacion?.idAsignacion]);
 
-  useEffect(cargarTareas, [asignacion?.idAsignacion]);
+  const cargarEntregas = useCallback(async (idTarea: number) => {
+    const solicitud = ++solicitudEntregas.current;
+    setLoadingEntregas(true);
+    setErrorEntregas(null);
+    try {
+      const lista = await tareasApi.entregasDeTarea(idTarea);
+      if (solicitud === solicitudEntregas.current) setEntregas(lista);
+    } catch (e) {
+      if (solicitud !== solicitudEntregas.current) return;
+      setEntregas([]);
+      setErrorEntregas(e instanceof ApiError ? e.message : "No se pudieron cargar las entregas.");
+    } finally {
+      if (solicitud === solicitudEntregas.current) setLoadingEntregas(false);
+    }
+  }, []);
 
-  const cargarEntregas = () => {
-    if (idTareaSel == null) { setEntregas([]); return; }
-    tareasApi.entregasDeTarea(idTareaSel).then(setEntregas)
-      .catch(e => setErrorApi(e instanceof ApiError ? e.message : "No se pudieron cargar las entregas."));
-  };
-  useEffect(cargarEntregas, [idTareaSel]);
+  const cargarAdjuntos = useCallback(async (idTarea: number) => {
+    const solicitud = ++solicitudAdjuntos.current;
+    setLoadingAdjuntos(true);
+    setErrorAdjuntos(null);
+    try {
+      const lista = await tareasApi.adjuntosDeTarea(idTarea);
+      if (solicitud === solicitudAdjuntos.current) setAdjuntos(lista);
+    } catch (e) {
+      if (solicitud !== solicitudAdjuntos.current) return;
+      setAdjuntos([]);
+      setErrorAdjuntos(e instanceof ApiError ? e.message : "No se pudo cargar el material de apoyo.");
+    } finally {
+      if (solicitud === solicitudAdjuntos.current) setLoadingAdjuntos(false);
+    }
+  }, []);
 
-  const cargarAdjuntos = () => {
-    if (idTareaSel == null) { setAdjuntos([]); return; }
-    tareasApi.adjuntosDeTarea(idTareaSel).then(setAdjuntos).catch(() => setAdjuntos([]));
-  };
-  useEffect(cargarAdjuntos, [idTareaSel]);
+  useEffect(() => {
+    solicitudTareas.current++;
+    solicitudEntregas.current++;
+    solicitudAdjuntos.current++;
+    setTareas([]); setIdTareaSel(null); setEntregas([]); setAdjuntos([]);
+    setLoading(false); setLoadingEntregas(false); setLoadingAdjuntos(false);
+    setErrorApi(null); setErrorEntregas(null); setErrorAdjuntos(null); setConfirmacion(null);
+    setMostrarForm(false); setTitulo(""); setDescripcion(""); setFechaLimite(""); setParcial(1); setPuntaje("10");
+    setEditando(null); setEditTitulo(""); setEditDescripcion(""); setEditFechaLimite(""); setEditParcial(1); setEditPuntaje("10");
+    setEliminando(null); setCalificando(null); setNotaInput(""); setObservacionInput("");
+    setNombreAdjunto(""); setArchivoAdjunto(null); setAdjuntoUploadKey(k => k + 1);
+    if (asignacion) void cargarTareas();
+    return () => {
+      solicitudTareas.current++;
+      solicitudEntregas.current++;
+      solicitudAdjuntos.current++;
+    };
+  }, [asignacion?.idAsignacion, cargarTareas]);
+
+  useEffect(() => {
+    solicitudEntregas.current++;
+    solicitudAdjuntos.current++;
+    setEntregas([]); setAdjuntos([]);
+    setLoadingEntregas(false); setLoadingAdjuntos(false);
+    setErrorEntregas(null); setErrorAdjuntos(null);
+    setEditando(null); setEditTitulo(""); setEditDescripcion(""); setEditFechaLimite(""); setEditParcial(1); setEditPuntaje("10");
+    setEliminando(null); setCalificando(null); setNotaInput(""); setObservacionInput("");
+    setNombreAdjunto(""); setArchivoAdjunto(null); setAdjuntoUploadKey(k => k + 1);
+    if (idTareaSel != null) {
+      void cargarEntregas(idTareaSel);
+      void cargarAdjuntos(idTareaSel);
+    }
+    return () => {
+      solicitudEntregas.current++;
+      solicitudAdjuntos.current++;
+    };
+  }, [idTareaSel, cargarEntregas, cargarAdjuntos]);
 
   const crearTarea = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!asignacion || !titulo.trim() || !fechaLimite) return;
+    const puntajeNum = Number(puntaje);
+    if (!Number.isFinite(puntajeNum) || puntajeNum < 0.01) {
+      toast.error("El puntaje debe ser un número mayor que cero.");
+      return;
+    }
+    const fechaLimiteMs = new Date(fechaLimite).getTime();
+    if (!Number.isFinite(fechaLimiteMs) || fechaLimiteMs <= Date.now()) {
+      toast.error("La fecha límite debe ser futura.");
+      return;
+    }
     setGuardando(true);
     try {
-      const puntajeNum = puntaje.trim() === "" ? undefined : Number(puntaje);
-      await tareasApi.crear(asignacion.idAsignacion, titulo.trim(), descripcion.trim() || undefined,
+      const creada = await tareasApi.crear(asignacion.idAsignacion, titulo.trim(), descripcion.trim() || undefined,
         new Date(fechaLimite).toISOString(), parcial, puntajeNum);
       toast.success("Deber publicado correctamente");
-      setTitulo(""); setDescripcion(""); setFechaLimite(""); setParcial(1); setPuntaje("10"); setMostrarForm(false);
-      cargarTareas();
+      setConfirmacion(`Deber “${creada.titulo}” publicado correctamente.`);
+      limpiarCreacion();
+      await cargarTareas(creada.idTarea);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el deber.");
     } finally {
@@ -121,14 +214,24 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
   const guardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editando || !editTitulo.trim() || !editFechaLimite) return;
+    const puntajeNum = Number(editPuntaje);
+    if (!Number.isFinite(puntajeNum) || puntajeNum < 0.01) {
+      toast.error("El puntaje debe ser un número mayor que cero.");
+      return;
+    }
+    const fechaLimiteMs = new Date(editFechaLimite).getTime();
+    if (!Number.isFinite(fechaLimiteMs) || fechaLimiteMs <= Date.now()) {
+      toast.error("La fecha límite debe ser futura.");
+      return;
+    }
     setGuardandoEdicion(true);
     try {
       const actualizada = await tareasApi.editar(editando.idTarea, editTitulo.trim(), editDescripcion.trim() || undefined,
-        new Date(editFechaLimite).toISOString(), editParcial, Number(editPuntaje));
-      setTareas(prev => prev.map(t => t.idTarea === actualizada.idTarea ? actualizada : t));
+        new Date(editFechaLimite).toISOString(), editParcial, puntajeNum);
       toast.success("Deber actualizado correctamente");
+      setConfirmacion(`Deber “${actualizada.titulo}” actualizado correctamente.`);
       setEditando(null);
-      cargarEntregas();
+      await cargarTareas(actualizada.idTarea);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo actualizar el deber.");
     } finally {
@@ -143,9 +246,9 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
       await tareasApi.eliminar(eliminando.idTarea);
       toast.success("Deber eliminado correctamente");
       const restantes = tareas.filter(t => t.idTarea !== eliminando.idTarea);
-      setTareas(restantes);
-      if (idTareaSel === eliminando.idTarea) setIdTareaSel(restantes[0]?.idTarea ?? null);
+      setConfirmacion(`Deber “${eliminando.titulo}” eliminado correctamente.`);
       setEliminando(null);
+      await cargarTareas(restantes[0]?.idTarea);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo eliminar el deber.");
     } finally {
@@ -160,8 +263,10 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
     try {
       await tareasApi.subirAdjunto(idTareaSel, nombreAdjunto.trim(), archivoAdjunto);
       toast.success("Material de apoyo publicado");
+      setConfirmacion(`Material “${nombreAdjunto.trim()}” publicado correctamente.`);
       setNombreAdjunto(""); setArchivoAdjunto(null);
-      cargarAdjuntos();
+      setAdjuntoUploadKey(k => k + 1);
+      await cargarAdjuntos(idTareaSel);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo publicar el material de apoyo.");
     } finally {
@@ -182,7 +287,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
     setEliminandoAdjuntoId(idAdjunto);
     try {
       await tareasApi.eliminarAdjunto(idAdjunto);
-      setAdjuntos(prev => prev.filter(a => a.idAdjunto !== idAdjunto));
+      setConfirmacion("Material de apoyo eliminado correctamente.");
+      if (idTareaSel != null) await cargarAdjuntos(idTareaSel);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo eliminar el material.");
     } finally {
@@ -206,10 +312,12 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
     }
     setGuardandoRevision(true);
     try {
-      const actualizada = await tareasApi.revisar(calificando.idEntrega, observacionInput.trim() || undefined, nota);
-      setEntregas(prev => prev.map(en => en.idEntrega === actualizada.idEntrega ? actualizada : en));
+      await tareasApi.revisar(calificando.idEntrega, observacionInput.trim() || undefined, nota);
       toast.success("Entrega calificada correctamente");
+      setConfirmacion(`Entrega de ${calificando.estudiante} calificada correctamente.`);
       setCalificando(null);
+      setNotaInput(""); setObservacionInput("");
+      if (idTareaSel != null) await cargarEntregas(idTareaSel);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "No se pudo calificar la entrega.");
     } finally {
@@ -227,6 +335,20 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
   };
 
   const tareaSel = tareas.find(t => t.idTarea === idTareaSel);
+  const fechaMinima = toDatetimeLocalValue(new Date().toISOString());
+  const hayMutacion = guardando || guardandoEdicion || borrando || subiendoAdjunto
+    || eliminandoAdjuntoId != null || guardandoRevision;
+  const errorGeneral = errorAsignaciones ?? errorApi ?? errorEntregas;
+
+  const reintentarGeneral = () => {
+    if (errorAsignaciones) {
+      void recargarAsignaciones();
+    } else if (errorApi) {
+      void cargarTareas(idTareaSel ?? undefined);
+    } else if (errorEntregas && idTareaSel != null) {
+      void cargarEntregas(idTareaSel);
+    }
+  };
 
   const resumenEntregas = useMemo(() => {
     const revisadas = entregas.filter(en => en.estado === "REVISADO").length;
@@ -242,26 +364,40 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 flex items-end gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-[280px]">
             <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Asignación</label>
-            <select value={idAsignacion} onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
+            <select value={idAsignacion} disabled={loadingAsignaciones || hayMutacion}
+              onChange={e => setIdAsignacion(e.target.value ? Number(e.target.value) : "")}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6] bg-white">
-              {asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
+              {loadingAsignaciones && <option value="">Cargando asignaciones…</option>}
+              {!loadingAsignaciones && asignacionesOpciones.length === 0 && <option value="">Sin asignaciones</option>}
               {asignacionesOpciones.map(a => (
                 <option key={a.idAsignacion} value={a.idAsignacion}>
-                  {a.paralelo} · {a.materia} · {a.periodo}{a.docente ? ` · ${a.docente}` : ""}
+                  {a.paralelo} · {a.materia} · {a.periodo}{a.periodoActivo ? " · Activo" : ""}{a.docente ? ` · ${a.docente}` : ""}
                 </option>
               ))}
             </select>
           </div>
           {!soloLectura && (
-            <Btn onClick={() => setMostrarForm(v => !v)} disabled={!asignacion} className="ml-auto">
+            <Btn onClick={() => { if (mostrarForm) limpiarCreacion(); else setMostrarForm(true); }}
+              disabled={!asignacion || loadingAsignaciones || hayMutacion} className="ml-auto">
               <Plus size={14} aria-hidden="true" />Nuevo deber
             </Btn>
           )}
         </div>
 
-        {(errorApi || errorAsignaciones) && (
+        {errorGeneral && (
           <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi ?? errorAsignaciones}
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span className="flex-1">{errorGeneral}</span>
+            <Btn type="button" size="sm" variant="secondary"
+              disabled={loadingAsignaciones || loading || loadingEntregas} onClick={reintentarGeneral}>
+              Reintentar
+            </Btn>
+          </div>
+        )}
+
+        {confirmacion && (
+          <div role="status" className="mb-4 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-[#2E7D32]">
+            <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{confirmacion}
           </div>
         )}
 
@@ -281,7 +417,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
             <div className="flex gap-3 flex-wrap">
               <div className="max-w-xs flex-1 min-w-[200px]">
                 <label htmlFor="tarea-fecha" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Fecha límite</label>
-                <input id="tarea-fecha" type="datetime-local" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)} required
+                <input id="tarea-fecha" type="datetime-local" value={fechaLimite} min={fechaMinima}
+                  onChange={e => setFechaLimite(e.target.value)} required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
               </div>
               <div className="max-w-[140px]">
@@ -295,7 +432,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
               </div>
               <div className="max-w-[110px]">
                 <label htmlFor="tarea-puntaje" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Puntaje</label>
-                <input id="tarea-puntaje" type="number" min={0.01} step={0.5} value={puntaje} onChange={e => setPuntaje(e.target.value)}
+                <input id="tarea-puntaje" type="number" min={0.01} step={0.01} value={puntaje}
+                  onChange={e => setPuntaje(e.target.value)} required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
               </div>
             </div>
@@ -306,7 +444,7 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
           </form>
         )}
 
-        {!asignacion && !loading && (
+        {!asignacion && !loadingAsignaciones && !loading && !errorAsignaciones && (
           <EmptyState icon={FileUp} title="Seleccione una asignación para ver o publicar deberes." />
         )}
 
@@ -315,13 +453,14 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 lg:col-span-1">
               <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Deberes publicados</p>
               {loading && <Loader2 size={16} className="animate-spin text-gray-400" aria-hidden="true" />}
-              {!loading && tareas.length === 0 && <p className="text-sm text-gray-600">Todavía no hay deberes para esta asignación.</p>}
+              {!loading && !errorApi && tareas.length === 0 && <p className="text-sm text-gray-600">Todavía no hay deberes para esta asignación.</p>}
               <ul className="space-y-1">
                 {tareas.map(t => (
                   <li key={t.idTarea}>
-                    <button type="button" onClick={() => setIdTareaSel(t.idTarea)}
+                    <button type="button" disabled={hayMutacion} onClick={() => setIdTareaSel(t.idTarea)}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors
-                        ${idTareaSel === t.idTarea ? "bg-[#EAF2FB] text-[#1F4E79] font-medium" : "hover:bg-gray-50 text-gray-700"}`}>
+                        ${idTareaSel === t.idTarea ? "bg-[#EAF2FB] text-[#1F4E79] font-medium" : "hover:bg-gray-50 text-gray-700"}
+                        disabled:opacity-50 disabled:cursor-not-allowed`}>
                       <p className="truncate">{t.titulo}</p>
                       <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                         <Clock size={11} aria-hidden="true" />
@@ -349,17 +488,24 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                     </div>
                     {!soloLectura && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" title="Editar deber" onClick={() => abrirEditar(tareaSel)}
-                          className="p-1.5 rounded-md text-gray-500 hover:bg-[#EAF2FB] hover:text-[#1F4E79] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40">
+                        <button type="button" title="Editar deber" disabled={hayMutacion || loadingEntregas}
+                          onClick={() => abrirEditar(tareaSel)}
+                          className="p-1.5 rounded-md text-gray-500 hover:bg-[#EAF2FB] hover:text-[#1F4E79] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 disabled:opacity-50 disabled:cursor-not-allowed">
                           <Pencil size={14} aria-hidden="true" />
                         </button>
-                        <button type="button" title="Eliminar deber" onClick={() => setEliminando(tareaSel)}
-                          className="p-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-[#C62828] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40">
+                        <button type="button" title="Eliminar deber" disabled={hayMutacion || loadingEntregas}
+                          onClick={() => setEliminando(tareaSel)}
+                          className="p-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-[#C62828] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40 disabled:opacity-50 disabled:cursor-not-allowed">
                           <Trash2 size={14} aria-hidden="true" />
                         </button>
                       </div>
                     )}
                   </div>
+                  {loadingEntregas ? (
+                    <div className="px-4 py-8 text-center text-sm text-gray-600">
+                      <Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando entregas…
+                    </div>
+                  ) : (
                   <table className="w-full text-sm">
                     <caption className="sr-only">Entregas de {tareaSel.titulo}</caption>
                     <thead>
@@ -385,14 +531,14 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                                 </button>
                               )}
                               {!soloLectura && en.estado === "ENTREGADO" && (
-                                <button type="button" onClick={() => abrirCalificar(en)}
-                                  className="inline-flex items-center gap-1 text-xs font-medium text-[#2E7D32] hover:underline focus:outline-none">
+                                <button type="button" disabled={hayMutacion} onClick={() => abrirCalificar(en)}
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-[#2E7D32] hover:underline focus:outline-none disabled:opacity-50">
                                   <CheckCircle2 size={12} aria-hidden="true" />Calificar
                                 </button>
                               )}
                               {!soloLectura && en.estado === "REVISADO" && (
-                                <button type="button" onClick={() => abrirCalificar(en)}
-                                  className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline focus:outline-none">
+                                <button type="button" disabled={hayMutacion} onClick={() => abrirCalificar(en)}
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:underline focus:outline-none disabled:opacity-50">
                                   Editar calificación
                                 </button>
                               )}
@@ -406,6 +552,7 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                       ))}
                     </tbody>
                   </table>
+                  )}
                 </div>
               )}
             </div>
@@ -424,7 +571,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
                 </div>
                 <div className="min-w-[240px]">
-                  <FileUpload accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mp3" maxSizeMb={15}
+                  <FileUpload key={adjuntoUploadKey}
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mp3" maxSizeMb={15}
                     onFileSelected={setArchivoAdjunto} disabled={subiendoAdjunto} label="Adjuntar archivo" />
                 </div>
                 <Btn disabled={subiendoAdjunto || !archivoAdjunto || !nombreAdjunto.trim()}>
@@ -433,9 +581,21 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                 </Btn>
               </form>
             )}
-            {adjuntos.length === 0 ? (
+            {errorAdjuntos && (
+              <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span className="flex-1">{errorAdjuntos}</span>
+                <Btn type="button" size="sm" variant="secondary" disabled={loadingAdjuntos}
+                  onClick={() => { if (idTareaSel != null) void cargarAdjuntos(idTareaSel); }}>
+                  Reintentar
+                </Btn>
+              </div>
+            )}
+            {loadingAdjuntos ? (
+              <p className="text-sm text-gray-600"><Loader2 size={14} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando material…</p>
+            ) : !errorAdjuntos && adjuntos.length === 0 ? (
               <p className="text-sm text-gray-500">No hay material de apoyo publicado para este deber.</p>
-            ) : (
+            ) : !errorAdjuntos ? (
               <ul className="divide-y divide-gray-100">
                 {adjuntos.map(a => (
                   <li key={a.idAdjunto} className="py-2 flex items-center justify-between gap-3">
@@ -452,7 +612,7 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
                   </li>
                 ))}
               </ul>
-            )}
+            ) : null}
           </div>
         )}
       </div>
@@ -473,7 +633,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
             <div className="flex gap-3 flex-wrap">
               <div className="max-w-xs flex-1 min-w-[200px]">
                 <label htmlFor="edit-fecha" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Fecha límite</label>
-                <input id="edit-fecha" type="datetime-local" value={editFechaLimite} onChange={e => setEditFechaLimite(e.target.value)} required
+                <input id="edit-fecha" type="datetime-local" value={editFechaLimite} min={fechaMinima}
+                  onChange={e => setEditFechaLimite(e.target.value)} required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
               </div>
               <div className="max-w-[140px]">
@@ -487,7 +648,8 @@ export function TareasView({ soloLectura = false }: { soloLectura?: boolean }) {
               </div>
               <div className="max-w-[110px]">
                 <label htmlFor="edit-puntaje" className="block text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Puntaje</label>
-                <input id="edit-puntaje" type="number" min={0.01} step={0.5} value={editPuntaje} onChange={e => setEditPuntaje(e.target.value)}
+                <input id="edit-puntaje" type="number" min={0.01} step={0.01} value={editPuntaje}
+                  onChange={e => setEditPuntaje(e.target.value)} required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:ring-2 focus:ring-[#2E75B6]/30 focus:border-[#2E75B6]" />
               </div>
             </div>

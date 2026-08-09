@@ -54,7 +54,9 @@ sagab:
     access-key: ${SAGAB_S3_ACCESS_KEY:}
     secret-key: ${SAGAB_S3_SECRET_KEY:}
     local-dir: ${SAGAB_STORAGE_LOCAL_DIR:./data/uploads}
-    public-base-url: ${SAGAB_PUBLIC_API_URL:http://localhost:8080}
+    # Vacío por defecto: StorageService emite una ruta relativa al origen actual. Definir una
+    # URL absoluta solo cuando API y frontend se publiquen en orígenes distintos.
+    public-base-url: ${SAGAB_PUBLIC_API_URL:}
   uploads:
     max-mb-deberes: ${SAGAB_UPLOAD_MAX_MB_DEBERES:15}
     max-mb-comprobante: ${SAGAB_UPLOAD_MAX_MB_COMPROBANTE:8}

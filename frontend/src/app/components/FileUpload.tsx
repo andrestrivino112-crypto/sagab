@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileUp, Loader2, Paperclip, X } from "lucide-react";
 
 /**
@@ -6,31 +6,46 @@ import { FileUp, Loader2, Paperclip, X } from "lucide-react";
  * (mejor experiencia, feedback inmediato) — la validación real de tipo/tamaño/contenido la
  * hace siempre el backend (ver FileValidationService), este control nunca es la única defensa.
  */
-export function FileUpload({ accept, maxSizeMb, onFileSelected, disabled = false, label = "Adjuntar archivo" }: {
+export function FileUpload({ accept, maxSizeMb, onFileSelected, value, disabled = false, label = "Adjuntar archivo" }: {
   accept: string; maxSizeMb: number; onFileSelected: (file: File | null) => void;
+  /** Si se define, el archivo queda controlado por el componente padre. Pasar null después de
+   * guardar también limpia el input nativo, permitiendo seleccionar de nuevo el mismo archivo. */
+  value?: File | null;
   disabled?: boolean; label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const [archivoInterno, setArchivoInterno] = useState<File | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const controlado = value !== undefined;
+  const archivo = controlado ? value : archivoInterno;
+
+  useEffect(() => {
+    if (controlado && value == null) {
+      if (inputRef.current) inputRef.current.value = "";
+      setError(null);
+    }
+  }, [controlado, value]);
+
+  const actualizar = (file: File | null) => {
+    if (!controlado) setArchivoInterno(file);
+    onFileSelected(file);
+  };
 
   const aceptar = (file: File) => {
     if (file.size > maxSizeMb * 1024 * 1024) {
       setError(`El archivo supera el tamaño máximo permitido (${maxSizeMb} MB).`);
-      setArchivo(null);
-      onFileSelected(null);
+      actualizar(null);
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
     setError(null);
-    setArchivo(file);
-    onFileSelected(file);
+    actualizar(file);
   };
 
   const quitar = () => {
-    setArchivo(null);
+    actualizar(null);
     setError(null);
-    onFileSelected(null);
     if (inputRef.current) inputRef.current.value = "";
   };
 

@@ -62,16 +62,31 @@ export function MisMateriasView({ idEstudiante }: { idEstudiante: number }) {
   const [pestaña, setPestaña] = useState<Pestaña>("info");
   const [entregaSel, setEntregaSel] = useState<EntregaResponse | null>(null);
 
-  const cargar = () => {
+  useEffect(() => {
+    let vigente = true;
     setLoading(true);
     setErrorApi(null);
-    Promise.all([materiasApi.porEstudiante(idEstudiante), tareasApi.misEntregas(idEstudiante)])
-      .then(([m, e]) => { setMateriasList(m); setEntregas(e); })
-      .catch(err => setErrorApi(err instanceof ApiError ? err.message : "No se pudo cargar la información académica."))
-      .finally(() => setLoading(false));
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(cargar, [idEstudiante]);
+    setMateriasList([]);
+    setEntregas([]);
+    setVista("grid");
+    setMateriaSel(null);
+    setEntregaSel(null);
+    setBusqueda("");
+    void Promise.allSettled([
+      materiasApi.porEstudiante(idEstudiante),
+      tareasApi.misEntregas(idEstudiante),
+    ]).then(([materiasResult, entregasResult]) => {
+      if (!vigente) return;
+      if (materiasResult.status === "fulfilled") setMateriasList(materiasResult.value);
+      if (entregasResult.status === "fulfilled") setEntregas(entregasResult.value);
+      const errores = [
+        materiasResult.status === "rejected" ? "No se pudieron cargar las materias." : null,
+        entregasResult.status === "rejected" ? "No se pudieron cargar los deberes; las materias disponibles siguen accesibles." : null,
+      ].filter((mensaje): mensaje is string => mensaje != null);
+      setErrorApi(errores.length > 0 ? errores.join(" ") : null);
+    }).finally(() => { if (vigente) setLoading(false); });
+    return () => { vigente = false; };
+  }, [idEstudiante]);
 
   const materiasFiltradas = useMemo(
     () => materiasList.filter(m => m.nombre.toLowerCase().includes(busqueda.trim().toLowerCase())),
@@ -95,14 +110,6 @@ export function MisMateriasView({ idEstudiante }: { idEstudiante: number }) {
   if (loading) {
     return <div className="text-center text-sm text-gray-600 py-8"><Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…</div>;
   }
-  if (errorApi) {
-    return (
-      <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-        <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
-      </div>
-    );
-  }
-
   if (vista === "entrega" && entregaSel) {
     return <DetalleEntrega entrega={entregaSel} idEstudiante={idEstudiante} toast={toast} onVolver={volverAlDetalle} />;
   }
@@ -117,6 +124,11 @@ export function MisMateriasView({ idEstudiante }: { idEstudiante: number }) {
   // ── Grid de materias ──────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {errorApi && (
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+          <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
+        </div>
+      )}
       <div className="relative max-w-md">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar materia por nombre"
@@ -302,7 +314,7 @@ function MaterialSemanalLectura({ materiales, idEstudiante, toast }: {
   }, [materiales]);
 
   const abrir = async (r: RecursoAcademicoResponse) => {
-    if (r.tipo === "LINK_CLASE" && r.urlExterna) {
+    if (r.urlExterna) {
       window.open(r.urlExterna, "_blank", "noopener,noreferrer");
       return;
     }
@@ -327,13 +339,13 @@ function MaterialSemanalLectura({ materiales, idEstudiante, toast }: {
                 <li key={r.idRecurso}>
                   <button type="button" onClick={() => abrir(r)}
                     className="w-full text-left flex items-start gap-2 text-sm text-[#2E75B6] hover:underline focus:outline-none">
-                    {r.tipo === "LINK_CLASE" ? <ExternalLink size={13} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
+                    {r.urlExterna ? <ExternalLink size={13} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
                       : <Icono size={13} className="flex-shrink-0 mt-0.5" aria-hidden="true" />}
                     <span className="min-w-0">
                       <span className="block truncate">{r.nombre}</span>
                       {r.descripcion && <span className="block text-xs text-gray-500 no-underline">{r.descripcion}</span>}
                     </span>
-                    {r.tipo !== "LINK_CLASE" && <Download size={12} className="flex-shrink-0 mt-1 text-gray-400" aria-hidden="true" />}
+                    {!r.urlExterna && <Download size={12} className="flex-shrink-0 mt-1 text-gray-400" aria-hidden="true" />}
                   </button>
                 </li>
               );
@@ -382,6 +394,7 @@ function DetalleEntrega({ entrega, idEstudiante, toast, onVolver }: {
   const [enviando, setEnviando] = useState(false);
   const [entregaActual, setEntregaActual] = useState(entrega);
   const [adjuntos, setAdjuntos] = useState<AdjuntoTareaResponse[]>([]);
+  const [adjuntosError, setAdjuntosError] = useState<string | null>(null);
 
   const estado = estadoVisual(entregaActual);
   const info = ESTADO_INFO[estado];
@@ -390,9 +403,16 @@ function DetalleEntrega({ entrega, idEstudiante, toast, onVolver }: {
   const pasadoLimite = new Date(entregaActual.fechaLimite) < new Date();
 
   useEffect(() => {
-    tareasApi.adjuntosDeTarea(entregaActual.idTarea, idEstudiante).then(setAdjuntos).catch(() => setAdjuntos([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entregaActual.idTarea]);
+    let vigente = true;
+    setAdjuntos([]);
+    setAdjuntosError(null);
+    tareasApi.adjuntosDeTarea(entregaActual.idTarea, idEstudiante)
+      .then(lista => { if (vigente) setAdjuntos(lista); })
+      .catch(e => {
+        if (vigente) setAdjuntosError(e instanceof ApiError ? e.message : "No se pudo cargar el material de apoyo del deber.");
+      });
+    return () => { vigente = false; };
+  }, [entregaActual.idTarea, idEstudiante]);
 
   const enviar = async () => {
     if (!archivo) return;
@@ -456,6 +476,11 @@ function DetalleEntrega({ entrega, idEstudiante, toast, onVolver }: {
             </ul>
           </div>
         )}
+        {adjuntosError && (
+          <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{adjuntosError}
+          </div>
+        )}
 
         <div className="mt-4 pt-4 border-t border-gray-100">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Estado de la entrega</p>
@@ -489,7 +514,7 @@ function DetalleEntrega({ entrega, idEstudiante, toast, onVolver }: {
               {entregaActual.estado !== "PENDIENTE" && (
                 <p className="text-xs text-gray-500">Puede reemplazar el archivo mientras no haya vencido la fecha límite.</p>
               )}
-              <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15}
+              <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15} value={archivo}
                 onFileSelected={setArchivo} disabled={enviando}
                 label={entregaActual.estado === "PENDIENTE" ? "Adjuntar tarea (PDF, Word, imagen o ZIP)" : "Reemplazar archivo (PDF, Word, imagen o ZIP)"} />
               <Btn size="sm" onClick={enviar} disabled={!archivo || enviando} className="w-full">

@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.net.URI;
+import java.time.OffsetDateTime;
 
 /**
  * Sílabo, formatos de presentación y link de clase virtual de una asignación — sección
@@ -109,6 +110,7 @@ public class RecursoAcademicoService {
     public RecursoAcademicoDtos.RecursoResponse subirArchivo(Long idAsignacion, RecursoAcademico.TipoRecurso tipo,
             String nombre, String descripcion, Short semana, java.time.OffsetDateTime fechaLimite,
             MultipartFile archivo, Authentication auth) {
+        validarNombreYSemana(nombre, semana);
         if (tipo == RecursoAcademico.TipoRecurso.LINK_CLASE) {
             throw new IllegalArgumentException("LINK_CLASE no lleva archivo, use el endpoint de enlace");
         }
@@ -141,11 +143,20 @@ public class RecursoAcademicoService {
             storage.eliminar(clave);
             throw e;
         }
+        completarCreadoEn(rec);
         return toResponse(rec);
     }
 
     @Transactional
     public RecursoAcademicoDtos.RecursoResponse crearLink(RecursoAcademicoDtos.CrearLinkRequest req, Authentication auth) {
+        validarNombreYSemana(req.nombre(), req.semana());
+        RecursoAcademico.TipoRecurso tipo = req.tipo() == null
+                ? RecursoAcademico.TipoRecurso.LINK_CLASE
+                : req.tipo();
+        if (tipo != RecursoAcademico.TipoRecurso.LINK_CLASE
+                && tipo != RecursoAcademico.TipoRecurso.MATERIAL) {
+            throw new IllegalArgumentException("Un enlace solo puede ser LINK_CLASE o MATERIAL");
+        }
         AsignacionDocente asignacion = asignaciones.findById(req.idAsignacion())
                 .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
         asignacionDocenteService.exigirDueñoDeAsignacion(asignacion, auth);
@@ -154,7 +165,7 @@ public class RecursoAcademicoService {
         Long idUsuario = usuarios.findByEmail(auth.getName()).orElseThrow().getId();
         RecursoAcademico rec = new RecursoAcademico();
         rec.setAsignacion(asignacion);
-        rec.setTipo(RecursoAcademico.TipoRecurso.LINK_CLASE);
+        rec.setTipo(tipo);
         rec.setNombre(req.nombre().trim());
         rec.setDescripcion(req.descripcion() == null || req.descripcion().isBlank() ? null : req.descripcion().trim());
         rec.setSemana(req.semana());
@@ -162,6 +173,7 @@ public class RecursoAcademicoService {
         rec.setUrlExterna(url);
         rec.setCreadoPor(idUsuario);
         rec = recursos.save(rec);
+        completarCreadoEn(rec);
         return toResponse(rec);
     }
 
@@ -200,6 +212,26 @@ public class RecursoAcademicoService {
                 r.getAsignacion().getMateria().getNombre(), r.getAsignacion().getParalelo().getNivel(),
                 r.getAsignacion().getParalelo().etiqueta(), r.getAsignacion().getDocente().getUsuario().nombreCompleto(),
                 autor, r.getCreadoEn(), r.getFechaLimite());
+    }
+
+    private void validarNombreYSemana(String nombre, Short semana) {
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException("El nombre del recurso es obligatorio");
+        }
+        if (nombre.length() > 150) {
+            throw new IllegalArgumentException("El nombre del recurso no puede superar 150 caracteres");
+        }
+        if (semana != null && (semana < 1 || semana > 52)) {
+            throw new IllegalArgumentException("La semana debe estar entre 1 y 52");
+        }
+    }
+
+    private void completarCreadoEn(RecursoAcademico recurso) {
+        // creado_en lo genera PostgreSQL y la columna es insertable=false. Hibernate no relee
+        // ese DEFAULT tras save(), por lo que se completa la instancia usada en la respuesta.
+        if (recurso.getCreadoEn() == null) {
+            recurso.setCreadoEn(OffsetDateTime.now());
+        }
     }
 
     private String urlHttpValida(String valor) {

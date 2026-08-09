@@ -60,6 +60,8 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
   const [notifs, setNotifs] = useState<NotificacionResponse[]>([]);
   const [loading, setLoading] = useState(!embed);
   const [errorApi, setErrorApi] = useState<string | null>(null);
+  const [erroresInicio, setErroresInicio] = useState<string[]>([]);
+  const [erroresEstudiante, setErroresEstudiante] = useState<string[]>([]);
 
   const tabs: { id: ParentTab; label: string; icon: React.ElementType }[] = [
     { id:"home",       label:"Inicio",     icon: Home },
@@ -73,15 +75,30 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
 
   useEffect(() => {
     if (embed) { setLoading(false); return; }
-    estudiantesApi.mios()
-      .then(lista => {
-        setHijos(lista);
-        if (lista.length > 0) setIdEstudiante(lista[0].id);
-      })
-      .catch(e => setErrorApi(e instanceof ApiError ? e.message : "No se pudo cargar la información."))
-      .finally(() => setLoading(false));
-    mensajesApi.mias().then(setInbox).catch(() => {});
-    notificacionesApi.mias().then(setNotifs).catch(() => {});
+    let vigente = true;
+    setLoading(true);
+    setErrorApi(null);
+    setErroresInicio([]);
+    void Promise.allSettled([
+      estudiantesApi.mios(),
+      mensajesApi.mias(),
+      notificacionesApi.mias(),
+    ]).then(([hijosResult, mensajesResult, notificacionesResult]) => {
+      if (!vigente) return;
+      if (hijosResult.status === "fulfilled") {
+        setHijos(hijosResult.value);
+        setIdEstudiante(hijosResult.value[0]?.id ?? null);
+      } else {
+        setErrorApi(hijosResult.reason instanceof ApiError ? hijosResult.reason.message : "No se pudo cargar la información de estudiantes.");
+      }
+      if (mensajesResult.status === "fulfilled") setInbox(mensajesResult.value);
+      if (notificacionesResult.status === "fulfilled") setNotifs(notificacionesResult.value);
+      setErroresInicio([
+        mensajesResult.status === "rejected" ? "No se pudieron cargar los mensajes institucionales." : null,
+        notificacionesResult.status === "rejected" ? "No se pudieron cargar las notificaciones." : null,
+      ].filter((mensaje): mensaje is string => mensaje != null));
+    }).finally(() => { if (vigente) setLoading(false); });
+    return () => { vigente = false; };
   }, [embed]);
 
   const marcarNotificacionLeida = async (id: number) => {
@@ -89,7 +106,11 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
     try {
       await notificacionesApi.marcarLeida(id);
     } catch {
-      notificacionesApi.mias().then(setNotifs).catch(() => {});
+      try {
+        setNotifs(await notificacionesApi.mias());
+      } catch {
+        toast.error("No se pudo confirmar ni restaurar el estado de la notificación.");
+      }
     }
   };
 
@@ -101,26 +122,61 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
       await mensajesApi.marcarLeido(mensaje.idMensaje);
       window.dispatchEvent(new CustomEvent("sagab:mensajes-actualizados"));
     } catch {
-      mensajesApi.mias().then(setInbox).catch(() => {});
+      try {
+        setInbox(await mensajesApi.mias());
+      } catch {
+        toast.error("No se pudo confirmar ni restaurar el estado del mensaje.");
+      }
     }
   };
 
   useEffect(() => {
     if (embed || idEstudiante == null) return;
-    Promise.all([
+    let vigente = true;
+    setNotas([]);
+    setAsistenciaHist([]);
+    setObligaciones([]);
+    setEntregas([]);
+    setErroresEstudiante([]);
+    void Promise.allSettled([
       calificacionesApi.porEstudiante(idEstudiante),
       asistenciaApi.porEstudiante(idEstudiante),
       finanzasApi.porEstudiante(idEstudiante),
       tareasApi.misEntregas(idEstudiante),
-    ]).then(([n, a, o, e]) => { setNotas(n); setAsistenciaHist(a); setObligaciones(o); setEntregas(e); })
-      .catch(e => setErrorApi(e instanceof ApiError ? e.message : "No se pudo cargar la información del estudiante."));
+    ]).then(([notasResult, asistenciaResult, obligacionesResult, entregasResult]) => {
+      if (!vigente) return;
+      if (notasResult.status === "fulfilled") setNotas(notasResult.value);
+      if (asistenciaResult.status === "fulfilled") setAsistenciaHist(asistenciaResult.value);
+      if (obligacionesResult.status === "fulfilled") setObligaciones(obligacionesResult.value);
+      if (entregasResult.status === "fulfilled") setEntregas(entregasResult.value);
+      setErroresEstudiante([
+        notasResult.status === "rejected" ? "No se pudieron cargar las calificaciones." : null,
+        asistenciaResult.status === "rejected" ? "No se pudo cargar la asistencia." : null,
+        obligacionesResult.status === "rejected" ? "No se pudieron cargar los pagos." : null,
+        entregasResult.status === "rejected" ? "No se pudieron cargar los deberes." : null,
+      ].filter((mensaje): mensaje is string => mensaje != null));
+    });
+    return () => { vigente = false; };
   }, [embed, idEstudiante]);
 
-  const recargarEntregas = () => {
-    if (idEstudiante != null) tareasApi.misEntregas(idEstudiante).then(setEntregas).catch(() => {});
+  const recargarEntregas = async (): Promise<boolean> => {
+    if (idEstudiante == null) return false;
+    try {
+      setEntregas(await tareasApi.misEntregas(idEstudiante));
+      return true;
+    } catch {
+      return false;
+    }
   };
-  const recargarObligaciones = () => {
-    if (idEstudiante != null) finanzasApi.porEstudiante(idEstudiante).then(setObligaciones).catch(() => {});
+  const recargarObligaciones = async (): Promise<boolean> => {
+    if (idEstudiante == null) return false;
+    try {
+      setObligaciones(await finanzasApi.porEstudiante(idEstudiante));
+      return true;
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo actualizar el estado de los pagos.");
+      return false;
+    }
   };
 
   const promedios = notas.map(n => n.promedio).filter((p): p is number => p != null);
@@ -190,9 +246,10 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
             <div className="text-center text-sm text-gray-600 py-8"><Loader2 size={16} className="animate-spin inline-block mr-2" aria-hidden="true" />Cargando…</div>
           )}
 
-          {!embed && !loading && errorApi && (
+          {!embed && !loading && (errorApi || erroresInicio.length > 0 || erroresEstudiante.length > 0) && (
             <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-[#C62828]">
-              <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />{errorApi}
+              <AlertCircle size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <span>{[errorApi, ...erroresInicio, ...erroresEstudiante].filter(Boolean).join(" ")}</span>
             </div>
           )}
 
@@ -443,7 +500,7 @@ export function ParentPortal({ onLogout, embed = false, nombre = "", rol = "REPR
 // ── Tarjeta de entrega de deber (con subida de archivo si está pendiente) ───
 // El estudiante y su representante comparten el mismo acceso — ambos pueden entregar.
 function EntregaCard({ entrega, idEstudiante, onSubido, toast }: {
-  entrega: EntregaResponse; idEstudiante: number; onSubido: () => void; toast: ReturnType<typeof useToast>;
+  entrega: EntregaResponse; idEstudiante: number; onSubido: () => Promise<boolean>; toast: ReturnType<typeof useToast>;
 }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -455,7 +512,8 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast }: {
     try {
       await tareasApi.subirEntrega(entrega.idTarea, idEstudiante, archivo);
       toast.success("Deber entregado correctamente");
-      onSubido();
+      setArchivo(null);
+      if (!await onSubido()) toast.error("El deber se entregó, pero no se pudo actualizar el listado. No vuelva a enviarlo.");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo subir el archivo.");
     } finally {
@@ -477,7 +535,7 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast }: {
 
       {entrega.estado === "PENDIENTE" && (
         <div className="mt-3 space-y-2">
-          <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15}
+          <FileUpload accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp" maxSizeMb={15} value={archivo}
             onFileSelected={setArchivo} disabled={enviando} label="Adjuntar tarea (PDF, Word, imagen o ZIP)" />
           <Btn size="sm" onClick={enviar} disabled={!archivo || enviando} className="w-full">
             {enviando ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Send size={13} aria-hidden="true" />}
