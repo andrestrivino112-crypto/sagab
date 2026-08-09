@@ -1,6 +1,7 @@
 package ec.edu.bellini.sagab.config;
 
 import ec.edu.bellini.sagab.middleware.JwtAuthFilter;
+import ec.edu.bellini.sagab.middleware.SecurityFailureHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,7 +41,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
+                                           SecurityFailureHandler failureHandler) throws Exception {
         http.csrf(csrf -> csrf.disable())               // API stateless con JWT: CSRF no aplica
             .cors(cors -> cors.configurationSource(corsSource()))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -48,28 +50,34 @@ public class SecurityConfig {
                 .contentTypeOptions(o -> {})
                 .frameOptions(f -> f.deny())
                 .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint(failureHandler)
+                .accessDeniedHandler(failureHandler))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 // Descarga local firmada y de corta duración. El token HMAC sustituye al JWT
                 // porque window.open/img no pueden adjuntar Authorization; el permiso del
                 // recurso se verifica antes de emitir el enlace.
                 .requestMatchers(HttpMethod.GET, "/api/storage/local/**").permitAll()
-                .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN")
-                .requestMatchers("/api/personal/**").hasRole("ADMIN")
+                .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
+                .requestMatchers("/api/auditoria/**").hasAnyRole("AUDITOR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/personal/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 // Regla específica antes de la general de abajo: la cola de revisión es solo ADMIN
                 // (coincide con @PreAuthorize de FinanzasController.colaRevision(), documentado aquí
                 // también para que SecurityConfig no sugiera una regla más permisiva de la real).
-                .requestMatchers(HttpMethod.GET, "/api/finanzas/pagos/revision").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/pagos/revision").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 // Drill-down "Estudiantes en mora" del Dashboard: mismos roles que ya ven el Dashboard
                 // (DashboardController.resumen), no la regla general de abajo (que incluye a las
                 // familias) — es un listado institucional completo, no el de un único estudiante.
-                .requestMatchers(HttpMethod.GET, "/api/finanzas/mora").hasAnyRole("ADMIN", "DOCENTE", "AUDITOR", "DECE")
-                .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "REPRESENTANTE", "ESTUDIANTE")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/mora").hasAnyRole("ADMIN", "SUPER_ADMIN", "AUDITOR")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/pendientes").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/finanzas/pendientes/*/notificacion").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/finanzas/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "REPRESENTANTE", "ESTUDIANTE")
                 // El estudiante o su representante suben comprobantes de su propia transferencia
                 // (verificado además por FinanzasService.esPropio); el admin únicamente revisa
                 // (aprobar/rechazar), nunca sube. El resto de /api/finanzas/** sigue siendo solo ADMIN.
                 .requestMatchers(HttpMethod.POST, "/api/finanzas/pagos/transferencia").hasAnyRole("REPRESENTANTE", "ESTUDIANTE")
-                .requestMatchers("/api/finanzas/**").hasRole("ADMIN")
+                .requestMatchers("/api/finanzas/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

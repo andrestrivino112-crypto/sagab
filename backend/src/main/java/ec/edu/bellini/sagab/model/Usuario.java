@@ -61,6 +61,14 @@ public class Usuario {
     @Column(name = "debe_cambiar_clave", nullable = false)
     private boolean debeCambiarClave = true;
 
+    /** Versión de seguridad incluida en el JWT. Al incrementarla, todos los tokens anteriores
+     * quedan revocados aunque todavía no hayan alcanzado su fecha de expiración. */
+    @Column(name = "auth_version", nullable = false)
+    private int authVersion = 0;
+
+    @Column(name = "creado_en", insertable = false, updatable = false)
+    private OffsetDateTime creadoEn;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "usuario_rol",
             joinColumns = @JoinColumn(name = "id_usuario"),

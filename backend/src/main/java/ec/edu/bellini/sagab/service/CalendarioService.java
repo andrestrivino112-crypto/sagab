@@ -61,7 +61,7 @@ public class CalendarioService {
         validarRango(desde, hasta);
         OffsetDateTime inicio = desde.atStartOfDay(ZONA).toOffsetDateTime();
         OffsetDateTime fin = hasta.plusDays(1).atStartOfDay(ZONA).minusNanos(1).toOffsetDateTime();
-        boolean admin = tieneRol(auth, "ADMIN");
+        boolean admin = tieneRolAdministrativo(auth);
 
         List<CalendarioDtos.CalendarioItemResponse> resultado = new ArrayList<>();
         List<EventoCalendario> eventosVisibles = admin ? eventos.enRangoAdmin(inicio, fin)
@@ -223,7 +223,7 @@ public class CalendarioService {
     }
 
     private List<RecursoAcademico> recursosVisibles(OffsetDateTime desde, OffsetDateTime hasta, Authentication auth) {
-        if (tieneRol(auth, "ADMIN")) return recursos.calendarioAdmin(desde, hasta);
+        if (tieneRolAdministrativo(auth)) return recursos.calendarioAdmin(desde, hasta);
         if (tieneRol(auth, "DOCENTE")) return recursos.calendarioDocente(auth.getName(), desde, hasta);
         List<Integer> paralelos = paralelosFamilia(auth);
         return paralelos.isEmpty() ? List.of() : recursos.calendarioParalelos(paralelos, desde, hasta);
@@ -300,7 +300,7 @@ public class CalendarioService {
     }
 
     private void exigirEventoVisible(EventoCalendario evento, Authentication auth) {
-        if (tieneRol(auth, "ADMIN")) return;
+        if (tieneRolAdministrativo(auth)) return;
         boolean visible = evento.getEstado() == EventoCalendario.Estado.PUBLICADO
                 || evento.getEstado() == EventoCalendario.Estado.CANCELADO
                 || (evento.getEstado() == EventoCalendario.Estado.PROGRAMADO
@@ -311,6 +311,10 @@ public class CalendarioService {
 
     private boolean tieneRol(Authentication auth, String rol) {
         return auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_" + rol));
+    }
+
+    private boolean tieneRolAdministrativo(Authentication auth) {
+        return tieneRol(auth, "ADMIN") || tieneRol(auth, "SUPER_ADMIN");
     }
 
     private void validarRango(LocalDate desde, LocalDate hasta) {

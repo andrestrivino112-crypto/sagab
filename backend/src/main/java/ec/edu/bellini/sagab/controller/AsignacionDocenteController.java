@@ -27,30 +27,30 @@ public class AsignacionDocenteController {
 
     /** Asignaciones (paralelo+materia+período) del docente autenticado; todas si es ADMIN. */
     @GetMapping("/mias")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN')")
     public List<AsignacionDocenteDtos.AsignacionResponse> mias(Authentication auth) {
         return service.mias(auth);
     }
 
     @GetMapping("/catalogos")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public AsignacionDocenteDtos.CatalogosResponse catalogos() { return service.catalogos(); }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public List<AsignacionDocenteDtos.AsignacionResponse> crear(
             @Valid @RequestBody AsignacionDocenteDtos.CrearAsignacionesRequest req) {
         return service.crear(req);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public AsignacionDocenteDtos.AsignacionResponse editar(@PathVariable Long id,
             @Valid @RequestBody AsignacionDocenteDtos.EditarAsignacionRequest req) {
         return service.editar(id, req);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public void eliminar(@PathVariable Long id) { service.eliminar(id); }
 }

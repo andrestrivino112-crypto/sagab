@@ -16,7 +16,7 @@ import { useAsignaciones } from "../hooks/useAsignaciones";
 import { useDebouncedSearch } from "../hooks/useDebouncedSearch";
 import { calcAvg, isComplete, isValid } from "../helpers";
 import type { Screen } from "../types";
-import type { RolSistema } from "../../api/auth";
+import { esRolAdministrativo, type RolSistema } from "../../api/auth";
 
 interface NotaRow { idEstudiante: number; nombre: string; tarea: string; clase: string; examen: string; }
 type NotaSortKey = "nombre" | "promedio";
@@ -33,7 +33,7 @@ function tamanoArchivo(bytes: number | null): string {
 export function GradesView({ onNavigate, rol }: { onNavigate: (s: Screen) => void; rol: RolSistema }) {
   const toast = useToast();
   const [modo, setModo] = useState<"ingreso" | "consulta" | "recursos">("ingreso");
-  const puedeVerRecursos = rol !== "ADMIN";
+  const puedeVerRecursos = !esRolAdministrativo(rol);
   const modosDisponibles = puedeVerRecursos
     ? (["ingreso", "consulta", "recursos"] as const)
     : (["ingreso", "consulta"] as const);

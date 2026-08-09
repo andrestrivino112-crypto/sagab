@@ -1,5 +1,7 @@
 package ec.edu.bellini.sagab.exception;
 
+import ec.edu.bellini.sagab.service.EventoSeguridadService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -8,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,6 +33,11 @@ import java.util.NoSuchElementException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final EventoSeguridadService eventos;
+
+    public GlobalExceptionHandler(EventoSeguridadService eventos) {
+        this.eventos = eventos;
+    }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> credenciales(BadCredentialsException e) {
@@ -40,8 +50,18 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> denegado(AccessDeniedException e) {
-        log.warn("Acceso denegado: {}", e.getMessage());
+    public ResponseEntity<Map<String, Object>> denegado(AccessDeniedException e,
+                                                        HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String actor = auth == null || auth.getName() == null ? "anonimo" : auth.getName();
+        if (!(e instanceof AuditedAccessDeniedException)) {
+            try {
+                eventos.accesoDenegado(actor, "Acceso denegado por autorización de método",
+                        request.getRemoteAddr(), request.getHeader("User-Agent"));
+            } catch (RuntimeException auditError) {
+                log.warn("No se pudo auditar un acceso denegado a {}", request.getRequestURI());
+            }
+        }
         return error(HttpStatus.FORBIDDEN, "No tiene permisos para esta operación");
     }
 
@@ -63,6 +83,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, detalle);
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> cuerpoInvalido(HttpMessageNotReadableException e) {
+        return error(HttpStatus.BAD_REQUEST, "El cuerpo de la solicitud no es válido");
+    }
+
     /** Archivo más grande que spring.servlet.multipart.max-file-size — se dispara antes de llegar a FileValidationService. */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> archivoDemasiadoGrande(MaxUploadSizeExceededException e) {
@@ -81,7 +106,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> integridad(DataIntegrityViolationException e) {
-        log.warn("Violación de integridad de datos: {}", e.getMostSpecificCause().getMessage());
+        log.warn("Violación de integridad de datos ({})", e.getClass().getSimpleName());
         return error(HttpStatus.CONFLICT, "La operación viola una restricción de datos (registro duplicado o referenciado)");
     }
 

@@ -19,9 +19,9 @@ fi
 # Orden real de ejecución (verificado contra una base de datos limpia): NO es el orden
 # numérico literal. 09_estudiante_usuario.sql debe correr antes que 07_usuario_username.sql
 # pese a que 09 se numeró después — 09 solo depende de 01-04/06, no de 07/08. Todos los
-# scripts de este bloque son estructurales (tablas, triggers, funciones) y no contienen
-# credenciales de personas reales, así que es seguro automatizarlos en cualquier entorno.
-echo "Ejecutando scripts de esquema, roles y todos los módulos (estructural, sin credenciales reales)..."
+# scripts de este bloque son estructurales (tablas, triggers, funciones), salvo 31, que crea
+# de forma idempotente las dos cuentas SUPER_ADMIN iniciales expresamente solicitadas.
+echo "Ejecutando scripts de esquema, roles, módulos y cuentas SUPER_ADMIN iniciales..."
 for script in \
   01_schema.sql 02_indices.sql 03_auditoria.sql 04_roles_bd.sql \
   06_matricula_campos.sql 09_estudiante_usuario.sql \
@@ -31,13 +31,14 @@ for script in \
   20_recursos_academicos.sql 21_entrega_tarea_nota.sql 22_audit_notificacion.sql \
   23_indice_asistencia_dashboard.sql 25_notificacion_generica.sql \
   26_recursos_clase_semanal.sql 27_tarea_puntaje_adjuntos.sql \
-  28_calendario_institucional.sql 29_seguimiento_dece.sql; do
+  28_calendario_institucional.sql 29_seguimiento_dece.sql \
+  30_reparar_rol_estudiante.sql 31_super_admin_gestion_cuentas.sql; do
   echo "  -> $script"
   psql -d "$DB_NAME" -f "$SCRIPT_DIR/$script"
 done
 
 echo ""
-echo "Base de datos estructural inicializada (23 scripts). Quedan pendientes de tu decisión,"
+echo "Base de datos estructural inicializada (25 scripts). Quedan pendientes de tu decisión,"
 echo "en este orden si los ejecutas, porque contienen datos de prueba o cuentas de personas reales:"
 echo ""
 echo "  Solo desarrollo (datos ficticios, NO producción):"

@@ -25,7 +25,7 @@ import { MisMateriasView } from "./MisMateriasView";
 import { CalendarView } from "./CalendarView";
 // Formulario de pago por transferencia en Bootstrap (a pedido explícito), escopado bajo
 // ".matricula-form" — mismo mecanismo que ya usa MatriculaView, ver scripts/scope-bootstrap.mjs.
-import "../../styles/bootstrap-scoped.css";
+import "../../styles/forms-scoped.css";
 
 type ParentTab = "home" | "grades" | "attendance" | "tareas" | "materias" | "calendar" | "payments";
 
@@ -487,7 +487,19 @@ function EntregaCard({ entrega, idEstudiante, onSubido, toast }: {
       )}
 
       {entrega.estado !== "PENDIENTE" && (
-        <div className="mt-3 text-xs text-gray-600">
+        <div className="mt-3 space-y-2 text-xs text-gray-600">
+          {entrega.estado === "REVISADO" && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-[#EAF2FB] px-3 py-2.5">
+              <span className="font-semibold text-[#1F4E79]">Calificación del deber</span>
+              {entrega.nota != null ? (
+                <span className="whitespace-nowrap text-base font-bold text-[#1F4E79]">
+                  {entrega.nota.toLocaleString("es-EC", { maximumFractionDigits: 2 })} / 10
+                </span>
+              ) : (
+                <span className="font-medium text-gray-600">Sin nota numérica</span>
+              )}
+            </div>
+          )}
           <p className="flex items-center gap-1"><CheckCircle2 size={12} className="text-[#2E7D32]" aria-hidden="true" />{entrega.archivoNombreOriginal}</p>
           {entrega.observacionDocente && (
             <p className="mt-1.5 italic text-gray-600">"{entrega.observacionDocente}"</p>
@@ -791,7 +803,7 @@ function ObligacionCard({ obligacion: o, onPagado, toast }: {
             </Btn>
           ) : (
             // Formulario en Bootstrap 5 (a pedido explícito) — escopado bajo ".matricula-form"
-            // (ver src/styles/bootstrap-scoped.css) para que Bootstrap no afecte al resto de la app.
+            // (ver src/styles/forms-scoped.css) para que los estilos no afecten al resto de la app.
             <div className="matricula-form">
               <form onSubmit={enviar} className="card border-0">
                 <div className="card-body p-0 pt-2">

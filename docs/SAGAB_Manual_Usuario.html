@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAGAB — Manual de usuario y requisitos</title>
+  <link rel="stylesheet" href="manuales.css">
+  <link rel="stylesheet" href="manual_usuario.css">
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="cover-mark">SAGAB</div>
+      <div class="cover-kicker">Guía completa · Versión 3.1</div>
+      <h1>Manual de usuario</h1>
+      <p class="subtitle">Guía sencilla de uso, requisitos funcionales y no funcionales, alcance y límites actuales del Sistema Avanzado de Gestión Académica Bellini.</p>
+    </div>
+    <div class="meta">
+      <p><strong>Dirigido a:</strong> Administración, docentes, DECE, auditoría, representantes y estudiantes</p>
+      <p><strong>Versión del documento:</strong> 3.1</p>
+      <p><strong>Estado evaluado:</strong> Aplicación disponible al 7 de agosto de 2026</p>
+      <p><strong>Idioma y zona horaria:</strong> Español · Ecuador (America/Guayaquil)</p>
+    </div>
+    <p class="confidential">Documento de evaluación y operación institucional. Las funciones descritas corresponden al estado verificado del proyecto y no sustituyen las políticas internas del colegio.</p>
+  </section>
+
+  <section>
+    <h1>Todo lo que necesitas para comenzar</h1>
+    <p class="lead">Esta guía acompaña a cada persona desde su primer ingreso hasta las tareas propias de su perfil. Puedes leerla completa o ir directamente al capítulo que necesitas.</p>
+    <table>
+      <thead><tr><th>Elemento</th><th>Detalle</th></tr></thead>
+      <tbody>
+        <tr><td>Producto</td><td>SAGAB — sistema web de gestión académica, administrativa y familiar.</td></tr>
+        <tr><td>Objetivo</td><td>Enseñar el uso del sistema con palabras simples y dejar por escrito qué hace, qué necesita y qué todavía no incluye.</td></tr>
+        <tr><td>Alcance</td><td>Perfiles Administrador, Docente, DECE, Auditor, Representante y Estudiante.</td></tr>
+        <tr><td>Responsable institucional recomendado</td><td>La institución designa a la persona responsable de la cuenta Administrador y mantiene separados los accesos personales.</td></tr>
+        <tr><td>Revisión</td><td>Debe actualizarse después de cambios importantes de módulos, permisos o infraestructura.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout success">
+      <strong>Cómo leer este manual.</strong> Los capítulos 1 a 3 explican el sistema. Los capítulos 4 a 9 enseñan cada perfil paso a paso. Los capítulos finales contienen requisitos, límites, solución de problemas y listas de verificación.
+    </div>
+
+    <div class="quick-paths">
+      <div class="quick-card"><span>01</span><strong>¿Es tu primera vez?</strong><p>Empieza por los capítulos 1, 2 y 3 para conocer SAGAB, ingresar y orientarte.</p></div>
+      <div class="quick-card"><span>02</span><strong>¿Buscas tu perfil?</strong><p>Ve a las guías de Administrador, Docente, DECE, Auditor o Portal Familiar.</p></div>
+      <div class="quick-card"><span>03</span><strong>¿Algo no funciona?</strong><p>Consulta los límites y la solución de problemas en los capítulos 11 y 12.</p></div>
+    </div>
+
+    <nav class="toc">
+      <h2>Encuentra lo que necesitas</h2>
+      <ol>
+        <li><a href="#presentacion">Presentación, alcance y conceptos</a></li>
+        <li><a href="#requisitos-uso">Qué necesita una persona para usar SAGAB</a></li>
+        <li><a href="#acceso">Ingreso, contraseña, navegación y mensajes</a></li>
+        <li><a href="#admin">Guía del Administrador</a></li>
+        <li><a href="#docente">Guía del Docente</a></li>
+        <li><a href="#dece">Guía del DECE</a></li>
+        <li><a href="#auditor">Guía del Auditor</a></li>
+        <li><a href="#familia">Guía del Representante y Estudiante</a></li>
+        <li><a href="#requisitos-funcionales">Requisitos funcionales</a></li>
+        <li><a href="#requisitos-no-funcionales">Requisitos no funcionales</a></li>
+        <li><a href="#limites">Límites y funciones no incluidas</a></li>
+        <li><a href="#problemas">Solución de problemas</a></li>
+        <li><a href="#checklists">Listas de verificación institucional</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <section id="presentacion" class="chapter">
+    <h1>1. Presentación, alcance y conceptos</h1>
+    <p class="lead">SAGAB reúne en un mismo sitio la información académica, la asistencia, las tareas, el calendario, los pagos, la comunicación institucional y el acompañamiento estudiantil.</p>
+
+    <h2>1.1 ¿Para qué sirve?</h2>
+    <p>El sistema reduce el uso de registros separados y permite que cada persona vea únicamente las opciones correspondientes a su perfil. El docente registra calificaciones y tareas; el representante consulta a sus representados; y el Administrador ejecuta la operación institucional.</p>
+
+    <h2>1.2 Perfiles disponibles</h2>
+    <table>
+      <thead><tr><th>Perfil</th><th>Finalidad</th><th>Funciones principales</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Administrador</strong></td><td>Operación institucional.</td><td>Matrícula, personal operativo, asignaciones, notas, asistencia, calendario, mensajes y finanzas.</td></tr>
+        <tr><td><strong>Docente</strong></td><td>Gestión de sus cursos y materias.</td><td>Notas, asistencia, tareas, entregas, recursos académicos, calendario y comunicación con estudiantes asignados.</td></tr>
+        <tr><td><strong>DECE</strong></td><td>Acompañamiento y seguimiento.</td><td>Casos estudiantiles, historial, alertas de inasistencia, comunicación individual y calendario institucional.</td></tr>
+        <tr><td><strong>Auditor</strong></td><td>Control y trazabilidad.</td><td>Consulta del panel y de registros de cambios y eventos de seguridad.</td></tr>
+        <tr><td><strong>Representante</strong></td><td>Seguimiento familiar.</td><td>Notas, asistencia, deberes, materias, calendario, pagos, mensajes y cambio entre representados.</td></tr>
+        <tr><td><strong>Estudiante</strong></td><td>Consulta y participación académica.</td><td>Notas, asistencia, materias, deberes, entregas, calendario de pendientes, pagos y mensajes.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>1.3 Conceptos que aparecen en la pantalla</h2>
+    <table>
+      <thead><tr><th>Término</th><th>Significado sencillo</th></tr></thead>
+      <tbody>
+        <tr><td>Curso</td><td>Nivel académico: 1.º BGU, 2.º BGU o 3.º BGU.</td></tr>
+        <tr><td>Paralelo</td><td>Grupo dentro del curso, por ejemplo 1.º BGU A o 1.º BGU B.</td></tr>
+        <tr><td>Asignación</td><td>Relación entre un docente, una materia, un paralelo y un periodo académico.</td></tr>
+        <tr><td>Parcial</td><td>Bloque de evaluación. SAGAB maneja Parcial 1, Parcial 2 y Parcial 3.</td></tr>
+        <tr><td>Obligación</td><td>Valor que un estudiante debe cancelar por un rubro institucional.</td></tr>
+        <tr><td>Transferencia en revisión</td><td>Pago reportado por la familia que todavía debe ser aprobado o rechazado por administración.</td></tr>
+        <tr><td>Evento institucional</td><td>Actividad, feriado, reunión u otra fecha visible según el estado y los permisos.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="requisitos-uso" class="chapter">
+    <h1>2. Qué necesita una persona para usar SAGAB</h1>
+    <h2>2.1 Requisitos básicos</h2>
+    <ul>
+      <li>Un computador, tableta o teléfono con conexión estable a Internet o a la red donde esté instalado SAGAB.</li>
+      <li>Una versión reciente de Google Chrome, Microsoft Edge o Mozilla Firefox. Chrome o Edge son las opciones recomendadas.</li>
+      <li>La dirección web entregada por la institución.</li>
+      <li>Usuario y contraseña personal. Las cuentas no deben compartirse.</li>
+      <li>Permiso del navegador para descargar archivos cuando se generen reportes o se abran adjuntos.</li>
+    </ul>
+    <div class="callout warning">
+      <strong>Importante.</strong> La dirección <code>localhost</code> solo funciona en la computadora donde se está ejecutando el proyecto. Para uso real, el colegio necesita una dirección institucional con HTTPS y un servidor disponible para todos los usuarios.
+    </div>
+
+    <h2>2.2 Requisitos para archivos</h2>
+    <table>
+      <thead><tr><th>Proceso</th><th>Formatos admitidos</th><th>Límite actual</th></tr></thead>
+      <tbody>
+        <tr><td>Entrega de deberes y adjuntos de calendario</td><td>PDF, Word, ZIP e imágenes, según el formulario.</td><td>15 MB por archivo.</td></tr>
+        <tr><td>Comprobante de transferencia</td><td>JPG, PNG, WEBP o PDF.</td><td>8 MB.</td></tr>
+        <tr><td>Recursos académicos</td><td>PDF, Office, ZIP/RAR, imágenes, video, audio, TXT y CSV.</td><td>100 MB.</td></tr>
+        <tr><td>Adjuntos de un evento</td><td>Archivos validados por el sistema.</td><td>Máximo 10 adjuntos por evento; 15 MB por archivo.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="acceso" class="chapter">
+    <h1>3. Ingreso, contraseña, navegación y mensajes</h1>
+    <h2>3.1 Iniciar sesión</h2>
+    <ol class="steps">
+      <li>Abra la dirección web de SAGAB.</li>
+      <li>Escriba el <strong>nombre de usuario</strong>. El acceso se realiza con usuario, no con correo electrónico.</li>
+      <li>Escriba la contraseña y seleccione <strong>Ingresar</strong>. El icono de ojo permite mostrar u ocultar la contraseña.</li>
+      <li>Si es el primer ingreso, cree una contraseña nueva de al menos 8 caracteres, diferente de la temporal, y confírmela.</li>
+      <li>Compruebe que el nombre y el rol mostrados en el menú lateral sean correctos.</li>
+    </ol>
+    <div class="callout danger">
+      <strong>Bloqueo de seguridad.</strong> Después de 5 intentos incorrectos, la cuenta se bloquea durante 15 minutos. Actualmente no existe una opción automática de “Olvidé mi contraseña”; el restablecimiento requiere apoyo técnico o administrativo.
+    </div>
+
+    <h2>3.2 Navegar</h2>
+    <ul>
+      <li>El menú lateral muestra los módulos autorizados para la cuenta.</li>
+      <li>La campana superior contiene mensajes y notificaciones no leídas.</li>
+      <li>Los botones de búsqueda y filtros reducen la información mostrada.</li>
+      <li>Los avisos verdes confirman una operación; los amarillos piden atención; los rojos indican un error que debe revisarse.</li>
+      <li>Seleccione <strong>Cerrar sesión</strong> al terminar, especialmente en equipos compartidos.</li>
+    </ul>
+
+    <h2>3.3 Leer un mensaje</h2>
+    <ol class="steps">
+      <li>Seleccione la campana.</li>
+      <li>Abra el mensaje deseado.</li>
+      <li>Al abrirlo queda marcado como leído. El remitente puede consultar el conteo de lecturas cuando corresponda.</li>
+    </ol>
+    <p>Los mensajes de SAGAB son internos. No equivalen a WhatsApp, SMS ni notificaciones móviles, y el usuario debe entrar al sistema para revisarlos.</p>
+  </section>
+
+  <section id="admin" class="chapter">
+    <h1>4. Guía del Administrador</h1>
+    <p class="lead">La cuenta Administrador concentra la operación institucional. Cada persona debe usar su propia cuenta; nunca se deben compartir credenciales.</p>
+    <div class="callout success"><strong>Regla sencilla.</strong> El Administrador ejecuta matrículas, asignaciones, registros, calendario, mensajes y pagos.</div>
+
+    <h2>4.1 Inicio: panel de control</h2>
+    <p>El panel del Administrador resume estudiantes en mora, promedio institucional y ausencias del día. También presenta rendimiento por paralelo, alertas y accesos rápidos. La tarjeta “Mensajes pendientes” no se muestra porque la comunicación oficial se gestiona desde <strong>Mensajes institucionales</strong>.</p>
+    <h3>Consultar ausencias</h3>
+    <ol class="steps">
+      <li>Seleccione la tarjeta <strong>Ausencias hoy</strong>.</li>
+      <li>Defina fecha inicial y final.</li>
+      <li>Seleccione curso: 1.º BGU, 2.º BGU o 3.º BGU.</li>
+      <li>Seleccione el paralelo correspondiente, por ejemplo A o B.</li>
+      <li>Pulse <strong>Filtrar</strong>. Puede imprimir el reporte cuando exista información.</li>
+    </ol>
+    <h3>Consultar morosidad y rendimiento</h3>
+    <p>Abra la tarjeta correspondiente, utilice búsqueda y ordenamiento, revise los totales y genere el reporte PDF cuando la opción esté disponible. Los indicadores dependen de que notas, asistencias y obligaciones estén correctamente registradas.</p>
+
+    <h2>4.2 Matricular un estudiante</h2>
+    <ol class="steps">
+      <li>Abra <strong>Matrícula</strong>.</li>
+      <li>Complete nombres, apellidos, cédula ecuatoriana de 10 dígitos, fecha de nacimiento, género, paralelo, dirección y datos médicos.</li>
+      <li>Complete los datos del representante: nombres, cédula, parentesco, correo, teléfono y contacto de emergencia.</li>
+      <li>Marque los cuatro controles documentales solicitados: copia de cédula, partida de nacimiento, foto y certificado de conducta.</li>
+      <li>Revise la información y confirme la matrícula.</li>
+      <li>Guarde de manera segura el usuario y la contraseña temporal mostrados. La contraseña temporal solo debe entregarse a su propietario.</li>
+    </ol>
+    <div class="callout warning">
+      <strong>Alcance actual.</strong> Los documentos de matrícula se registran como casillas de verificación; el sistema no almacena esos cuatro documentos. La interfaz actual crea matrículas, pero no ofrece todavía una gestión completa para editar, retirar, promover o rematricular estudiantes.
+    </div>
+
+    <h2>4.3 Crear cuentas de personal</h2>
+    <ol class="steps">
+      <li>Abra <strong>Personal</strong>.</li>
+      <li>Complete los datos personales, cédula, teléfono, correo institucional y título opcional.</li>
+      <li>Seleccione Docente, DECE o Auditor.</li>
+      <li>Pulse <strong>Crear cuenta</strong>.</li>
+      <li>Entregue al funcionario su usuario y clave temporal por un canal seguro. El primer ingreso exige cambio de contraseña.</li>
+    </ol>
+    <p>Todavía no se editan, desactivan o eliminan cuentas existentes, ni se restablecen contraseñas desde la interfaz.</p>
+
+    <h2>4.4 Asignar materias a docentes</h2>
+    <ol class="steps">
+      <li>En <strong>Personal</strong>, baje hasta <strong>Asignación de materias</strong>.</li>
+      <li>Seleccione al docente.</li>
+      <li>Elija materia, curso/paralelo y periodo académico.</li>
+      <li>Guarde. Una misma persona puede tener varias asignaciones.</li>
+      <li>Compruebe la asignación en la lista. Puede editarla o eliminarla si fue creada por error.</li>
+    </ol>
+    <p>La asignación determina qué estudiantes puede calificar el docente, qué paralelos puede registrar en asistencia y a quiénes puede enviar comunicaciones.</p>
+    <p>El Administrador puede crear, editar o eliminar asignaciones.</p>
+
+    <h2>4.5 Registrar y consultar calificaciones</h2>
+    <p>El Administrador ve Ingreso de notas y Búsqueda avanzada. La opción Recursos corresponde al trabajo docente.</p>
+    <ol class="steps">
+      <li>Abra <strong>Académico → Ingreso de notas</strong>.</li>
+      <li>Seleccione la asignación y el parcial.</li>
+      <li>Ubique al estudiante por nombre si la lista es extensa.</li>
+      <li>Registre Tarea (20 %), Clase (20 %) y Examen (60 %) en escala de 0 a 10.</li>
+      <li>Revise el promedio calculado. La nota mínima de aprobación configurada es 7,0.</li>
+      <li>Guarde los estudiantes completados.</li>
+    </ol>
+    <p>La búsqueda avanzada permite filtrar por estudiante, curso, materia y parcial, descargar reportes y eliminar registros. Una eliminación debe realizarse únicamente después de validar autorización y evidencia, porque todavía no existe un flujo formal de cierre de periodo o aprobación de correcciones.</p>
+
+    <h2>4.6 Registrar asistencia</h2>
+    <ol class="steps">
+      <li>Abra <strong>Asistencia</strong> y seleccione asignación y fecha.</li>
+      <li>Use una fecha de hoy o anterior; no se permite registrar una fecha futura.</li>
+      <li>Marque cada estudiante: Presente, Ausencia justificada o Ausencia injustificada.</li>
+      <li>Guarde y revise el mensaje de confirmación.</li>
+      <li>Si un estudiante acumula 3 o más ausencias injustificadas consecutivas, atienda la alerta y coordine el seguimiento.</li>
+    </ol>
+    <p>El modelo técnico admite atraso y texto de justificación, pero la pantalla actual no ofrece controles completos para atraso ni carga de documentos justificativos.</p>
+
+    <h2>4.7 Administrar el calendario institucional</h2>
+    <ol class="steps">
+      <li>Abra <strong>Calendario</strong>. Use las flechas para avanzar o retroceder; el botón <strong>Mes</strong> regresa al mes actual.</li>
+      <li>Alterne las vistas Mes, Semana o Día, o seleccione una fecha concreta.</li>
+      <li>Pulse <strong>Nuevo evento</strong>.</li>
+      <li>Complete título, descripción, inicio, fin, categoría, lugar, estado y color.</li>
+      <li>Opcionalmente incluya enlace externo y hasta 10 adjuntos.</li>
+      <li>Guarde. Si el estado es Publicado, los perfiles autorizados lo verán; Borrador u Oculto permanece para Administración.</li>
+    </ol>
+    <p>El Administrador puede editar, duplicar, publicar, ocultar, cancelar o eliminar eventos. El calendario se actualiza automáticamente cada 30 segundos y cuando la ventana vuelve a estar activa. También incluye feriados y fechas importantes de Ecuador.</p>
+    <div class="callout success">
+      <strong>Regla de deberes.</strong> Los deberes pendientes aparecen únicamente en el calendario del estudiante que pertenece al paralelo correspondiente. No aparecen como pendientes en los calendarios del Administrador, Docente, DECE o Representante.
+    </div>
+
+    <h2>4.8 Enviar mensajes institucionales</h2>
+    <ol class="steps">
+      <li>Abra <strong>Mensajes institucionales</strong>.</li>
+      <li>Seleccione mensaje masivo a docentes activos o mensaje privado a un docente.</li>
+      <li>Escriba asunto y contenido; revise destinatarios.</li>
+      <li>Pulse <strong>Enviar</strong>.</li>
+      <li>Consulte el historial y el conteo de lecturas.</li>
+    </ol>
+    <p>Desde el panel también existen envíos a estudiantes específicos, cursos, paralelos, representantes, docentes o toda la institución, según la opción mostrada. El asunto admite hasta 150 caracteres y el mensaje hasta 10.000.</p>
+
+    <h2>4.9 Gestionar pagos</h2>
+    <h3>Consultar a un estudiante</h3>
+    <ol class="steps">
+      <li>Abra <strong>Financiero</strong>.</li>
+      <li>Busque por nombre o cédula del estudiante o representante.</li>
+      <li>Revise obligaciones, valores pagados, pendientes y vencidos.</li>
+      <li>Si corresponde, cree la obligación del mes a partir del rubro configurado.</li>
+      <li>Registre un pago directo únicamente después de confirmar el valor recibido.</li>
+    </ol>
+    <h3>Revisar una transferencia</h3>
+    <ol class="steps">
+      <li>Abra la cola de transferencias en revisión.</li>
+      <li>Verifique estudiante, rubro, valor, fecha, número de transacción y titular.</li>
+      <li>Abra el comprobante y compárelo con el movimiento bancario.</li>
+      <li>Apruebe si la información coincide; rechace e indique la razón si no coincide.</li>
+    </ol>
+    <p>El sistema impide que la suma de pagos aprobados supere el valor de una obligación y detecta comprobantes repetidos para la misma obligación. Las obligaciones vencidas se actualizan diariamente.</p>
+    <h2>4.10 Rutina recomendada para Administración</h2>
+    <div class="two-col">
+      <div class="card"><h3>Diariamente</h3><ul><li>Revisar ausencias y alertas.</li><li>Supervisar transferencias pendientes sin procesarlas.</li><li>Leer mensajes y validar incidentes.</li><li>Revisar próximos eventos.</li></ul></div>
+      <div class="card"><h3>Semanal o mensual</h3><ul><li>Revisar rendimiento y morosidad.</li><li>Confirmar asignaciones docentes.</li><li>Auditar muestras de notas y asistencia.</li><li>Verificar respaldo y disponibilidad con soporte técnico.</li></ul></div>
+    </div>
+  </section>
+
+  <section id="docente" class="chapter">
+    <h1>5. Guía del Docente</h1>
+    <h2>5.1 Calificaciones</h2>
+    <p>El docente ve únicamente sus asignaciones al trabajar con notas. Selecciona materia/paralelo y parcial, registra Tarea 20 %, Clase 20 % y Examen 60 %, y guarda. La búsqueda avanzada permite consultar notas y generar reportes de su ámbito.</p>
+    <div class="callout warning"><strong>Buena práctica.</strong> Verifique curso, paralelo y parcial antes de escribir. Evite eliminar una calificación sin autorización documentada.</div>
+
+    <h2>5.2 Asistencia</h2>
+    <ol class="steps">
+      <li>Abra <strong>Asistencia</strong> y elija una de sus asignaciones.</li>
+      <li>Seleccione la fecha y marque a todos los estudiantes.</li>
+      <li>Guarde y compruebe que no queden estudiantes sin estado.</li>
+      <li>Informe al tutor/DECE si se muestra una alerta por ausencias consecutivas.</li>
+    </ol>
+
+    <h2>5.3 Crear y revisar deberes</h2>
+    <ol class="steps">
+      <li>Abra <strong>Deberes</strong> y seleccione la asignación.</li>
+      <li>Cree una actividad con título, instrucciones, fecha límite, parcial y puntaje.</li>
+      <li>Adjunte material si hace falta y publique.</li>
+      <li>Abra la actividad para revisar la lista de entregas.</li>
+      <li>Descargue el archivo, registre nota de 1 a 10 cuando corresponda y escriba retroalimentación.</li>
+      <li>Guarde la revisión. Puede corregir la valoración de una entrega revisada.</li>
+    </ol>
+    <p>El estudiante puede reemplazar su archivo hasta la fecha límite. Después del vencimiento no puede realizar una entrega nueva desde el flujo normal.</p>
+
+    <h2>5.4 Publicar recursos académicos</h2>
+    <ol class="steps">
+      <li>Abra <strong>Académico → Recursos</strong>.</li>
+      <li>Seleccione Sílabo, Formato, Enlace de clase o Material semanal.</li>
+      <li>Complete nombre, descripción, semana y fecha relacionada cuando corresponda.</li>
+      <li>Cargue un archivo o registre un enlace válido.</li>
+      <li>Guarde y verifique que el recurso sea visible en <strong>Mis materias</strong> del estudiante o representante.</li>
+    </ol>
+
+    <h2>5.5 Calendario y mensajes</h2>
+    <p>El calendario docente muestra eventos institucionales publicados y fechas de sus propios recursos. No muestra los deberes como “pendientes”, porque esa vista está reservada al estudiante. Desde el panel, el docente puede enviar mensajes a estudiantes pertenecientes a los paralelos que tiene asignados y revisar lecturas.</p>
+
+    <h2>5.6 Límites del perfil docente</h2>
+    <p>No incluye planificación microcurricular, rúbricas detalladas, horarios, firma de actas, cierre/bloqueo de parciales ni solicitud formal de corrección de notas. Estas tareas requieren procedimiento institucional externo hasta que sean desarrolladas.</p>
+  </section>
+
+  <section id="dece" class="chapter">
+    <h1>6. Guía del DECE</h1>
+    <h2>6.1 Iniciar un seguimiento</h2>
+    <ol class="steps">
+      <li>Abra <strong>Estudiantes en seguimiento</strong>.</li>
+      <li>Busque al estudiante activo por nombre o identificación.</li>
+      <li>Seleccione <strong>Agregar seguimiento</strong> y registre fecha, estado y observación.</li>
+      <li>Use estados Activo, En observación, Intervención o Resuelto de acuerdo con el protocolo institucional.</li>
+      <li>Guarde y compruebe que la anotación conste en el historial.</li>
+    </ol>
+    <p>El detalle muestra datos de contacto y emergencia, condiciones médicas registradas, promedio, cantidad de notas y ausencias injustificadas. La observación admite hasta 2.000 caracteres.</p>
+
+    <h2>6.2 Actualizar, comunicar y archivar</h2>
+    <ul>
+      <li>Actualice estado y observación cuando exista una actuación nueva.</li>
+      <li>Use el historial para conocer la secuencia del caso.</li>
+      <li>Envíe un mensaje individual al estudiante cuando sea apropiado y consulte si fue leído.</li>
+      <li>Archive el seguimiento solo cuando esté cerrado; el sistema conserva el historial.</li>
+    </ul>
+
+    <h2>6.3 Alertas de asistencia</h2>
+    <p>Abra <strong>Alertas de Asistencia</strong>, seleccione el paralelo y revise estudiantes con 3 o más ausencias injustificadas consecutivas. La alerta ayuda a priorizar; no reemplaza la entrevista, el registro profesional ni el protocolo de protección.</p>
+    <div class="callout danger"><strong>Confidencialidad.</strong> No escriba diagnósticos o datos sensibles innecesarios. Acceda únicamente a casos legítimos, no comparta capturas de pantalla y aplique las políticas de protección de datos del colegio.</div>
+
+    <h2>6.4 Calendario DECE</h2>
+    <p>Muestra el calendario institucional publicado y fechas generales. No muestra deberes pendientes de estudiantes.</p>
+  </section>
+
+  <section id="auditor" class="chapter">
+    <h1>7. Guía del Auditor</h1>
+    <h2>7.1 Consultar cambios</h2>
+    <ol class="steps">
+      <li>Abra <strong>Auditoría</strong> y seleccione la pestaña de cambios.</li>
+      <li>Filtre por tabla y/o usuario.</li>
+      <li>Revise fecha, operación, entidad y responsable.</li>
+      <li>Para reconstruir una secuencia, use la trazabilidad por nombre técnico de tabla e identificador.</li>
+    </ol>
+    <h2>7.2 Consultar seguridad</h2>
+    <p>La pestaña de eventos de seguridad permite revisar accesos exitosos o fallidos y otros sucesos registrados. Los resultados se muestran por páginas de 50 registros. La información de auditoría es inmutable desde la aplicación.</p>
+    <div class="callout warning"><strong>Límite de uso.</strong> La pantalla utiliza nombres técnicos de tablas e identificadores y todavía no ofrece exportación directa ni reportes ejecutivos. Para una investigación extensa puede requerirse apoyo del responsable técnico.</div>
+  </section>
+
+  <section id="familia" class="chapter">
+    <h1>8. Guía del Representante y Estudiante</h1>
+    <p>Ambos perfiles usan el Portal Familiar. El representante puede cambiar entre sus representados; el estudiante ve únicamente su propia información.</p>
+
+    <h2>8.1 Inicio</h2>
+    <p>Presenta promedio general, asistencia de los últimos seis meses, saldo y alertas académicas. También aparecen mensajes recientes. Si el promedio es menor a 7,0 se muestra una advertencia de riesgo.</p>
+
+    <h2>8.2 Consultar notas y asistencia</h2>
+    <ol class="steps">
+      <li>Seleccione el representado correcto si usa una cuenta de representante.</li>
+      <li>Abra <strong>Calificaciones</strong> para revisar materia, parcial, componentes y promedio.</li>
+      <li>Abra <strong>Asistencia</strong> para revisar el resumen de los últimos seis meses.</li>
+      <li>Si detecta una inconsistencia, comuníquese con el colegio; no intente enviar datos sensibles por canales no autorizados.</li>
+    </ol>
+
+    <h2>8.3 Entregar un deber</h2>
+    <ol class="steps">
+      <li>Abra <strong>Deberes</strong> y seleccione una actividad pendiente.</li>
+      <li>Lea instrucciones, fecha límite y archivos del docente.</li>
+      <li>Seleccione el archivo de respuesta y confirme la entrega.</li>
+      <li>Mientras no venza el plazo, puede reemplazar el archivo.</li>
+      <li>Después de la revisión, consulte calificación y retroalimentación.</li>
+    </ol>
+    <p>Los deberes se agrupan en Pendientes, Entregados y Revisados. El calendario del <strong>estudiante</strong> ubica cada deber pendiente en su fecha de entrega; el del representante no incorpora esa capa.</p>
+
+    <h2>8.4 Consultar materias y recursos</h2>
+    <p>En <strong>Mis materias</strong> puede buscar una asignatura, identificar al docente, revisar el avance de deberes y abrir sílabos, formatos, enlaces de clase, materiales semanales y actividades por parcial.</p>
+
+    <h2>8.5 Reportar una transferencia</h2>
+    <ol class="steps">
+      <li>Abra <strong>Pagos</strong> y revise las obligaciones.</li>
+      <li>Seleccione el rubro o la opción Otro.</li>
+      <li>Registre valor, titular de la cuenta, concepto, número de transacción y fecha.</li>
+      <li>Adjunte una imagen o PDF legible del comprobante.</li>
+      <li>Envíe y espere la revisión administrativa. El registro no queda pagado hasta que sea aprobado.</li>
+    </ol>
+    <div class="callout warning"><strong>No duplicar.</strong> Envíe una sola vez cada comprobante. Si se rechaza, consulte la razón antes de volver a reportarlo.</div>
+  </section>
+
+  <section id="requisitos-funcionales" class="chapter">
+    <h1>9. Requisitos funcionales</h1>
+    <p>Los siguientes requisitos describen el comportamiento actual esperado. “Implementado” significa que existe en el proyecto evaluado; su funcionamiento en producción depende de una instalación y configuración correctas.</p>
+    <div class="callout"><strong>Lectura opcional.</strong> Esta sección sirve para evaluación institucional y contractual. Si solo necesitas aprender a usar SAGAB, puedes continuar directamente con el capítulo 11.</div>
+    <table>
+      <thead><tr><th>ID</th><th>Requisito</th><th>Perfiles</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td>RF-01</td><td>Autenticar con usuario y contraseña y cerrar sesión.</td><td>Todos</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-02</td><td>Obligar a cambiar la contraseña temporal en el primer acceso.</td><td>Todos</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-03</td><td>Mostrar menús y autorizar operaciones según rol.</td><td>Todos</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-04</td><td>Crear cuentas de Docente, DECE o Auditor con clave temporal y cambio obligatorio en el primer ingreso.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-05</td><td>Asignar una o varias materias, paralelos y periodos a un docente; editar o eliminar la asignación.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-06</td><td>Matricular estudiante, vincular o crear representante y crear la cuenta estudiantil.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-07</td><td>Validar cédula, edad, campos obligatorios y controles documentales de matrícula.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-08</td><td>Registrar calificaciones por asignación y parcial con componentes 20/20/60 y escala 0–10.</td><td>Administrador, Docente</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-09</td><td>Calcular promedio y señalar aprobación desde 7,0.</td><td>Académicos y familia</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-10</td><td>Buscar calificaciones, consultar papeleta y generar reportes PDF.</td><td>Según rol</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-11</td><td>Registrar asistencia por asignación y fecha, y consultar historial.</td><td>Administrador, Docente</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-12</td><td>Detectar 3 o más ausencias injustificadas consecutivas para seguimiento.</td><td>Docente, DECE, Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-13</td><td>Crear, editar y eliminar deberes con fecha límite, parcial, puntaje y adjuntos.</td><td>Docente</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-14</td><td>Entregar o reemplazar un deber antes del plazo; revisar, calificar y retroalimentar.</td><td>Estudiante/familia, Docente</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-15</td><td>Publicar archivos o enlaces como recursos académicos y organizarlos por tipo.</td><td>Docente</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-16</td><td>Consultar calendario en vistas mes, semana y día con sincronización periódica.</td><td>Todos</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-17</td><td>Crear y gestionar el ciclo de vida de eventos institucionales con adjuntos.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-18</td><td>Mostrar feriados y fechas importantes de Ecuador.</td><td>Todos</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-19</td><td>Mostrar deberes pendientes en el calendario exclusivamente al estudiante del paralelo correspondiente.</td><td>Estudiante</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-20</td><td>Enviar mensajes internos por destinatario o grupo autorizado y registrar lectura.</td><td>Administrador, Docente, DECE</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-21</td><td>Consultar obligaciones, pagos, saldos y morosidad del estudiante.</td><td>Administrador, Familia</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-22</td><td>Crear obligación mensual y registrar pago directo.</td><td>Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-23</td><td>Reportar transferencia con comprobante, aprobarla o rechazarla.</td><td>Familia, Administrador</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-24</td><td>Actualizar obligaciones vencidas y evitar pagos aprobados por encima del valor adeudado.</td><td>Sistema</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-25</td><td>Permitir al representante cambiar entre sus representados y consultar su información.</td><td>Representante</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-26</td><td>Mostrar al estudiante sus datos académicos, actividades, recursos, calendario y pagos.</td><td>Estudiante</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-27</td><td>Crear, actualizar, resolver y archivar seguimientos, conservando historial.</td><td>DECE</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-28</td><td>Enviar comunicación individual desde un seguimiento y conocer su lectura.</td><td>DECE</td><td><span class="badge ok">Implementado</span></td></tr>
+        <tr><td>RF-29</td><td>Registrar y consultar cambios de datos y eventos de seguridad de forma inmutable.</td><td>Sistema, Auditor</td><td><span class="badge ok">Implementado</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="requisitos-no-funcionales" class="chapter">
+    <h1>10. Requisitos no funcionales</h1>
+    <p>Definen la calidad, seguridad y condiciones de operación necesarias. Algunos son controles ya implementados y otros son obligaciones de la institución al desplegar el sistema.</p>
+    <div class="callout"><strong>En palabras sencillas.</strong> Aquí se explica no solo qué hace SAGAB, sino bajo qué condiciones debe funcionar para ser seguro, confiable y mantenible.</div>
+    <table>
+      <thead><tr><th>ID</th><th>Requisito y criterio</th><th>Situación actual</th></tr></thead>
+      <tbody>
+        <tr><td>RNF-01</td><td><strong>Usabilidad:</strong> interfaz web en español, navegación por rol, formularios con validación y mensajes comprensibles.</td><td>Implementación base disponible; se recomienda prueba formal con usuarios reales.</td></tr>
+        <tr><td>RNF-02</td><td><strong>Compatibilidad:</strong> operar en versiones recientes de Chrome, Edge y Firefox, en escritorio y pantalla móvil.</td><td>Diseño adaptable; no existe una matriz automatizada de compatibilidad.</td></tr>
+        <tr><td>RNF-03</td><td><strong>Autenticación:</strong> contraseñas cifradas, sesión firmada, cambio inicial obligatorio y bloqueo por intentos.</td><td>BCrypt, JWT de 30 minutos, 5 intentos y bloqueo de 15 minutos.</td></tr>
+        <tr><td>RNF-04</td><td><strong>Autorización:</strong> validar permisos en interfaz y servidor, incluyendo propiedad de curso, materia o representado.</td><td>Controles por rol y alcance en servicios; el panel docente no recibe morosidad ni promedios institucionales.</td></tr>
+        <tr><td>RNF-05</td><td><strong>Confidencialidad:</strong> proteger datos personales, académicos, financieros y de DECE con HTTPS y mínimo privilegio.</td><td>La aplicación aporta controles; HTTPS, políticas y gestión de usuarios dependen del despliegue.</td></tr>
+        <tr><td>RNF-06</td><td><strong>Integridad:</strong> impedir relaciones duplicadas y que pagos aprobados superen la obligación.</td><td>Restricciones y disparadores de base de datos implementados.</td></tr>
+        <tr><td>RNF-07</td><td><strong>Auditoría:</strong> registrar cambios y accesos relevantes sin permitir modificación de la evidencia.</td><td>Esquema de auditoría y registros inmutables implementados.</td></tr>
+        <tr><td>RNF-08</td><td><strong>Rendimiento:</strong> responder de forma razonable con filtros, paginación y límites definidos.</td><td>Existen límites técnicos; no hay prueba de carga ni capacidad certificada.</td></tr>
+        <tr><td>RNF-09</td><td><strong>Disponibilidad:</strong> contar con servidor, base y almacenamiento persistente supervisados.</td><td>No existe SLA incorporado; depende de la infraestructura contratada.</td></tr>
+        <tr><td>RNF-10</td><td><strong>Recuperación:</strong> respaldos cifrados, prueba de restauración y objetivos RPO/RTO aprobados.</td><td>Responsabilidad de operación; el repositorio no automatiza un plan completo.</td></tr>
+        <tr><td>RNF-11</td><td><strong>Archivos:</strong> validar extensión, contenido, tamaño, nombre seguro y acceso temporal.</td><td>Validaciones, claves aleatorias y enlaces firmados disponibles.</td></tr>
+        <tr><td>RNF-12</td><td><strong>Mantenibilidad:</strong> separar interfaz, API y datos, versionar código y aplicar cambios de base ordenados.</td><td>Arquitectura separada; scripts manuales, sin gestor automático de migraciones.</td></tr>
+        <tr><td>RNF-13</td><td><strong>Accesibilidad:</strong> navegación legible, etiquetas y foco visibles, con meta WCAG 2.1 AA.</td><td>No existe certificación ni auditoría formal WCAG.</td></tr>
+        <tr><td>RNF-14</td><td><strong>Observabilidad:</strong> registrar fallos, salud, métricas y alertas sin exponer secretos.</td><td>Hay logs controlados; faltan métricas, panel de salud y alertamiento integral.</td></tr>
+        <tr><td>RNF-15</td><td><strong>Localización:</strong> operar en español, escala 0–10 y zona horaria de Ecuador.</td><td>Configurado para America/Guayaquil.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="limites" class="chapter">
+    <h1>11. Límites y funciones no incluidas</h1>
+    <div class="callout warning">
+      <strong>Antes de vender o usar con datos reales.</strong> El alcance del panel docente ya fue reducido a sus ausencias y mensajes: no recibe morosidad, promedio ni rendimiento institucional. Aun así, deben ejecutarse pruebas integrales de permisos por cada rol antes de producción.
+    </div>
+
+    <h2>11.1 Límites funcionales actuales</h2>
+    <table>
+      <thead><tr><th>Área</th><th>Qué no incluye actualmente</th><th>Alternativa temporal</th></tr></thead>
+      <tbody>
+        <tr><td>Cuentas</td><td>Recuperación automática de contraseña, edición, desactivación, eliminación y restablecimiento desde Administración.</td><td>Procedimiento técnico controlado y registro de la solicitud.</td></tr>
+        <tr><td>Matrícula</td><td>Edición, retiro, promoción, rematrícula y archivo real de los cuatro documentos.</td><td>Expediente institucional externo y corrección técnica autorizada.</td></tr>
+        <tr><td>Académico</td><td>Cierre de parciales, actas firmadas, aprobación de corrección, rúbricas avanzadas y planificación curricular.</td><td>Proceso académico institucional documentado.</td></tr>
+        <tr><td>Asistencia</td><td>Control completo de atrasos, carga de justificativos y flujo de aprobación.</td><td>Registrar soporte en el expediente institucional.</td></tr>
+        <tr><td>Disciplina</td><td>Existe estructura técnica de incidencias, pero no un módulo utilizable en la interfaz.</td><td>Usar el procedimiento vigente del colegio.</td></tr>
+        <tr><td>Finanzas</td><td>Facturación electrónica SRI, conciliación bancaria automática, pasarela de tarjeta, devoluciones, notas de crédito e integración contable.</td><td>Contabilidad y facturación oficiales fuera de SAGAB.</td></tr>
+        <tr><td>Personal</td><td>Horarios, contratos, nómina, evaluaciones y asistencia laboral.</td><td>Sistema de talento humano separado.</td></tr>
+        <tr><td>Calendario</td><td>Eventos recurrentes e integración directa con Google Calendar u Outlook.</td><td>Crear eventos individuales.</td></tr>
+        <tr><td>Comunicación</td><td>SMS, WhatsApp, notificación push, respuestas familiares y campañas por correo general.</td><td>Mensaje interno y canales oficiales existentes.</td></tr>
+        <tr><td>DECE</td><td>Citas, derivaciones, consentimientos, formularios y adjuntos clínicos especializados.</td><td>Protocolo confidencial externo.</td></tr>
+        <tr><td>Auditoría</td><td>Exportación directa, reportes ejecutivos e investigación con nombres amigables.</td><td>Apoyo técnico para consultas autorizadas.</td></tr>
+        <tr><td>Aplicación</td><td>Aplicación móvil nativa, funcionamiento sin Internet y soporte multidioma.</td><td>Usar la versión web con conexión.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>11.2 Límites de capacidad visibles</h2>
+    <ul>
+      <li>La consulta de calendario admite rangos de hasta 370 días.</li>
+      <li>Las listas masivas tienen topes técnicos: generalmente 500 registros; transferencias 200; mensajes/notificaciones 100; auditoría 50 por página.</li>
+      <li>Los tamaños de archivos son los indicados en el capítulo 2. Los archivos mayores deben compartirse por otro medio institucional.</li>
+      <li>La capacidad simultánea, tiempo de respuesta y almacenamiento dependen del servidor contratado. No existe una cifra de usuarios concurrentes certificada por pruebas de carga.</li>
+    </ul>
+
+    <h2>11.3 Condiciones que no garantiza el software por sí solo</h2>
+    <ul>
+      <li>Disponibilidad continua, Internet, energía, copias de seguridad y recuperación.</li>
+      <li>Exactitud de información mal ingresada por una persona.</li>
+      <li>Cumplimiento legal automático: la institución debe definir bases legales, avisos de privacidad, conservación y responsables.</li>
+      <li>Entrega de mensajes fuera de SAGAB o lectura inmediata del destinatario.</li>
+      <li>Validez contable o tributaria de una obligación o transferencia sin el proceso financiero oficial.</li>
+    </ul>
+  </section>
+
+  <section id="problemas" class="chapter">
+    <h1>12. Solución de problemas</h1>
+    <table>
+      <thead><tr><th>Situación</th><th>Qué revisar</th><th>Acción</th></tr></thead>
+      <tbody>
+        <tr><td>No abre la página.</td><td>Dirección, Internet/red y disponibilidad del servidor.</td><td>Pruebe otra página; confirme la dirección; reporte hora y captura a soporte.</td></tr>
+        <tr><td>Usuario o contraseña incorrectos.</td><td>Mayúsculas, espacios y que se esté usando el usuario, no el correo.</td><td>Reintente con cuidado. Tras 5 fallos, espere 15 minutos y solicite soporte.</td></tr>
+        <tr><td>No aparecen cursos o paralelos.</td><td>Periodo activo, paralelos existentes y asignaciones/matrículas.</td><td>Administrador: verifique asignación. Docente: solicite revisión de su carga académica.</td></tr>
+        <tr><td>No aparecen estudiantes.</td><td>Paralelo elegido y matrícula activa.</td><td>Confirme curso/paralelo y que la matrícula fue completada.</td></tr>
+        <tr><td>Error al guardar notas o asistencia.</td><td>Campos faltantes, fecha, valores fuera de 0–10 o sesión vencida.</td><td>Corrija datos, vuelva a iniciar sesión y reintente una vez. No duplique registros.</td></tr>
+        <tr><td>No se puede entregar un deber.</td><td>Fecha límite, tamaño, formato y conexión.</td><td>Use un archivo admitido menor a 15 MB y confirme que el plazo siga abierto.</td></tr>
+        <tr><td>Transferencia sigue “En revisión”.</td><td>No ha sido aprobada por Administración.</td><td>No la reenvíe; consulte al área financiera con el número de transacción.</td></tr>
+        <tr><td>No se descarga un adjunto.</td><td>Bloqueo de descargas, enlace vencido o archivo eliminado.</td><td>Permita la descarga y vuelva a abrir el elemento para generar un enlace nuevo.</td></tr>
+        <tr><td>Aparece “Error interno”.</td><td>Es un fallo del servidor o una condición no controlada.</td><td>Anote usuario, módulo, hora y pasos; adjunte captura sin datos sensibles; comunique a soporte.</td></tr>
+      </tbody>
+    </table>
+    <h2>12.1 Datos mínimos para reportar un incidente</h2>
+    <ul>
+      <li>Fecha y hora aproximada.</li>
+      <li>Perfil afectado, nunca la contraseña.</li>
+      <li>Módulo y acción realizada.</li>
+      <li>Mensaje mostrado y captura ocultando datos sensibles.</li>
+      <li>Si ocurrió a una sola persona o a varias.</li>
+    </ul>
+  </section>
+
+  <section id="checklists" class="chapter">
+    <h1>13. Listas de verificación institucional</h1>
+    <h2>13.1 Antes de comenzar un periodo</h2>
+    <ul>
+      <li>☐ Periodo académico, cursos, paralelos, materias y rubros revisados por soporte/administración.</li>
+      <li>☐ Personal creado con roles correctos y credenciales entregadas de forma privada.</li>
+      <li>☐ Asignaciones docentes verificadas con coordinación académica.</li>
+      <li>☐ Estudiantes y representantes matriculados en el paralelo correcto.</li>
+      <li>☐ Calendario institucional publicado.</li>
+      <li>☐ Responsables, respaldo, privacidad y canal de soporte definidos.</li>
+    </ul>
+
+    <h2>13.2 Antes de permitir datos reales</h2>
+    <ul>
+      <li>☐ Dirección HTTPS institucional y servidor de producción.</li>
+      <li>☐ Contraseñas y secretos reales, únicos y fuera del código.</li>
+      <li>☐ Alcance del panel docente y permisos probados/corregidos.</li>
+      <li>☐ Copia de seguridad automática y restauración ensayada.</li>
+      <li>☐ Almacenamiento persistente y monitoreo configurados.</li>
+      <li>☐ Pruebas de procesos críticos con cada rol.</li>
+      <li>☐ Aviso de privacidad, retención y protocolo de incidentes aprobados.</li>
+      <li>☐ Capacitación y aceptación firmada por usuarios clave.</li>
+    </ul>
+
+    <h2>13.3 Acta de recepción sugerida</h2>
+    <p>La institución confirma que recibió una demostración del alcance actual, revisó los límites descritos y definirá con el proveedor cuáles mejoras forman parte de la implantación o de una fase posterior.</p>
+    <div class="signature">
+      <div>Rector/a o delegado institucional<br>Nombre, firma y fecha</div>
+      <div>Responsable del sistema<br>Nombre, firma y fecha</div>
+    </div>
+  </section>
+</body>
+</html>

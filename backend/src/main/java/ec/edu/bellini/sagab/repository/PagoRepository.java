@@ -16,6 +16,8 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
      * (temporada de matrícula/cobro puede acumular muchos comprobantes de golpe). */
     List<Pago> findByEstadoRevisionOrderByFechaPagoAsc(Pago.EstadoRevision estadoRevision, Pageable pageable);
 
+    long countByEstadoRevision(Pago.EstadoRevision estadoRevision);
+
     /** Detección de comprobante duplicado: la misma imagen/PDF ya se subió para esta obligación. */
     boolean existsByObligacionIdAndComprobanteHash(Long idObligacion, String comprobanteHash);
 }

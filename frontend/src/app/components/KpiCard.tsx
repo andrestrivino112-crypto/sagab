@@ -1,9 +1,9 @@
 import { AlertTriangle } from "lucide-react";
 
-export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert = false, onClick }: {
+export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert = false, onClick, opensDialog = true }: {
   label: string; value: string | number; sub?: string;
   icon: React.ElementType; accent?: "blue"|"green"|"red"|"amber"; alert?: boolean;
-  onClick?: () => void;
+  onClick?: () => void; opensDialog?: boolean;
 }) {
   const styles = {
     blue:  { border:"border-l-[#2E75B6]", bg:"bg-[#EAF2FB]", icon:"text-[#2E75B6]" },
@@ -28,7 +28,7 @@ export function KpiCard({ label, value, sub, icon: Icon, accent = "blue", alert 
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} aria-haspopup="dialog"
+      <button type="button" onClick={onClick} aria-haspopup={opensDialog ? "dialog" : undefined}
         className={`${className} text-left cursor-pointer transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6]/40`}>
         {content}
       </button>

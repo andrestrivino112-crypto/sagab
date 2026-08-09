@@ -240,6 +240,7 @@ public class TareaService {
         EntregaTarea e = entregas.findById(idEntrega)
                 .orElseThrow(() -> new NoSuchElementException("La entrega no existe"));
         boolean esDocenteODuenio = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
                 || asignacionDocenteService.esDocenteDeLaAsignacion(e.getTarea().getAsignacion(), auth);
         if (!esDocenteODuenio && !estudianteService.esPropio(e.getEstudiante().getId(), auth)) {
             throw new AccessDeniedException("No autorizado para descargar este archivo");
@@ -256,6 +257,7 @@ public class TareaService {
     public List<TareaDtos.AdjuntoTareaResponse> adjuntosDeTarea(Long idTarea, Long idEstudiante, Authentication auth) {
         Tarea t = tareas.findById(idTarea).orElseThrow(() -> new NoSuchElementException("La tarea no existe"));
         boolean esDocenteODuenio = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
                 || asignacionDocenteService.esDocenteDeLaAsignacion(t.getAsignacion(), auth);
         if (!esDocenteODuenio) {
             if (idEstudiante == null || !estudianteService.esPropio(idEstudiante, auth)

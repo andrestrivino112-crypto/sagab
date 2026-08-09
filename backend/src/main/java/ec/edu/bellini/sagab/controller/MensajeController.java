@@ -27,7 +27,7 @@ public class MensajeController {
     /** Envío directo a ids ya resueltos. El canal docente usa /broadcast y el institucional
      * usa /institucionales, de modo que cada flujo aplique sus propias reglas de alcance. */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public MensajeDtos.MensajeResponse enviar(@Valid @RequestBody MensajeDtos.EnviarMensajeRequest req, Authentication auth) {
         return service.enviar(req, auth);
     }
@@ -41,7 +41,7 @@ public class MensajeController {
     /** Envío masivo por grupo (un estudiante, varios, todo un curso/paralelo, representantes,
      * docentes o todo el colegio) — el profesor resuelve a quién llegar sin conocer ids de usuario. */
     @PostMapping("/broadcast")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE')")
     public MensajeDtos.MensajeResponse enviarBroadcast(@Valid @RequestBody MensajeDtos.EnviarBroadcastRequest req,
                                                          Authentication auth) {
         return service.enviarBroadcast(req, auth);
@@ -49,7 +49,7 @@ public class MensajeController {
 
     /** Canal exclusivo del Administrador: privado a un docente o masivo a todo el cuerpo docente. */
     @PostMapping("/institucionales")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public MensajeDtos.MensajeResponse enviarInstitucional(
             @Valid @RequestBody MensajeDtos.EnviarInstitucionalRequest req, Authentication auth) {
         return service.enviarInstitucional(req, auth);

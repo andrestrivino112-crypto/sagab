@@ -145,7 +145,8 @@ public class CalificacionService {
     @Transactional(readOnly = true)
     public List<CalificacionDtos.NotaBusquedaResponse> buscar(Long idEstudiante, Integer idParalelo,
             Integer idMateria, Short parcial, Authentication auth) {
-        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         Long idDocenteEfectivo = null;
         if (!esAdmin) {
             Docente propio = docentes.findByUsuarioEmail(auth.getName())
@@ -174,7 +175,8 @@ public class CalificacionService {
         Calificacion cal = calificaciones.findById(idCalificacion)
                 .orElseThrow(() -> new NoSuchElementException("La calificación no existe"));
 
-        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         if (!esAdmin) {
             AsignacionDocente asignacion = asignaciones.findById(cal.getIdAsignacion())
                     .orElseThrow(() -> new NoSuchElementException("La asignación de la calificación no existe"));

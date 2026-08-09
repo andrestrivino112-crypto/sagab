@@ -20,7 +20,7 @@ public class ParaleloController {
 
     /** ADMIN administra matrícula; DECE y AUDITOR requieren la lista para reportes institucionales. */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','DECE','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DECE','AUDITOR')")
     public List<ParaleloDtos.ParaleloResponse> listar() {
         return service.delAnioLectivoVigente();
     }

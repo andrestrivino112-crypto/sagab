@@ -92,5 +92,11 @@ async function manejarRespuesta<T>(res: Response, token: string | null): Promise
     throw new ApiError(res.status, mensaje);
   }
 
-  return res.status === 204 ? (undefined as T) : res.json();
+  if (res.status === 204) return undefined as T;
+
+  // Algunos endpoints de escritura responden 200 sin cuerpo. Leer primero como texto evita
+  // que Response.json() lance un SyntaxError después de una operación que sí fue exitosa.
+  const contenido = await res.text();
+  if (!contenido.trim()) return undefined as T;
+  return JSON.parse(contenido) as T;
 }

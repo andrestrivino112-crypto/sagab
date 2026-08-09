@@ -143,8 +143,8 @@ export function PersonalView() {
               <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-semibold mb-1">Cuenta creada — {creado.nombreCompleto} ({creado.rol})</p>
-                <p>Usuario: <strong>{creado.username}</strong> · contraseña temporal: <strong>{creado.claveTemporal}</strong></p>
-                <p className="text-xs text-[#2E7D32]/80 mt-1">Anote esta contraseña ahora: no se vuelve a mostrar. Deberá cambiarla al ingresar por primera vez.</p>
+                <p>Usuario: <strong>{creado.username}</strong></p>
+                <p className="text-xs text-[#2E7D32]/80 mt-1">La contraseña inicial corresponde a la cédula registrada y deberá cambiarse al ingresar por primera vez.</p>
               </div>
             </div>
           )}

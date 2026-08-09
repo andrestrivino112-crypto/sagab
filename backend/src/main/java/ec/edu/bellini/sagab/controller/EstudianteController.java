@@ -26,7 +26,7 @@ public class EstudianteController {
 
     /** DOCENTE solo ve la nómina de un paralelo donde dicta; ADMIN y DECE (monitoreo de ausentismo) cualquiera. */
     @GetMapping("/paralelo/{idParalelo}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','DECE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN','DECE')")
     public List<EstudianteDtos.EstudianteResumen> porParalelo(@PathVariable Integer idParalelo, Authentication auth) {
         return service.porParalelo(idParalelo, auth);
     }
@@ -45,8 +45,14 @@ public class EstudianteController {
      * en sí sigue restringida a las asignaciones propias del docente en CalificacionService).
      */
     @GetMapping("/buscar")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE')")
     public List<EstudianteDtos.EstudianteConParalelo> buscar(@RequestParam @NotBlank String q) {
         return service.buscar(q);
+    }
+
+    @GetMapping("/matriculados")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public List<EstudianteDtos.EstudianteMatriculado> matriculados() {
+        return service.matriculadosPeriodoActivo();
     }
 }

@@ -83,7 +83,8 @@ public class MensajeService {
     @Transactional
     public MensajeDtos.MensajeResponse enviarBroadcast(MensajeDtos.EnviarBroadcastRequest req, Authentication auth) {
         boolean esDocente = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"))
-                && !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                && !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                && !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         boolean gruposPermitidosDocente = switch (req.grupo()) {
             case ESTUDIANTES, TODO_PARALELO -> true;
             case TODO_CURSO, TODOS_REPRESENTANTES, TODOS_DOCENTES, TODO_COLEGIO -> false;

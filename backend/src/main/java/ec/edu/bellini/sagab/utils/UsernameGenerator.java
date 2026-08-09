@@ -10,14 +10,17 @@ import java.util.function.Predicate;
  */
 public final class UsernameGenerator {
 
+    private static final int MAX_LONGITUD = 40;
+
     private UsernameGenerator() {}
 
     public static String generar(String nombres, String apellidos, Predicate<String> yaExiste) {
-        String base = normalizar(primerToken(nombres)) + "." + normalizar(primerToken(apellidos));
+        String base = recortar(normalizar(primerToken(nombres)) + "." + normalizar(primerToken(apellidos)), MAX_LONGITUD);
         String candidato = base;
         int sufijo = 2;
         while (yaExiste.test(candidato)) {
-            candidato = base + sufijo++;
+            String textoSufijo = String.valueOf(sufijo++);
+            candidato = recortar(base, MAX_LONGITUD - textoSufijo.length()) + textoSufijo;
         }
         return candidato;
     }
@@ -32,5 +35,9 @@ public final class UsernameGenerator {
         String sinTildes = Normalizer.normalize(texto, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         String limpio = sinTildes.toLowerCase().replaceAll("[^a-z0-9]", "");
         return limpio.isEmpty() ? "usuario" : limpio;
+    }
+
+    private static String recortar(String valor, int maximo) {
+        return valor.length() <= maximo ? valor : valor.substring(0, maximo);
     }
 }

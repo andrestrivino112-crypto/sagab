@@ -1,6 +1,10 @@
 import { api, tokenStore } from "./client";
 
-export type RolSistema = "ADMIN" | "DOCENTE" | "REPRESENTANTE" | "AUDITOR" | "DECE" | "ESTUDIANTE";
+export type RolSistema = "SUPER_ADMIN" | "ADMIN" | "DOCENTE" | "REPRESENTANTE" | "AUDITOR" | "DECE" | "ESTUDIANTE";
+
+/** Los dos roles que comparten las funciones operativas de Secretaría. */
+export const esRolAdministrativo = (rol: RolSistema): boolean =>
+  rol === "ADMIN" || rol === "SUPER_ADMIN";
 
 export interface Sesion {
   accessToken: string;
@@ -40,8 +44,9 @@ export async function recuperarSesion(): Promise<Sesion | null> {
 }
 
 export async function cambiarClave(claveActual: string, claveNueva: string): Promise<void> {
-  await api<void>("/api/auth/cambiar-clave", {
+  const respuesta = await api<{ accessToken: string }>("/api/auth/cambiar-clave", {
     method: "POST",
     body: { claveActual, claveNueva },
   });
+  tokenStore.set(respuesta.accessToken);
 }

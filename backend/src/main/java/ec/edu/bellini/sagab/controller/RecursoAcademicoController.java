@@ -27,7 +27,7 @@ public class RecursoAcademicoController {
 
     /** Sílabo, formatos y link de clase de una asignación — "Información Académica" del Portal Familiar. */
     @GetMapping("/asignacion/{idAsignacion}")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE','REPRESENTANTE','ESTUDIANTE')")
     public List<RecursoAcademicoDtos.RecursoResponse> porAsignacion(@PathVariable Long idAsignacion,
             @RequestParam(required = false) Long idEstudiante, Authentication auth) {
         return service.porAsignacion(idAsignacion, idEstudiante, auth);
@@ -74,7 +74,7 @@ public class RecursoAcademicoController {
 
     /** URL de descarga temporal de un sílabo/formato/material (no aplica a LINK_CLASE). */
     @GetMapping("/{idRecurso}/descarga")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE','REPRESENTANTE','ESTUDIANTE')")
     public ResponseEntity<Map<String, String>> urlDescarga(@PathVariable Long idRecurso,
             @RequestParam(required = false) Long idEstudiante, Authentication auth) {
         return ResponseEntity.ok(Map.of("url", service.urlDescarga(idRecurso, idEstudiante, auth)));

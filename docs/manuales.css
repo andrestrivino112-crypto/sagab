@@ -1,0 +1,241 @@
+:root {
+  --azul: #1f5783;
+  --azul-oscuro: #143a59;
+  --azul-claro: #eaf3fb;
+  --verde: #237a4b;
+  --amarillo: #946200;
+  --rojo: #b42318;
+  --gris-900: #202631;
+  --gris-700: #4c5667;
+  --gris-500: #778195;
+  --gris-300: #d7dde6;
+  --gris-100: #f4f6f9;
+}
+
+@page {
+  size: A4;
+  margin: 16mm 15mm 17mm;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--gris-900);
+  font-size: 10.5pt;
+  line-height: 1.48;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  background: white;
+}
+
+h1, h2, h3, h4 {
+  color: var(--azul-oscuro);
+  line-height: 1.2;
+  break-after: avoid;
+}
+
+h1 { font-size: 23pt; margin: 0 0 10mm; }
+h2 {
+  font-size: 16pt;
+  margin: 10mm 0 4mm;
+  border-bottom: 2px solid var(--azul);
+  padding-bottom: 2mm;
+}
+h3 { font-size: 12.5pt; margin: 7mm 0 2.5mm; }
+h4 { font-size: 10.8pt; margin: 5mm 0 2mm; }
+
+p { margin: 0 0 3.2mm; }
+ul, ol { margin: 2mm 0 4mm 6mm; padding-left: 5mm; }
+li { margin: 0 0 1.5mm; }
+
+a { color: var(--azul); text-decoration: none; }
+code {
+  font-family: "DejaVu Sans Mono", Consolas, monospace;
+  font-size: 8.7pt;
+  background: var(--gris-100);
+  border: 1px solid var(--gris-300);
+  border-radius: 3px;
+  padding: 0.2mm 1mm;
+  overflow-wrap: anywhere;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: "DejaVu Sans Mono", Consolas, monospace;
+  font-size: 8.3pt;
+  line-height: 1.4;
+  color: #eaf3fb;
+  background: #172536;
+  border-radius: 5px;
+  padding: 4mm;
+  break-inside: avoid;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 3mm 0 6mm;
+  font-size: 9pt;
+}
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th, td {
+  border: 1px solid var(--gris-300);
+  padding: 2.3mm 2.5mm;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  color: white;
+  background: var(--azul);
+  font-weight: 700;
+}
+tbody tr:nth-child(even) { background: #f8fafc; }
+
+.cover {
+  min-height: 258mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20mm 12mm 12mm;
+  border-top: 12mm solid var(--azul-oscuro);
+  page-break-after: always;
+}
+.cover-mark {
+  color: var(--azul);
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.cover h1 {
+  font-size: 31pt;
+  color: var(--azul-oscuro);
+  margin: 24mm 0 6mm;
+}
+.cover .subtitle {
+  max-width: 145mm;
+  font-size: 15pt;
+  line-height: 1.4;
+  color: var(--gris-700);
+}
+.cover .meta {
+  border-left: 4px solid var(--azul);
+  padding-left: 5mm;
+  color: var(--gris-700);
+}
+.cover .confidential {
+  color: var(--gris-500);
+  font-size: 8.7pt;
+}
+
+.chapter { page-break-before: always; }
+.keep { break-inside: avoid; }
+.small { font-size: 8.7pt; color: var(--gris-700); }
+.muted { color: var(--gris-700); }
+.lead { font-size: 12pt; color: var(--gris-700); }
+.toc ol { list-style: decimal; }
+.toc li { margin-bottom: 2.2mm; }
+
+.callout {
+  margin: 4mm 0 5mm;
+  padding: 3.5mm 4mm;
+  border-left: 4px solid var(--azul);
+  background: var(--azul-claro);
+  break-inside: avoid;
+}
+.callout strong { color: var(--azul-oscuro); }
+.callout.warning { border-color: #d89b00; background: #fff7da; }
+.callout.warning strong { color: #6e4b00; }
+.callout.danger { border-color: var(--rojo); background: #fff0ee; }
+.callout.danger strong { color: var(--rojo); }
+.callout.success { border-color: var(--verde); background: #eaf8f0; }
+.callout.success strong { color: var(--verde); }
+
+.steps {
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin-left: 0;
+}
+.steps > li {
+  position: relative;
+  min-height: 9mm;
+  padding: 1mm 0 4mm 12mm;
+  break-inside: avoid;
+}
+.steps > li::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7mm;
+  height: 7mm;
+  line-height: 7mm;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--azul);
+  color: white;
+  font-weight: bold;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.5mm 2mm;
+  border-radius: 10px;
+  font-size: 8pt;
+  font-weight: 700;
+  color: white;
+  background: var(--azul);
+  white-space: nowrap;
+}
+.badge.ok { background: var(--verde); }
+.badge.warn { background: var(--amarillo); }
+.badge.no { background: var(--rojo); }
+.badge.gray { background: var(--gris-700); }
+
+.diagram {
+  margin: 4mm 0 6mm;
+  padding: 5mm;
+  border: 1px solid var(--gris-300);
+  background: var(--gris-100);
+  text-align: center;
+  font-family: "DejaVu Sans Mono", Consolas, monospace;
+  font-size: 8.8pt;
+  white-space: pre-wrap;
+  break-inside: avoid;
+}
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5mm;
+}
+.card {
+  border: 1px solid var(--gris-300);
+  border-radius: 5px;
+  padding: 4mm;
+  break-inside: avoid;
+}
+.card h3, .card h4 { margin-top: 0; }
+
+.signature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18mm;
+  margin-top: 20mm;
+}
+.signature div {
+  border-top: 1px solid var(--gris-700);
+  padding-top: 2mm;
+  text-align: center;
+}
+
+@media screen {
+  body { max-width: 210mm; margin: 0 auto; padding: 10mm; box-shadow: 0 0 18px #ccd2db; }
+  .cover { min-height: 270mm; }
+}

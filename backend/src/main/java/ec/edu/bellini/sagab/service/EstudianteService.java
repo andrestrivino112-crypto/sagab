@@ -4,6 +4,7 @@ import ec.edu.bellini.sagab.dto.EstudianteDtos;
 import ec.edu.bellini.sagab.model.Estudiante;
 import ec.edu.bellini.sagab.model.Representante;
 import ec.edu.bellini.sagab.repository.EstudianteRepository;
+import ec.edu.bellini.sagab.repository.PeriodoAcademicoRepository;
 import ec.edu.bellini.sagab.repository.RepresentanteRepository;
 import ec.edu.bellini.sagab.repository.UsuarioRepository;
 import org.springframework.data.domain.PageRequest;
@@ -22,13 +23,16 @@ public class EstudianteService {
     private final RepresentanteRepository representantes;
     private final UsuarioRepository usuarios;
     private final AsignacionDocenteService asignacionDocenteService;
+    private final PeriodoAcademicoRepository periodos;
 
     public EstudianteService(EstudianteRepository estudiantes, RepresentanteRepository representantes,
-                             UsuarioRepository usuarios, AsignacionDocenteService asignacionDocenteService) {
+                             UsuarioRepository usuarios, AsignacionDocenteService asignacionDocenteService,
+                             PeriodoAcademicoRepository periodos) {
         this.estudiantes = estudiantes;
         this.representantes = representantes;
         this.usuarios = usuarios;
         this.asignacionDocenteService = asignacionDocenteService;
+        this.periodos = periodos;
     }
 
     /** Nómina de un paralelo — usada por Notas y Asistencia. DOCENTE solo la del paralelo donde dicta. */
@@ -69,6 +73,18 @@ public class EstudianteService {
                 .toList();
     }
 
+    /** Nómina completa del año lectivo activo para Secretaría. */
+    @Transactional(readOnly = true)
+    public List<EstudianteDtos.EstudianteMatriculado> matriculadosPeriodoActivo() {
+        return periodos.findFirstByActivoTrueOrderByFechaInicioDesc()
+                .map(periodo -> estudiantes.matriculadosDelAnio(periodo.getAnioLectivo()).stream()
+                        .map(e -> new EstudianteDtos.EstudianteMatriculado(
+                                e.getIdEstudiante(), e.getCodigo(), e.getNombreCompleto(),
+                                e.getCurso(), e.getParalelo(), e.getAnioLectivo()))
+                        .toList())
+                .orElseGet(List::of);
+    }
+
     /**
      * Verifica si el estudiante dado pertenece al usuario autenticado: es su representante,
      * o es el propio estudiante viendo sus propios datos. ADMIN y DOCENTE no tienen restricción
@@ -78,6 +94,7 @@ public class EstudianteService {
     @Transactional(readOnly = true)
     public boolean esPropio(Long idEstudiante, Authentication auth) {
         if (auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
                 || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DOCENTE"))) {
             return true;
         }

@@ -2,6 +2,7 @@
 // SAGAB — Servicios de dominio (calificaciones, asistencia, auditoría)
 // ============================================================================
 import { api, apiBlob, apiForm } from "./client";
+import type { RolSistema } from "./auth";
 
 // ── Calificaciones ─────────────────────────────────────────────────────
 export interface NotaRequest {
@@ -194,7 +195,17 @@ export const estudiantes = {
   porParalelo: (idParalelo: number) => api<EstudianteResumen[]>(`/api/estudiantes/paralelo/${idParalelo}`),
   mios: () => api<EstudianteConParalelo[]>("/api/estudiantes/mios"),
   buscar: (q: string) => api<EstudianteConParalelo[]>(`/api/estudiantes/buscar?q=${encodeURIComponent(q)}`),
+  matriculados: () => api<EstudianteMatriculado[]>("/api/estudiantes/matriculados"),
 };
+
+export interface EstudianteMatriculado {
+  idEstudiante: number;
+  codigo: string;
+  nombreCompleto: string;
+  curso: string;
+  paralelo: string;
+  anioLectivo: string;
+}
 
 // ── Matrícula (alta de estudiante + representante) ──────────────────────
 export interface MatriculaRequest {
@@ -227,7 +238,6 @@ export interface MatriculaResponse {
   usuarioEstudiante: string;
   representanteNuevo: boolean;
   usuarioRepresentante: string;
-  claveTemporal: string | null;
 }
 
 export const matriculas = {
@@ -247,6 +257,38 @@ export interface ResumenDashboard {
   ausenciasHoy: number;
   mensajesPendientes: number;
   rendimientoPorParalelo: RendimientoParalelo[];
+}
+
+export interface MatriculaRecienteAdministrativa extends EstudianteMatriculado {
+  creadoEn: string;
+}
+
+export interface EventoProximoAdministrativo {
+  idEvento: number;
+  titulo: string;
+  inicio: string;
+  fin: string;
+  lugar: string | null;
+  categoria: string;
+}
+
+export interface MensajeRecienteAdministrativo {
+  idMensaje: number;
+  asunto: string;
+  remitente: string;
+  enviadoEn: string;
+  leido: boolean;
+}
+
+export interface ResumenAdministrativo {
+  anioLectivoActivo: string | null;
+  estudiantesMatriculados: number;
+  matriculasRecientes: MatriculaRecienteAdministrativa[];
+  pagosPendientesRevision: number;
+  estudiantesConValoresPendientes: number;
+  proximosEventos: EventoProximoAdministrativo[];
+  mensajesNoLeidos: number;
+  mensajesRecientes: MensajeRecienteAdministrativo[];
 }
 
 export interface PromedioAgrupado {
@@ -275,6 +317,7 @@ export interface PromedioDetalle {
 
 export const dashboard = {
   resumen: () => api<ResumenDashboard>("/api/dashboard/resumen"),
+  administrativo: () => api<ResumenAdministrativo>("/api/dashboard/administrativo"),
   /** Drill-down "Promedio institucional": desglose por curso/paralelo/materia/docente/año. */
   promedio: () => api<PromedioDetalle>("/api/dashboard/promedio"),
 };
@@ -371,7 +414,27 @@ export const finanzas = {
   mora: () => api<EstudianteMoraResponse[]>("/api/finanzas/mora"),
   enviarComunicacion: (idEstudiante: number, body: ComunicacionMoraRequest) =>
     api<void>(`/api/finanzas/mora/${idEstudiante}/comunicacion`, { method: "POST", body }),
+  pendientes: () => api<ValorPendienteResponse[]>("/api/finanzas/pendientes"),
+  notificarPendiente: (idEstudiante: number, mensaje: string) =>
+    api<void>(`/api/finanzas/pendientes/${idEstudiante}/notificacion`, {
+      method: "POST", body: { mensaje },
+    }),
 };
+
+export interface ValorPendienteResponse {
+  idEstudiante: number;
+  codigo: string;
+  nombreCompleto: string;
+  curso: string | null;
+  paralelo: string | null;
+  representante: string | null;
+  representanteEmail: string | null;
+  representanteTelefono: string | null;
+  valorTotalPendiente: number;
+  cantidadObligaciones: number;
+  obligacionesVencidas: number;
+  fechaVencimientoMasAntigua: string;
+}
 
 /** Fila del drill-down "Estudiantes en mora" — un registro por estudiante, con el total de
  * sus obligaciones vencidas y los datos de contacto de su representante. */
@@ -817,7 +880,6 @@ export interface PersonalResponse {
   username: string;
   email: string;
   rol: string;
-  claveTemporal: string;
 }
 
 export interface PersonalResumen {
@@ -833,4 +895,58 @@ export const personal = {
   crear: (req: PersonalRequest) =>
     api<PersonalResponse>("/api/personal", { method: "POST", body: req }),
   listar: () => api<PersonalResumen[]>("/api/personal"),
+};
+
+// ── Gestión de cuentas (exclusiva de SUPER_ADMIN) ───────────────────────
+export type EstadoCuentaSistema = "ACTIVO" | "INACTIVO" | "BLOQUEADO";
+export type EstadoCuentaEditable = Exclude<EstadoCuentaSistema, "BLOQUEADO">;
+
+/** DTO deliberadamente limitado: nunca incluye cédula completa, claves, hashes ni tokens. */
+export interface UsuarioCuentaSistema {
+  idUsuario: number;
+  nombreCompleto: string;
+  username: string | null;
+  email: string | null;
+  roles: RolSistema[];
+  estado: EstadoCuentaSistema;
+  cedulaEnmascarada: string | null;
+  ultimoAcceso: string | null;
+  creadoEn: string | null;
+  debeCambiarClave: boolean;
+  esCuentaActual: boolean;
+}
+
+export interface PaginaUsuariosSistema {
+  contenido: UsuarioCuentaSistema[];
+  pagina: number;
+  tamano: number;
+  totalElementos: number;
+  totalPaginas: number;
+}
+
+export interface FiltrosUsuariosSistema {
+  q?: string;
+  rol?: RolSistema;
+  estado?: EstadoCuentaSistema;
+  page?: number;
+  size?: number;
+}
+
+export const superAdmin = {
+  usuarios: (filtros: FiltrosUsuariosSistema = {}) => {
+    const q = new URLSearchParams();
+    if (filtros.q?.trim()) q.set("q", filtros.q.trim());
+    if (filtros.rol) q.set("rol", filtros.rol);
+    if (filtros.estado) q.set("estado", filtros.estado);
+    q.set("page", String(filtros.page ?? 0));
+    q.set("size", String(filtros.size ?? 20));
+    return api<PaginaUsuariosSistema>(`/api/super-admin/usuarios?${q}`);
+  },
+  restablecerClave: (idUsuario: number) =>
+    api<void>(`/api/super-admin/usuarios/${idUsuario}/restablecer-clave`, { method: "POST" }),
+  cambiarEstado: (idUsuario: number, estado: EstadoCuentaEditable) =>
+    api<void>(`/api/super-admin/usuarios/${idUsuario}/estado`, {
+      method: "PATCH",
+      body: { estado },
+    }),
 };

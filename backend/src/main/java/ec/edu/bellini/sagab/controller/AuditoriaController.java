@@ -13,7 +13,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auditoria")
-@PreAuthorize("hasAnyRole('AUDITOR','ADMIN')")
+@PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPER_ADMIN')")
 public class AuditoriaController {
 
     private final JdbcTemplate jdbc;
@@ -31,7 +31,13 @@ public class AuditoriaController {
         return jdbc.queryForList("""
                 SELECT id_registro, ejecutado_en, usuario_app, operacion::text,
                        tabla, id_fila, columnas_modificadas,
-                       datos_antes::text, datos_despues::text, ip_cliente::text
+                       CASE WHEN datos_antes IS NULL THEN NULL
+                            WHEN tabla = 'usuario' THEN (datos_antes - 'hash_password' - 'cedula')::text
+                            ELSE datos_antes::text END AS datos_antes,
+                       CASE WHEN datos_despues IS NULL THEN NULL
+                            WHEN tabla = 'usuario' THEN (datos_despues - 'hash_password' - 'cedula')::text
+                            ELSE datos_despues::text END AS datos_despues,
+                       ip_cliente::text
                 FROM auditoria.registro_cambio
                 WHERE (?::text IS NULL OR tabla = ?)
                   AND (?::text IS NULL OR usuario_app = ?)
@@ -60,7 +66,13 @@ public class AuditoriaController {
     public List<Map<String, Object>> historialFila(@PathVariable String tabla, @PathVariable String idFila) {
         return jdbc.queryForList("""
                 SELECT ejecutado_en, usuario_app, operacion::text,
-                       columnas_modificadas, datos_antes::text, datos_despues::text
+                       columnas_modificadas,
+                       CASE WHEN datos_antes IS NULL THEN NULL
+                            WHEN tabla = 'usuario' THEN (datos_antes - 'hash_password' - 'cedula')::text
+                            ELSE datos_antes::text END AS datos_antes,
+                       CASE WHEN datos_despues IS NULL THEN NULL
+                            WHEN tabla = 'usuario' THEN (datos_despues - 'hash_password' - 'cedula')::text
+                            ELSE datos_despues::text END AS datos_despues
                 FROM auditoria.registro_cambio
                 WHERE tabla = ? AND id_fila = ?
                 ORDER BY ejecutado_en

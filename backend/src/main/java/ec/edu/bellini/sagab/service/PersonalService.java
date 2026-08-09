@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -22,7 +21,7 @@ import java.util.Set;
 /**
  * Alta de cuentas de personal (no familia) por un ADMIN: DOCENTE, DECE, AUDITOR — mismo mecanismo
  * de cuenta que MatriculaService usa para el representante (username generado, contraseña
- * temporal aleatoria devuelta una sola vez, debe_cambiar_clave=true). ADMIN/REPRESENTANTE/
+ * temporal basada en la cédula registrada y nunca devuelta, debe_cambiar_clave=true). ADMIN/REPRESENTANTE/
  * ESTUDIANTE quedan fuera a propósito: tienen sus propios flujos (matrícula) o son demasiado
  * sensibles para un alta genérica sin controles adicionales.
  */
@@ -30,9 +29,6 @@ import java.util.Set;
 public class PersonalService {
 
     private static final List<String> ROLES_PERSONAL = List.of("DOCENTE", "DECE", "AUDITOR");
-    private static final String ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    private final SecureRandom random = new SecureRandom();
-
     private final UsuarioRepository usuarios;
     private final RolRepository roles;
     private final DocenteRepository docentes;
@@ -72,8 +68,7 @@ public class PersonalService {
         u.setApellidos(req.apellidos().trim());
         u.setCedula(req.cedula());
         u.setTelefono(req.telefono());
-        String claveTemporal = generarClaveTemporal();
-        u.setHashPassword(encoder.encode(claveTemporal));
+        u.setHashPassword(encoder.encode(req.cedula()));
         u.setDebeCambiarClave(true);
         Set<Rol> rolesNuevos = new HashSet<>();
         rolesNuevos.add(rol);
@@ -89,7 +84,7 @@ public class PersonalService {
         }
 
         return new PersonalDtos.PersonalResponse(u.getId(), u.nombreCompleto(), u.getUsername(), u.getEmail(),
-                req.rol(), claveTemporal);
+                req.rol());
     }
 
     @Transactional(readOnly = true)
@@ -102,11 +97,4 @@ public class PersonalService {
                 .toList();
     }
 
-    private String generarClaveTemporal() {
-        StringBuilder sb = new StringBuilder(12);
-        for (int i = 0; i < 12; i++) {
-            sb.append(ALFABETO_CLAVE.charAt(random.nextInt(ALFABETO_CLAVE.length())));
-        }
-        return sb.toString();
-    }
 }

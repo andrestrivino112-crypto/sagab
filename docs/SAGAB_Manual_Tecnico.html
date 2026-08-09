@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAGAB — Manual técnico</title>
+  <link rel="stylesheet" href="manuales.css">
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="cover-mark">SAGAB</div>
+      <h1>Manual técnico</h1>
+      <p class="subtitle">Arquitectura, instalación, configuración, datos, API, seguridad, operación, pruebas, despliegue y límites técnicos.</p>
+    </div>
+    <div class="meta">
+      <p><strong>Producto:</strong> Sistema Avanzado de Gestión Académica Bellini</p>
+      <p><strong>Versión documental:</strong> 3.1</p>
+      <p><strong>Línea base inspeccionada:</strong> commit <code>7d21f8c</code> y árbol local al 7 de agosto de 2026</p>
+      <p><strong>Audiencia:</strong> Desarrollo, soporte, infraestructura, seguridad y auditoría técnica</p>
+    </div>
+    <p class="confidential">Documento técnico de uso controlado. No debe contener contraseñas, secretos, tokens, comprobantes ni datos personales reales.</p>
+  </section>
+
+  <section>
+    <h1>Control y alcance</h1>
+    <table>
+      <thead><tr><th>Elemento</th><th>Definición</th></tr></thead>
+      <tbody>
+        <tr><td>Objetivo</td><td>Permitir que un equipo técnico instale, entienda, mantenga, asegure, pruebe y opere SAGAB sin depender de conocimiento oral.</td></tr>
+        <tr><td>Incluye</td><td>Frontend, backend, PostgreSQL, archivos, correo opcional, API, perfiles, procesos programados, controles, despliegue y recuperación.</td></tr>
+        <tr><td>No incluye</td><td>Credenciales reales, contratos de servicio, inventario del proveedor, políticas legales propias del colegio ni una certificación de seguridad.</td></tr>
+        <tr><td>Regla de actualización</td><td>Actualizar después de modificar endpoints, entidades, migraciones, permisos, variables, infraestructura o reglas de negocio.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warning"><strong>Estado de madurez.</strong> La solución es una base funcional amplia, pero no debe calificarse como lista para producción institucional hasta cerrar los hallazgos críticos del capítulo 18 y ejecutar pruebas integrales de autorización, respaldo, carga y recuperación.</div>
+
+    <nav class="toc">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#vision">Visión general y arquitectura</a></li>
+        <li><a href="#stack">Tecnologías y dependencias</a></li>
+        <li><a href="#repositorio">Estructura del repositorio</a></li>
+        <li><a href="#backend">Arquitectura del backend</a></li>
+        <li><a href="#frontend">Arquitectura del frontend</a></li>
+        <li><a href="#datos">Base de datos y modelo de información</a></li>
+        <li><a href="#seguridad">Seguridad y autorización</a></li>
+        <li><a href="#reglas">Reglas de negocio</a></li>
+        <li><a href="#api">Catálogo de API</a></li>
+        <li><a href="#archivos">Almacenamiento y archivos</a></li>
+        <li><a href="#configuracion">Configuración y variables</a></li>
+        <li><a href="#local">Instalación local</a></li>
+        <li><a href="#produccion">Despliegue de producción</a></li>
+        <li><a href="#operacion">Operación, respaldo y recuperación</a></li>
+        <li><a href="#pruebas">Pruebas y calidad</a></li>
+        <li><a href="#diagnostico">Diagnóstico y errores</a></li>
+        <li><a href="#limites-tecnicos">Capacidades y límites</a></li>
+        <li><a href="#deuda">Riesgos, deuda técnica y hoja de ruta</a></li>
+        <li><a href="#checklist-tecnico">Listas de verificación</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <section id="vision" class="chapter">
+    <h1>1. Visión general y arquitectura</h1>
+    <p>SAGAB es una aplicación web de tres capas. El navegador ejecuta una SPA React; esta consume una API REST Spring Boot mediante JSON o <code>multipart/form-data</code>; la API persiste información en PostgreSQL y archivos en un directorio persistente o proveedor compatible con S3.</p>
+    <div class="diagram">Usuario / navegador
+        │ HTTPS
+        ▼
+Frontend React + TypeScript (SPA estática)
+        │ REST JSON / multipart + Bearer JWT
+        ▼
+Backend Spring Boot 3 · Tomcat embebido
+   ┌────┴───────────┬────────────────┐
+   ▼                ▼                ▼
+PostgreSQL       Storage local/S3   SMTP opcional
+sagab +          adjuntos           avisos financieros
+auditoria</div>
+
+    <h2>1.1 Responsabilidad de cada capa</h2>
+    <table>
+      <thead><tr><th>Capa</th><th>Responsabilidades</th><th>No debe asumir</th></tr></thead>
+      <tbody>
+        <tr><td>Frontend</td><td>Presentación, navegación, captura, validación inmediata, estado de sesión, descargas y experiencia por rol.</td><td>No es una frontera de seguridad. Ocultar un botón no autoriza ni protege un dato.</td></tr>
+        <tr><td>Backend</td><td>Autenticación, autorización, validación definitiva, reglas de negocio, archivos, reportes, auditoría y transacciones.</td><td>No debe confiar en IDs, roles, tipos MIME o valores calculados enviados por el cliente.</td></tr>
+        <tr><td>PostgreSQL</td><td>Integridad referencial, restricciones, índices, auditoría, estados y persistencia transaccional.</td><td>No reemplaza las comprobaciones de propiedad contextual realizadas en servicios.</td></tr>
+        <tr><td>Infraestructura</td><td>HTTPS, DNS, disponibilidad, secretos, red, copias, almacenamiento, métricas y alertas.</td><td>No forma parte automáticamente del código de aplicación.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>1.2 Flujo normal de una petición</h2>
+    <ol>
+      <li>El usuario inicia sesión mediante <code>POST /api/auth/login</code>.</li>
+      <li>El servidor verifica usuario, estado, bloqueo y hash BCrypt; devuelve JWT y datos mínimos de sesión.</li>
+      <li>El frontend guarda el JWT en <code>sessionStorage</code> y adjunta <code>Authorization: Bearer …</code>.</li>
+      <li>El filtro JWT valida firma/expiración y construye la identidad de Spring Security.</li>
+      <li>Las reglas HTTP, <code>@PreAuthorize</code> y el servicio validan rol y alcance.</li>
+      <li>Repositorio/JPA ejecuta la transacción; restricciones y triggers completan la integridad/auditoría.</li>
+      <li>La API devuelve DTO JSON, descarga binaria o error normalizado sin traza interna.</li>
+    </ol>
+  </section>
+
+  <section id="stack" class="chapter">
+    <h1>2. Tecnologías y dependencias</h1>
+    <h2>2.1 Backend</h2>
+    <table>
+      <thead><tr><th>Componente</th><th>Versión/línea</th><th>Uso</th></tr></thead>
+      <tbody>
+        <tr><td>Java</td><td>17</td><td>Lenguaje y runtime LTS.</td></tr>
+        <tr><td>Spring Boot</td><td>3.3.5</td><td>Aplicación, servidor embebido y configuración.</td></tr>
+        <tr><td>Spring Web</td><td>Gestionada por Boot</td><td>Controladores REST, JSON y multipart.</td></tr>
+        <tr><td>Spring Data JPA</td><td>Gestionada por Boot</td><td>Persistencia y repositorios.</td></tr>
+        <tr><td>Spring Security</td><td>Gestionada por Boot</td><td>Filtros, roles y seguridad de métodos.</td></tr>
+        <tr><td>JJWT</td><td>0.12.6</td><td>Emisión y validación de tokens.</td></tr>
+        <tr><td>OpenPDF</td><td>1.3.30</td><td>Generación de papeletas/reportes PDF.</td></tr>
+        <tr><td>AWS SDK S3</td><td>2.51.0</td><td>Almacenamiento S3 compatible.</td></tr>
+        <tr><td>Lombok</td><td>1.18.38</td><td>Reducción de código repetitivo.</td></tr>
+        <tr><td>Maven</td><td>3.9 recomendado</td><td>Dependencias, pruebas y empaquetado.</td></tr>
+      </tbody>
+    </table>
+    <h2>2.2 Frontend</h2>
+    <table>
+      <thead><tr><th>Componente</th><th>Versión</th><th>Uso</th></tr></thead>
+      <tbody>
+        <tr><td>React / React DOM</td><td>18.3.1</td><td>Componentes y renderizado.</td></tr>
+        <tr><td>TypeScript</td><td>5.7</td><td>Tipado estático.</td></tr>
+        <tr><td>Vite</td><td>6.4.3</td><td>Desarrollo y compilación.</td></tr>
+        <tr><td>React Router</td><td>6.30.x</td><td>Rutas de la SPA.</td></tr>
+        <tr><td>Tailwind CSS</td><td>4.1.12</td><td>Estilos utilitarios.</td></tr>
+        <tr><td>CSS de formularios</td><td>Subconjunto local</td><td>Componentes necesarios de Matrícula y Portal Familiar, aislados bajo <code>.matricula-form</code>; se retiró del bundle el Bootstrap completo.</td></tr>
+        <tr><td>Recharts</td><td>2.15.2</td><td>Gráficos del panel.</td></tr>
+        <tr><td>jsPDF / AutoTable</td><td>4.2.1 / 5.0.8</td><td>Reportes generados en el cliente.</td></tr>
+        <tr><td>ExcelJS</td><td>4.4.0</td><td>Exportación tabular donde se utilice.</td></tr>
+      </tbody>
+    </table>
+    <h2>2.3 Persistencia</h2>
+    <p>PostgreSQL 15 o superior es la recomendación operativa. Se utilizan dos esquemas: <code>sagab</code> para negocio y <code>auditoria</code> para trazabilidad. Hibernate trabaja con <code>ddl-auto: validate</code>; no crea ni modifica el esquema.</p>
+  </section>
+
+  <section id="repositorio" class="chapter">
+    <h1>3. Estructura del repositorio</h1>
+    <pre>sagab/
+├── backend/
+│   ├── Dockerfile
+│   ├── pom.xml
+│   └── src/
+│       ├── main/java/ec/edu/bellini/sagab/
+│       │   ├── config/       seguridad, storage, schedulers
+│       │   ├── controller/   endpoints REST
+│       │   ├── dto/          contratos de entrada/salida
+│       │   ├── exception/    traducción de errores
+│       │   ├── middleware/   filtro JWT
+│       │   ├── model/        entidades JPA
+│       │   ├── repository/   acceso a datos
+│       │   ├── service/      reglas y autorización contextual
+│       │   └── utils/        utilidades
+│       └── test/             pruebas unitarias actuales
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── scripts/
+│   └── src/
+│       ├── api/              cliente HTTP por dominio
+│       ├── app/components/   navegación y componentes
+│       ├── app/hooks/        lógica reutilizable
+│       ├── app/views/        pantallas por módulo
+│       └── styles/           CSS global/aislado
+├── database/
+│   ├── setup_db.sh
+│   └── 01_schema.sql … 29_seguimiento_dece.sql
+├── docs/                     manuales e informes
+├── render.yaml               plantilla parcial de despliegue
+└── README.md</pre>
+    <h2>3.1 Convenciones</h2>
+    <ul>
+      <li>El código backend usa el paquete raíz <code>ec.edu.bellini.sagab</code>.</li>
+      <li>Los endpoints de aplicación empiezan con <code>/api</code>.</li>
+      <li>La interfaz utiliza importación diferida de vistas para separar chunks.</li>
+      <li>Los cambios estructurales de datos deben agregarse como scripts idempotentes y probarse en una base limpia.</li>
+      <li>Los datos demo o personales nunca deben ejecutarse automáticamente en producción.</li>
+    </ul>
+  </section>
+
+  <section id="backend" class="chapter">
+    <h1>4. Arquitectura del backend</h1>
+    <h2>4.1 Capas</h2>
+    <table>
+      <thead><tr><th>Capa</th><th>Función</th><th>Regla de mantenimiento</th></tr></thead>
+      <tbody>
+        <tr><td>Controller</td><td>Mapea HTTP, valida DTO, obtiene identidad y define rol base.</td><td>No colocar consultas complejas ni decisiones de propiedad.</td></tr>
+        <tr><td>DTO</td><td>Define contratos y validaciones de entrada/salida.</td><td>No exponer entidades JPA directamente.</td></tr>
+        <tr><td>Service</td><td>Aplica transacciones, reglas, ownership, archivos, mensajes y reportes.</td><td>Es la autoridad de negocio; validar toda referencia recibida.</td></tr>
+        <tr><td>Repository</td><td>Consultas JPA o nativas optimizadas.</td><td>Incluir filtros de activo/alcance y evitar N+1.</td></tr>
+        <tr><td>Model</td><td>Mapea tablas, relaciones, enumeraciones y columnas.</td><td>Mantener sincronía exacta con scripts y <code>ddl-auto: validate</code>.</td></tr>
+        <tr><td>Config/middleware</td><td>Seguridad, CORS, storage, secretos y tareas programadas.</td><td>Los valores operativos deben provenir del entorno.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4.2 Manejo de errores</h2>
+    <p>Los errores de negocio y validación se convierten a respuestas HTTP mediante el paquete <code>exception</code>. El servidor tiene <code>server.error.include-stacktrace=never</code>, por lo que una respuesta no debe revelar SQL, rutas, clases ni secretos. El frontend busca el campo <code>mensaje</code>; si no existe, presenta el estado HTTP.</p>
+    <table>
+      <thead><tr><th>Estado</th><th>Interpretación operativa</th></tr></thead>
+      <tbody>
+        <tr><td>400</td><td>Solicitud inválida, dato fuera de rango o regla de negocio incumplida.</td></tr>
+        <tr><td>401</td><td>Token ausente, inválido o expirado. El cliente limpia la sesión activa.</td></tr>
+        <tr><td>403</td><td>Rol o propiedad insuficiente.</td></tr>
+        <tr><td>404</td><td>Recurso inexistente o no visible para esa identidad.</td></tr>
+        <tr><td>409</td><td>Conflicto o duplicado lógico.</td></tr>
+        <tr><td>413</td><td>Archivo o petición demasiado grande, según infraestructura/configuración.</td></tr>
+        <tr><td>500</td><td>Error no controlado; correlacionar hora y usuario con logs sin entregar detalles internos al cliente.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4.3 Procesos programados</h2>
+    <table>
+      <thead><tr><th>Proceso</th><th>Programación</th><th>Acción</th></tr></thead>
+      <tbody>
+        <tr><td>Obligaciones vencidas</td><td>Al arrancar y cada día a las 02:00.</td><td>Cambia obligaciones pendientes cuya fecha venció a <code>VENCIDO</code>.</td></tr>
+        <tr><td>Partición de auditoría</td><td>Al arrancar y el día 1 de cada mes a las 03:00.</td><td>Crea preventivamente la partición mensual necesaria.</td></tr>
+      </tbody>
+    </table>
+    <p>La zona horaria JDBC está configurada como <code>America/Guayaquil</code>. Debe alinearse con la zona del contenedor y de PostgreSQL para evitar cortes de fecha inconsistentes.</p>
+  </section>
+
+  <section id="frontend" class="chapter">
+    <h1>5. Arquitectura del frontend</h1>
+    <h2>5.1 Arranque y sesión</h2>
+    <p><code>App.tsx</code> recupera la sesión con <code>/api/auth/me</code>, fuerza la pantalla de cambio de clave cuando corresponde y elige la ruta inicial según el primer rol recibido. El token se guarda en <code>sessionStorage</code> bajo <code>sagab_token</code>; por tanto no se comparte entre sesiones de navegador y se elimina al cerrar sesión o recibir 401.</p>
+    <div class="callout warning"><strong>Decisión actual.</strong> No se utiliza refresh token en el flujo activo, aunque existe una tabla de base para ello. Al vencer el JWT de 30 minutos, la persona debe autenticarse otra vez.</div>
+
+    <h2>5.2 Rutas y perfiles</h2>
+    <table>
+      <thead><tr><th>Ruta</th><th>Vista</th><th>Roles de navegación</th></tr></thead>
+      <tbody>
+        <tr><td><code>/dashboard</code></td><td>Panel</td><td>ADMIN, DOCENTE, AUDITOR</td></tr>
+        <tr><td><code>/matricula</code></td><td>Matrícula</td><td>ADMIN</td></tr>
+        <tr><td><code>/grades</code></td><td>Académico</td><td>ADMIN, DOCENTE</td></tr>
+        <tr><td><code>/attendance</code></td><td>Asistencia</td><td>ADMIN, DOCENTE</td></tr>
+        <tr><td><code>/calendar</code></td><td>Calendario</td><td>ADMIN, DOCENTE, DECE</td></tr>
+        <tr><td><code>/messages</code></td><td>Mensajes institucionales</td><td>ADMIN</td></tr>
+        <tr><td><code>/tareas</code></td><td>Deberes</td><td>DOCENTE</td></tr>
+        <tr><td><code>/financial</code></td><td>Financiero</td><td>ADMIN</td></tr>
+        <tr><td><code>/personal</code></td><td>Personal</td><td>ADMIN</td></tr>
+        <tr><td><code>/deceSeguimiento</code></td><td>Seguimientos</td><td>DECE</td></tr>
+        <tr><td><code>/deceAlertas</code></td><td>Alertas de asistencia</td><td>DECE</td></tr>
+        <tr><td><code>/auditoria</code></td><td>Auditoría</td><td>AUDITOR</td></tr>
+        <tr><td><code>/parent</code></td><td>Portal familiar integrado</td><td>REPRESENTANTE, ESTUDIANTE</td></tr>
+      </tbody>
+    </table>
+    <p>Las rutas usan guardas visuales y redirección, pero la autorización real debe mantenerse en el backend. Representante y Estudiante utilizan un layout propio; no usan el Sidebar institucional.</p>
+
+    <h2>5.3 Cliente HTTP</h2>
+    <ul>
+      <li><code>api()</code>: JSON, agrega Bearer y normaliza errores.</li>
+      <li><code>apiForm()</code>: <code>FormData</code>; no fija manualmente Content-Type para conservar el boundary.</li>
+      <li><code>apiBlob()</code>: reportes/descargas autenticadas.</li>
+      <li>Un 401 con token previo dispara <code>sagab:sesion-expirada</code>.</li>
+      <li>La URL base proviene de <code>VITE_API_URL</code>, con fallback <code>http://localhost:8080</code>.</li>
+    </ul>
+    <h2>5.4 Compilación</h2>
+    <p>Las vistas son chunks diferidos. Vite desactiva mapas de fuente de producción y separa algunas dependencias pesadas. Se sustituyó el CSS Bootstrap completo de aproximadamente 280 KB por <code>forms-scoped.css</code> y las fuentes Inter se limitaron a Latin; el directorio de producción bajó aproximadamente de 3,2 MB a 2,2 MB. El chunk de gráficos sigue cerca de 553 KB antes de gzip, pero solo se solicita al abrir el panel.</p>
+    <div class="callout warning"><strong>Medición Lighthouse.</strong> No evaluar <code>npm run dev</code> con extensiones del navegador activas. La captura de referencia con puntuación 45 indicaba interferencia de extensiones. La medición válida debe hacerse contra el build de producción, en incógnito o en un perfil limpio, y repetirse varias veces.</div>
+  </section>
+
+  <section id="datos" class="chapter">
+    <h1>6. Base de datos y modelo de información</h1>
+    <h2>6.1 Esquemas y grupos de tablas</h2>
+    <table>
+      <thead><tr><th>Dominio</th><th>Tablas principales</th><th>Relación central</th></tr></thead>
+      <tbody>
+        <tr><td>Identidad</td><td><code>rol</code>, <code>permiso</code>, <code>rol_permiso</code>, <code>usuario</code>, <code>usuario_rol</code>, <code>refresh_token</code></td><td>Usuario recibe uno o más roles; refresh_token no se usa en el flujo actual.</td></tr>
+        <tr><td>Estructura académica</td><td><code>periodo_academico</code>, <code>paralelo</code>, <code>materia</code>, <code>docente</code>, <code>asignacion_docente</code></td><td>Asignación = docente + materia + paralelo + periodo.</td></tr>
+        <tr><td>Familia</td><td><code>representante</code>, <code>estudiante</code></td><td>Estudiante se vincula a usuario, representante y paralelo.</td></tr>
+        <tr><td>Académico</td><td><code>calificacion</code>, <code>asistencia</code>, <code>incidencia_disciplinaria</code></td><td>Notas y asistencia enlazan estudiante con asignación/paralelo.</td></tr>
+        <tr><td>Deberes y recursos</td><td><code>tarea</code>, <code>tarea_adjunto</code>, <code>entrega_tarea</code>, <code>recurso_academico</code></td><td>Docente publica por asignación; estudiante entrega por tarea.</td></tr>
+        <tr><td>Finanzas</td><td><code>rubro</code>, <code>obligacion_pago</code>, <code>pago</code></td><td>Obligación pertenece a estudiante/rubro; pagos aplican a obligación.</td></tr>
+        <tr><td>Comunicación</td><td><code>mensaje</code>, <code>mensaje_destinatario</code>, <code>notificacion</code></td><td>Separación de contenido, destinatarios y lectura.</td></tr>
+        <tr><td>Calendario</td><td><code>evento_calendario</code>, <code>evento_calendario_adjunto</code></td><td>Evento institucional con estado, rango y adjuntos.</td></tr>
+        <tr><td>DECE</td><td><code>seguimiento_dece</code>, <code>seguimiento_dece_historial</code>, <code>seguimiento_dece_mensaje</code></td><td>Caso por estudiante con línea de tiempo y comunicación.</td></tr>
+        <tr><td>Auditoría</td><td><code>auditoria.registro_cambio</code>, <code>auditoria.evento_seguridad</code></td><td>Cambios before/after y sucesos de seguridad.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6.2 Relaciones y restricciones importantes</h2>
+    <div class="diagram">representante 1 ─── * estudiante * ─── 1 paralelo
+                                  │
+                                  ├── * calificacion * ── 1 asignacion_docente
+                                  ├── * asistencia
+                                  ├── * obligacion_pago 1 ── * pago
+                                  ├── * entrega_tarea * ── 1 tarea
+                                  └── * seguimiento_dece
+
+docente 1 ─── * asignacion_docente * ─── 1 materia
+                         │
+                         ├── 1 paralelo
+                         ├── * tarea
+                         └── * recurso_academico</div>
+    <ul>
+      <li>Asignación única por docente/materia/paralelo/periodo, según el esquema.</li>
+      <li>Calificación única por estudiante/asignación/parcial.</li>
+      <li>Índices parciales aceleran usuarios no activos, estudiantes activos, notas en riesgo, ausencias injustificadas, mora y pagos en revisión.</li>
+      <li>Un trigger valida que la suma de pagos aprobados no supere la obligación.</li>
+      <li>Las tablas auditadas usan triggers de cambio; las tablas de auditoría bloquean UPDATE y DELETE.</li>
+      <li><code>registro_cambio</code> está particionada por mes e incluye una partición default.</li>
+    </ul>
+
+    <h2>6.3 Instalación del esquema</h2>
+    <p><code>database/setup_db.sh</code> crea la base local si hace falta y aplica <strong>23 scripts estructurales</strong>. El orden no es el orden numérico literal: <code>09_estudiante_usuario.sql</code> debe ejecutarse antes de <code>07_usuario_username.sql</code>; el script ya contiene el orden verificado.</p>
+    <div class="callout danger"><strong>No ejecutar datos demo en producción.</strong> Los scripts 05, 08, 11 y 24 son datos/cuentas de prueba. Los scripts 07 y 10 contienen cuentas personales y deben revisarse, sanearse o sustituirse por un aprovisionamiento controlado.</div>
+    <p>El proyecto no utiliza Flyway ni Liquibase. La versión instalada debe registrarse externamente y cada cambio debe probarse contra una copia y una base vacía.</p>
+
+    <h2>6.4 Roles de base de datos</h2>
+    <table>
+      <thead><tr><th>Rol</th><th>Finalidad</th><th>Recomendación</th></tr></thead>
+      <tbody>
+        <tr><td><code>sagab_app</code></td><td>Conexión normal de aplicación; CRUD en negocio.</td><td>Rotar contraseña semilla y limitar red.</td></tr>
+        <tr><td><code>sagab_auditor</code></td><td>Consulta controlada de auditoría.</td><td>No usar como cuenta del backend normal.</td></tr>
+        <tr><td><code>sagab_readonly</code></td><td>BI/reportes de solo lectura.</td><td>Entregar solo a procesos autorizados.</td></tr>
+      </tbody>
+    </table>
+    <p>No hay Row Level Security de PostgreSQL; el aislamiento contextual se implementa en servicios y consultas. Por ello las pruebas de autorización son un control crítico.</p>
+  </section>
+
+  <section id="seguridad" class="chapter">
+    <h1>7. Seguridad y autorización</h1>
+    <h2>7.1 Autenticación</h2>
+    <ul>
+      <li>API stateless, sin sesión HTTP de servidor.</li>
+      <li>Contraseñas con BCrypt, factor de costo 12.</li>
+      <li>JWT HMAC-SHA256 con duración de 30 minutos.</li>
+      <li>Bloqueo después de 5 intentos fallidos durante 15 minutos.</li>
+      <li>Cambio obligatorio de la clave temporal.</li>
+      <li>Registro de acceso exitoso/fallido en eventos de seguridad.</li>
+    </ul>
+    <p><code>SecretsGuard</code> impide arrancar si no existen las variables <code>SAGAB_DB_PASSWORD</code> y <code>SAGAB_JWT_SECRET</code>, evitando usar silenciosamente los valores de ejemplo.</p>
+
+    <h2>7.2 Superficie pública</h2>
+    <table>
+      <thead><tr><th>Recurso</th><th>Motivo</th><th>Control compensatorio</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /api/auth/login</code></td><td>Entrada al sistema.</td><td>Validación, bloqueo y auditoría.</td></tr>
+        <tr><td><code>GET /api/storage/local/{token}</code></td><td>Permite abrir/mostrar un archivo sin poder adjuntar Bearer desde ciertos contextos.</td><td>Token HMAC firmado, corto y emitido solo tras autorizar el recurso.</td></tr>
+      </tbody>
+    </table>
+    <p>Todo otro endpoint requiere autenticación.</p>
+
+    <h2>7.3 Autorización por capas</h2>
+    <table>
+      <thead><tr><th>Rol de aplicación</th><th>Alcance</th><th>Restricción principal</th></tr></thead>
+      <tbody>
+        <tr><td><code>ADMIN</code></td><td>Administración y operación institucional.</td><td>Acceso a matrícula, académico, asistencia, calendario, mensajes, finanzas y personal.</td></tr>
+        <tr><td><code>DOCENTE</code></td><td>Gestión académica de sus asignaciones.</td><td>Limitado a sus materias y paralelos.</td></tr>
+        <tr><td><code>DECE</code></td><td>Seguimiento y alertas estudiantiles.</td><td>Acceso especializado a información de acompañamiento.</td></tr>
+        <tr><td><code>AUDITOR</code></td><td>Consulta de trazabilidad y panel.</td><td>Sin operación académica.</td></tr>
+        <tr><td><code>REPRESENTANTE</code></td><td>Consulta de representados.</td><td>Limitado a estudiantes vinculados.</td></tr>
+        <tr><td><code>ESTUDIANTE</code></td><td>Consulta y participación propia.</td><td>Limitado a su identidad estudiantil.</td></tr>
+      </tbody>
+    </table>
+    <ol>
+      <li><strong>SecurityConfig:</strong> reglas generales por ruta/método.</li>
+      <li><strong>@PreAuthorize:</strong> roles permitidos en controlador.</li>
+      <li><strong>Servicio:</strong> propiedad y alcance: docente asignado, estudiante propio, representado vinculado, remitente autorizado.</li>
+      <li><strong>Base:</strong> claves foráneas, unicidad, checks y triggers de integridad.</li>
+    </ol>
+    <div class="callout success"><strong>Alcance corregido.</strong> Docente ya no recibe promedio, rendimiento ni mora institucional; sus ausencias se limitan a paralelos activos asignados. <code>/dashboard/promedio</code> y <code>/finanzas/mora</code> quedan reservados a Administración y Auditoría según el endpoint.</div>
+
+    <h2>7.4 Cabeceras, CORS y CSRF</h2>
+    <ul>
+      <li>CORS acepta solo orígenes exactos de <code>SAGAB_CORS</code>, métodos GET/POST/PUT/PATCH/DELETE/OPTIONS y cabeceras Authorization/Content-Type.</li>
+      <li><code>X-Frame-Options: DENY</code> reduce clickjacking.</li>
+      <li><code>X-Content-Type-Options</code> está habilitado.</li>
+      <li>HSTS se emite para un año e incluye subdominios; solo tiene efecto real sobre HTTPS.</li>
+      <li>CSRF se desactiva porque la API usa Bearer y no cookie de autenticación.</li>
+    </ul>
+
+    <h2>7.5 Recomendaciones para producción</h2>
+    <ul>
+      <li>HTTPS obligatorio, TLS moderno y redirección HTTP→HTTPS en proxy/plataforma.</li>
+      <li>Secretos en un gestor, rotación, acceso mínimo y nunca en Git/logs.</li>
+      <li>Base y bucket privados; firewall y credenciales distintas por entorno.</li>
+      <li>Agregar Content-Security-Policy, Referrer-Policy y Permissions-Policy tras pruebas.</li>
+      <li>Protección de tasa para login y endpoints costosos, además del bloqueo por cuenta.</li>
+      <li>Antivirus/escaneo asíncrono de archivos si se aceptan documentos reales.</li>
+      <li>Prueba OWASP, revisión de dependencias y modelo de amenazas antes del contrato.</li>
+    </ul>
+  </section>
+
+  <section id="reglas" class="chapter">
+    <h1>8. Reglas de negocio relevantes</h1>
+    <table>
+      <thead><tr><th>Módulo</th><th>Reglas actuales</th></tr></thead>
+      <tbody>
+        <tr><td>Matrícula</td><td>Cédula ecuatoriana de 10 dígitos; edad normal 3–20 con advertencia para BGU; cuatro controles documentales; representante existente puede reutilizarse; se crean credenciales temporales.</td></tr>
+        <tr><td>Asignación</td><td>Una relación define docente, materia, paralelo y periodo. El docente puede acumular varias.</td></tr>
+        <tr><td>Notas</td><td>Escala 0–10; Tarea 20 %, Clase 20 %, Examen 60 %; aprobación ≥7; un registro por estudiante/asignación/parcial.</td></tr>
+        <tr><td>Asistencia</td><td>Fecha no futura; estados de dominio incluyen presente, ausencias y atraso; alerta desde 3 ausencias injustificadas consecutivas.</td></tr>
+        <tr><td>Deberes</td><td>Parcial 1–3; entrega/reemplazo antes del vencimiento; revisión docente con nota 1–10 opcional y retroalimentación; acceso por asignación/representado.</td></tr>
+        <tr><td>Calendario</td><td>Consulta máxima 370 días; no administradores ven publicados/cancelados y programados cuando llega la fecha; deberes pendientes solo para estudiante activo del paralelo; recursos por alcance.</td></tr>
+        <tr><td>Mensajes</td><td>Asunto ≤150, cuerpo ≤10.000; destinatarios determinados por rol/asignación; registro individual de lectura.</td></tr>
+        <tr><td>Finanzas</td><td>Obligación por estudiante/rubro; pago aprobado no puede exceder saldo; transferencia requiere evidencia; hash SHA-256 detecta repetición para la obligación; vencimiento automático.</td></tr>
+        <tr><td>DECE</td><td>Estados ACTIVO, EN_OBSERVACION, INTERVENCION y RESUELTO; archivo lógico; historial append; observación ≤2.000.</td></tr>
+        <tr><td>Auditoría</td><td>Cambios con before/after JSONB y eventos de seguridad; actualización y eliminación bloqueadas.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="api" class="chapter">
+    <h1>9. Catálogo de API</h1>
+    <p>Prefijo base: <code>/api</code>. Salvo login y descarga local firmada, se requiere Bearer JWT. La tabla resume el contrato de rutas; los DTO Java son la fuente exacta de campos, tipos y validaciones.</p>
+
+    <h2>9.1 Identidad y catálogos</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /auth/login</code></td><td>Público</td><td>Autenticar y devolver sesión/JWT.</td></tr>
+        <tr><td><code>GET /auth/me</code></td><td>Autenticado</td><td>Reconstruir la sesión vigente.</td></tr>
+        <tr><td><code>POST /auth/cambiar-clave</code></td><td>Autenticado</td><td>Cambiar clave con validación de la actual.</td></tr>
+        <tr><td><code>GET /paralelos</code></td><td>ADMIN, DECE, AUDITOR</td><td>Catálogo de paralelos.</td></tr>
+        <tr><td><code>GET /estudiantes/paralelo/{id}</code></td><td>DOCENTE, ADMIN, DECE</td><td>Lista por paralelo con alcance de servicio.</td></tr>
+        <tr><td><code>GET /estudiantes/mios</code></td><td>REPRESENTANTE, ESTUDIANTE</td><td>Representados o identidad estudiantil propia.</td></tr>
+        <tr><td><code>GET /estudiantes/buscar</code></td><td>ADMIN, DOCENTE</td><td>Búsqueda limitada.</td></tr>
+        <tr><td><code>GET /materias/estudiante/{id}</code></td><td>ADMIN, REPRESENTANTE, ESTUDIANTE</td><td>Materias visibles para el estudiante.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.2 Personal, matrícula y asignaciones</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /personal</code></td><td>ADMIN</td><td>Crear cuentas Docente, DECE o Auditor.</td></tr>
+        <tr><td><code>GET /personal</code></td><td>ADMIN</td><td>Listar personal operativo.</td></tr>
+        <tr><td><code>POST /matriculas</code></td><td>ADMIN</td><td>Matricular estudiante y vincular familia/cuentas.</td></tr>
+        <tr><td><code>GET /asignaciones/mias</code></td><td>DOCENTE, ADMIN</td><td>Asignaciones propias o todas para Administración.</td></tr>
+        <tr><td><code>GET /asignaciones/catalogos</code></td><td>ADMIN</td><td>Docentes, materias, paralelos y periodos para formulario.</td></tr>
+        <tr><td><code>POST /asignaciones</code></td><td>ADMIN</td><td>Crear asignación.</td></tr>
+        <tr><td><code>PUT /asignaciones/{id}</code></td><td>ADMIN</td><td>Editar asignación.</td></tr>
+        <tr><td><code>DELETE /asignaciones/{id}</code></td><td>ADMIN</td><td>Eliminar asignación.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.3 Calificaciones y asistencia</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /calificaciones</code></td><td>DOCENTE, ADMIN</td><td>Guardar lote/registro de notas.</td></tr>
+        <tr><td><code>GET /calificaciones/asignacion/{id}/parcial/{p}</code></td><td>DOCENTE, ADMIN</td><td>Planilla por asignación/parcial.</td></tr>
+        <tr><td><code>GET /calificaciones/estudiante/{id}</code></td><td>DOCENTE, ADMIN, REP., EST.</td><td>Notas del estudiante bajo control de propiedad.</td></tr>
+        <tr><td><code>GET /calificaciones/buscar</code></td><td>DOCENTE, ADMIN</td><td>Búsqueda avanzada.</td></tr>
+        <tr><td><code>GET /calificaciones/{idEstudiante}/papeleta</code></td><td>DOCENTE, ADMIN</td><td>Generar papeleta PDF.</td></tr>
+        <tr><td><code>DELETE /calificaciones/{id}</code></td><td>DOCENTE, ADMIN</td><td>Eliminar si el alcance lo permite.</td></tr>
+        <tr><td><code>POST /asistencia</code></td><td>DOCENTE, ADMIN</td><td>Guardar asistencia.</td></tr>
+        <tr><td><code>GET /asistencia/paralelo/{id}</code></td><td>DOCENTE, ADMIN, DECE</td><td>Consultar por paralelo/fecha.</td></tr>
+        <tr><td><code>GET /asistencia/paralelo/{id}/consecutivas</code></td><td>DOCENTE, ADMIN, DECE</td><td>Ausencias injustificadas consecutivas.</td></tr>
+        <tr><td><code>GET /asistencia/estudiante/{id}</code></td><td>DOCENTE, ADMIN, REP., EST.</td><td>Historial bajo alcance.</td></tr>
+        <tr><td><code>GET /asistencia/reporte</code></td><td>ADMIN, DOCENTE, AUDITOR, DECE</td><td>Reporte institucional; el docente queda limitado a sus paralelos.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.4 Deberes y recursos</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /tareas</code>, <code>PUT /tareas/{id}</code>, <code>DELETE /tareas/{id}</code></td><td>DOCENTE</td><td>Ciclo de vida de tareas propias.</td></tr>
+        <tr><td><code>GET /tareas/asignacion/{id}</code></td><td>DOCENTE, ADMIN</td><td>Lista por asignación.</td></tr>
+        <tr><td><code>GET /tareas/{id}/entregas</code></td><td>DOCENTE, ADMIN</td><td>Entregas de una tarea.</td></tr>
+        <tr><td><code>GET /tareas/estudiante/{id}</code></td><td>DOCENTE, ADMIN, REP., EST.</td><td>Deberes por estudiante con ownership.</td></tr>
+        <tr><td><code>POST /tareas/{idTarea}/estudiante/{id}/entrega</code></td><td>REPRESENTANTE, ESTUDIANTE</td><td>Subir/reemplazar entrega multipart.</td></tr>
+        <tr><td><code>POST /tareas/entregas/{id}/revisar</code></td><td>DOCENTE</td><td>Nota y retroalimentación.</td></tr>
+        <tr><td><code>GET /tareas/entregas/{id}/descarga</code></td><td>DOCENTE, ADMIN, REP., EST.</td><td>Descarga autorizada.</td></tr>
+        <tr><td><code>GET/POST /tareas/{id}/adjuntos</code></td><td>Lectura autorizada / DOCENTE</td><td>Listar o adjuntar material.</td></tr>
+        <tr><td><code>GET/DELETE /tareas/adjuntos/{id}</code></td><td>Lectura autorizada / DOCENTE</td><td>Descargar o eliminar adjunto.</td></tr>
+        <tr><td><code>GET /recursos-academicos/asignacion/{id}</code></td><td>ADMIN, DOCENTE, REP., EST.</td><td>Listar recursos visibles.</td></tr>
+        <tr><td><code>POST /recursos-academicos/archivo</code></td><td>DOCENTE</td><td>Crear recurso de archivo.</td></tr>
+        <tr><td><code>POST /recursos-academicos/link</code></td><td>DOCENTE</td><td>Crear recurso de enlace.</td></tr>
+        <tr><td><code>PATCH/DELETE /recursos-academicos/{id}</code></td><td>DOCENTE</td><td>Editar metadatos o eliminar recurso propio.</td></tr>
+        <tr><td><code>GET /recursos-academicos/{id}/descarga</code></td><td>ADMIN, DOCENTE, REP., EST.</td><td>Descarga bajo alcance.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.5 Calendario</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /calendario</code></td><td>Todos los roles</td><td>Eventos, feriados y capas visibles por rango/rol.</td></tr>
+        <tr><td><code>POST /calendario</code></td><td>ADMIN</td><td>Crear evento.</td></tr>
+        <tr><td><code>PUT /calendario/{id}</code></td><td>ADMIN</td><td>Editar evento.</td></tr>
+        <tr><td><code>POST /calendario/{id}/duplicar</code></td><td>ADMIN</td><td>Duplicar evento.</td></tr>
+        <tr><td><code>DELETE /calendario/{id}</code></td><td>ADMIN</td><td>Eliminar evento.</td></tr>
+        <tr><td><code>POST /calendario/{id}/adjuntos</code></td><td>ADMIN</td><td>Adjuntar multipart.</td></tr>
+        <tr><td><code>GET /calendario/adjuntos/{id}/descarga</code></td><td>Todos los roles</td><td>Descarga después de verificar visibilidad.</td></tr>
+        <tr><td><code>DELETE /calendario/adjuntos/{id}</code></td><td>ADMIN</td><td>Eliminar adjunto.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.6 Mensajes, notificaciones y panel</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /mensajes/mias</code></td><td>Autenticado</td><td>Bandeja recibida.</td></tr>
+        <tr><td><code>POST /mensajes</code></td><td>ADMIN</td><td>Mensaje directo administrativo.</td></tr>
+        <tr><td><code>GET /mensajes/enviados</code></td><td>Autenticado</td><td>Historial emitido bajo remitente.</td></tr>
+        <tr><td><code>POST /mensajes/broadcast</code></td><td>ADMIN, DOCENTE</td><td>Envío grupal con restricciones.</td></tr>
+        <tr><td><code>POST /mensajes/institucionales</code></td><td>ADMIN</td><td>Envío masivo/privado a docentes.</td></tr>
+        <tr><td><code>POST /mensajes/{id}/leido</code></td><td>Autenticado</td><td>Marcar lectura propia.</td></tr>
+        <tr><td><code>GET /notificaciones/mias</code></td><td>Autenticado</td><td>Notificaciones del usuario.</td></tr>
+        <tr><td><code>POST /notificaciones/{id}/leida</code></td><td>Autenticado</td><td>Marcar notificación propia.</td></tr>
+        <tr><td><code>GET /dashboard/resumen</code></td><td>ADMIN, DOCENTE, AUDITOR</td><td>Indicadores; requiere corrección de scope.</td></tr>
+        <tr><td><code>GET /dashboard/promedio</code></td><td>ADMIN, DOCENTE, AUDITOR</td><td>Detalle/promedio; requiere corrección de scope.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.7 Finanzas</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /finanzas/estudiante/{id}</code></td><td>ADMIN, REP., EST.</td><td>Obligaciones y pagos propios/autorizados.</td></tr>
+        <tr><td><code>GET /finanzas/mora</code></td><td>ADMIN, DOCENTE, AUDITOR, DECE</td><td>Listado institucional actual; alcance a endurecer.</td></tr>
+        <tr><td><code>POST /finanzas/mora/{id}/comunicacion</code></td><td>ADMIN, DOCENTE</td><td>Recordatorio/comunicación actual; revisar necesidad docente.</td></tr>
+        <tr><td><code>POST /finanzas/pagos</code></td><td>ADMIN</td><td>Registrar pago directo.</td></tr>
+        <tr><td><code>POST /finanzas/obligaciones</code></td><td>ADMIN</td><td>Crear obligación.</td></tr>
+        <tr><td><code>POST /finanzas/pagos/transferencia</code></td><td>REP., EST.</td><td>Reportar transferencia con comprobante.</td></tr>
+        <tr><td><code>GET /finanzas/rubros</code></td><td>ADMIN, REP., EST.</td><td>Catálogo de rubros visibles.</td></tr>
+        <tr><td><code>GET /finanzas/pagos/revision</code></td><td>ADMIN</td><td>Cola de transferencias.</td></tr>
+        <tr><td><code>POST /finanzas/pagos/{id}/aprobar</code></td><td>ADMIN</td><td>Aprobar tras validar.</td></tr>
+        <tr><td><code>POST /finanzas/pagos/{id}/rechazar</code></td><td>ADMIN</td><td>Rechazar con motivo.</td></tr>
+        <tr><td><code>GET /finanzas/pagos/{id}/comprobante</code></td><td>ADMIN, REP., EST.</td><td>Abrir evidencia bajo ownership.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9.8 DECE y auditoría</h2>
+    <table>
+      <thead><tr><th>Método y ruta</th><th>Rol</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /dece/seguimientos/estudiantes</code></td><td>DECE</td><td>Buscar estudiantes activos.</td></tr>
+        <tr><td><code>GET/POST /dece/seguimientos</code></td><td>DECE</td><td>Listar o crear seguimiento.</td></tr>
+        <tr><td><code>GET/PUT/DELETE /dece/seguimientos/{id}</code></td><td>DECE</td><td>Detalle, actualización y archivo lógico.</td></tr>
+        <tr><td><code>GET /dece/seguimientos/{id}/historial</code></td><td>DECE</td><td>Línea de tiempo.</td></tr>
+        <tr><td><code>POST/GET /dece/seguimientos/{id}/mensajes</code></td><td>DECE</td><td>Enviar y consultar comunicaciones del caso.</td></tr>
+        <tr><td><code>GET /auditoria/cambios</code></td><td>AUDITOR, ADMIN</td><td>Consulta paginada de cambios.</td></tr>
+        <tr><td><code>GET /auditoria/eventos</code></td><td>AUDITOR, ADMIN</td><td>Eventos de seguridad.</td></tr>
+        <tr><td><code>GET /auditoria/historial/{tabla}/{idFila}</code></td><td>AUDITOR, ADMIN</td><td>Trazabilidad de una fila.</td></tr>
+        <tr><td><code>GET /storage/local/{token}</code></td><td>Token firmado</td><td>Descarga local temporal sin Bearer.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="archivos" class="chapter">
+    <h1>10. Almacenamiento y archivos</h1>
+    <h2>10.1 Selección de proveedor</h2>
+    <p>Si están presentes todas las variables esenciales S3 —endpoint, bucket, access key y secret key— se usa el proveedor compatible. Si todas faltan, se usa almacenamiento local. Una configuración parcial debe rechazarse para evitar escribir archivos en un destino inesperado.</p>
+    <table>
+      <thead><tr><th>Modo</th><th>Uso</th><th>Riesgo/condición</th></tr></thead>
+      <tbody>
+        <tr><td>Local</td><td>Desarrollo o servidor con volumen persistente.</td><td>Un filesystem efímero pierde adjuntos al desplegar; requiere volumen y respaldo.</td></tr>
+        <tr><td>S3 compatible</td><td>Producción distribuida: AWS S3, R2 u otro compatible.</td><td>Bucket privado, CORS del bucket, política mínima, cifrado y lifecycle.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>10.2 Controles</h2>
+    <ul>
+      <li>Claves/nombres internos aleatorios y defensa contra recorrido de rutas.</li>
+      <li>Comprobación de extensión, MIME declarado y firmas/magic bytes.</li>
+      <li>Autorización antes de emitir descarga.</li>
+      <li>En modo local, URL HMAC firmada con caducidad aproximada de 10 minutos.</li>
+      <li>Hash SHA-256 del comprobante financiero para detectar duplicado en una obligación.</li>
+    </ul>
+    <h2>10.3 Límites</h2>
+    <table>
+      <thead><tr><th>Tipo</th><th>Límite lógico</th><th>Configuración</th></tr></thead>
+      <tbody>
+        <tr><td>Entrega/deber y calendario</td><td>15 MB por archivo</td><td><code>SAGAB_UPLOAD_MAX_MB_DEBERES</code></td></tr>
+        <tr><td>Comprobante</td><td>8 MB</td><td><code>SAGAB_UPLOAD_MAX_MB_COMPROBANTE</code></td></tr>
+        <tr><td>Recurso académico</td><td>100 MB</td><td><code>SAGAB_UPLOAD_MAX_MB_RECURSOS</code></td></tr>
+        <tr><td>Multipart global</td><td>100 MB por archivo/petición por defecto</td><td><code>SAGAB_UPLOAD_MAX_MB</code></td></tr>
+        <tr><td>Adjuntos de evento</td><td>10 archivos</td><td>Regla de servicio</td></tr>
+      </tbody>
+    </table>
+    <p>El límite global debe ser igual o mayor al máximo lógico. El proxy/CDN también debe aceptar el tamaño necesario; si su límite es menor, responderá antes que Spring.</p>
+  </section>
+
+  <section id="configuracion" class="chapter">
+    <h1>11. Configuración y variables</h1>
+    <h2>11.1 Backend</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Obligatoria</th><th>Descripción / ejemplo no secreto</th></tr></thead>
+      <tbody>
+        <tr><td><code>SAGAB_DB_HOST</code></td><td>Producción</td><td>Host PostgreSQL; local por defecto.</td></tr>
+        <tr><td><code>SAGAB_DB_PORT</code></td><td>No</td><td>5432 por defecto.</td></tr>
+        <tr><td><code>SAGAB_DB_NAME</code></td><td>Producción</td><td><code>sagab</code> por defecto.</td></tr>
+        <tr><td><code>SAGAB_DB_USER</code></td><td>Producción</td><td>Usuario de aplicación, normalmente <code>sagab_app</code>.</td></tr>
+        <tr><td><code>SAGAB_DB_PASSWORD</code></td><td><strong>Sí</strong></td><td>Secreto de base; SecretsGuard exige presencia.</td></tr>
+        <tr><td><code>SAGAB_JWT_SECRET</code></td><td><strong>Sí</strong></td><td>Al menos 32 bytes aleatorios; generar con <code>openssl rand -base64 48</code>.</td></tr>
+        <tr><td><code>SAGAB_CORS</code></td><td>Producción</td><td>Origen exacto del frontend; admite lista según binding Spring.</td></tr>
+        <tr><td><code>PORT</code></td><td>No</td><td>Puerto HTTP; 8080 por defecto.</td></tr>
+        <tr><td><code>SAGAB_PUBLIC_API_URL</code></td><td>Producción</td><td>URL pública HTTPS usada al formar enlaces.</td></tr>
+        <tr><td><code>SAGAB_STORAGE_LOCAL_DIR</code></td><td>Modo local</td><td>Directorio persistente; default <code>./data/uploads</code>.</td></tr>
+        <tr><td><code>SAGAB_S3_ENDPOINT</code></td><td>Modo S3</td><td>Endpoint del proveedor.</td></tr>
+        <tr><td><code>SAGAB_S3_REGION</code></td><td>Modo S3</td><td>Región; default <code>auto</code>.</td></tr>
+        <tr><td><code>SAGAB_S3_BUCKET</code></td><td>Modo S3</td><td>Bucket privado.</td></tr>
+        <tr><td><code>SAGAB_S3_ACCESS_KEY</code></td><td>Modo S3</td><td>Clave de acceso mínima.</td></tr>
+        <tr><td><code>SAGAB_S3_SECRET_KEY</code></td><td>Modo S3</td><td>Secreto; nunca registrar.</td></tr>
+        <tr><td><code>SAGAB_SMTP_HOST</code></td><td>No</td><td>Servidor SMTP.</td></tr>
+        <tr><td><code>SAGAB_SMTP_USER</code></td><td>Si correo</td><td>Usuario SMTP.</td></tr>
+        <tr><td><code>SAGAB_SMTP_PASS</code></td><td>Si correo</td><td>Secreto SMTP.</td></tr>
+        <tr><td><code>SAGAB_UPLOAD_MAX_MB*</code></td><td>No</td><td>Ajustes de límites descritos en capítulo 10.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>11.2 Frontend</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Momento</th><th>Descripción</th></tr></thead>
+      <tbody>
+        <tr><td><code>VITE_API_URL</code></td><td>Build</td><td>URL pública del backend, sin barra final; ej. <code>https://api.colegio.edu.ec</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>Vite incorpora variables <code>VITE_*</code> en el bundle: nunca colocar secretos allí. El repositorio no contiene actualmente un <code>.env.example</code> operativo aunque algunos textos antiguos lo sugieran; debe crearse uno sin valores sensibles como mejora de mantenimiento.</p>
+  </section>
+
+  <section id="local" class="chapter">
+    <h1>12. Instalación local</h1>
+    <h2>12.1 Prerrequisitos</h2>
+    <ul>
+      <li>Git.</li>
+      <li>Java 17 y Maven 3.9.</li>
+      <li>Node.js 20 LTS y npm.</li>
+      <li>PostgreSQL 15+ con <code>psql</code> y <code>createdb</code> en PATH.</li>
+      <li>Puertos 5173 y 8080 disponibles.</li>
+    </ul>
+
+    <h2>12.2 Preparar PostgreSQL</h2>
+    <pre>cd /ruta/al/proyecto/sagab
+bash database/setup_db.sh</pre>
+    <p>El script supone que el usuario del sistema puede listar y crear bases con las credenciales locales configuradas en PostgreSQL. En un servidor administrado, aplique los scripts con una cuenta de migración y no con la cuenta runtime.</p>
+
+    <h2>12.3 Iniciar backend</h2>
+    <pre>cd backend
+export SAGAB_DB_HOST=localhost
+export SAGAB_DB_PORT=5432
+export SAGAB_DB_NAME=sagab
+export SAGAB_DB_USER=sagab_app
+export SAGAB_DB_PASSWORD='valor-local-seguro'
+export SAGAB_JWT_SECRET="$(openssl rand -base64 48)"
+export SAGAB_CORS=http://localhost:5173
+mvn spring-boot:run</pre>
+    <p>Verifique el arranque en el log y que no aparezcan fallos de validación Hibernate. No copie el secreto generado a documentación, tickets o Git.</p>
+
+    <h2>12.4 Iniciar frontend</h2>
+    <pre>cd frontend
+npm ci
+# Crear manualmente .env con esta línea no secreta:
+# VITE_API_URL=http://localhost:8080
+npm run dev</pre>
+    <p>Abra <code>http://localhost:5173</code>. Para exponer temporalmente en la red local, use <code>npm run dev -- --host 0.0.0.0</code>, ajuste CORS al origen exacto y permita el puerto en firewall. No es una configuración de producción.</p>
+
+    <h2>12.5 Verificación mínima</h2>
+    <ol>
+      <li>Login correcto e incorrecto.</li>
+      <li><code>/api/auth/me</code> conserva sesión al recargar.</li>
+      <li>Cada rol ve su menú y recibe 403 en operaciones ajenas.</li>
+      <li>Consulta de cursos/paralelos y asignaciones.</li>
+      <li>Creación/consulta en un módulo no destructivo de prueba.</li>
+      <li>Subida y descarga de un archivo de prueba permitido.</li>
+      <li>Cerrar sesión elimina el token.</li>
+    </ol>
+  </section>
+
+  <section id="produccion" class="chapter">
+    <h1>13. Despliegue de producción</h1>
+    <h2>13.1 Topología recomendada</h2>
+    <div class="diagram">Internet
+  ▼
+CDN/WAF o proxy TLS
+  ├── colegio.edu.ec      → frontend estático /dist
+  └── api.colegio.edu.ec  → contenedor backend
+                               ├── PostgreSQL privado
+                               ├── bucket S3 privado
+                               └── SMTP
+
+Monitoreo + logs + alertas + copias externas</div>
+
+    <h2>13.2 Backend con Docker</h2>
+    <p>El <code>backend/Dockerfile</code> usa dos etapas: Maven 3.9/Temurin 17 compila el JAR y Temurin 17 JRE Alpine lo ejecuta. El build actual omite pruebas con <code>-DskipTests</code>; la canalización debe ejecutar <code>mvn test</code> antes de construir la imagen.</p>
+    <pre>docker build -t sagab-backend:1.0 ./backend
+docker run --rm -p 8080:8080 \
+  --env-file /ruta-segura/sagab-backend.env \
+  sagab-backend:1.0</pre>
+    <p>El archivo de entorno debe vivir fuera del repositorio y con permisos restringidos. Si se usa almacenamiento local, monte un volumen explícito; preferentemente use S3 compatible.</p>
+
+    <h2>13.3 Frontend estático</h2>
+    <pre>cd frontend
+npm ci
+VITE_API_URL=https://api.colegio.edu.ec npm run build</pre>
+    <p>Publique <code>frontend/dist</code> en un host estático y configure fallback de rutas hacia <code>index.html</code>. La URL API queda embebida en build; un cambio de entorno requiere reconstrucción.</p>
+
+    <h2>13.4 Base y migraciones</h2>
+    <ol>
+      <li>Crear base, roles y secretos rotados.</li>
+      <li>Respaldar antes de cada cambio.</li>
+      <li>Aplicar scripts estructurales en el orden de <code>setup_db.sh</code> con una cuenta de migración.</li>
+      <li>Revisar salida y versión; ejecutar una prueba de arranque con <code>ddl-auto=validate</code>.</li>
+      <li>Desplegar aplicación y ejecutar smoke tests.</li>
+    </ol>
+
+    <h2>13.5 Observación sobre render.yaml</h2>
+    <p>La plantilla actual aprovisiona PostgreSQL y backend en plan gratuito, pero no incluye el frontend y mantiene un placeholder en <code>SAGAB_CORS</code>. Tampoco aplica automáticamente los 24 scripts estructurales. Los planes gratuitos, el disco efímero y la ausencia de SLA no son apropiados para información institucional sin una evaluación y controles adicionales.</p>
+  </section>
+
+  <section id="operacion" class="chapter">
+    <h1>14. Operación, respaldo y recuperación</h1>
+    <h2>14.1 Responsabilidades diarias</h2>
+    <table>
+      <thead><tr><th>Frecuencia</th><th>Control</th></tr></thead>
+      <tbody>
+        <tr><td>Continuo</td><td>Disponibilidad HTTP, errores 5xx, latencia, uso de conexiones, almacenamiento y fallos de login anómalos.</td></tr>
+        <tr><td>Diario</td><td>Estado de backup, jobs de vencimiento, capacidad, errores de storage/SMTP y cola financiera.</td></tr>
+        <tr><td>Semanal</td><td>Revisión de seguridad, cuentas activas, crecimiento de auditoría y restauración de muestra.</td></tr>
+        <tr><td>Mensual</td><td>Partición de auditoría, parches, dependencias, capacidad y revisión de accesos.</td></tr>
+        <tr><td>Por periodo</td><td>Catálogos, asignaciones, políticas de notas, archivo y retención.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>14.2 Política mínima de respaldo</h2>
+    <ul>
+      <li>PostgreSQL: backup diario automático y copias incrementales/PITR si el proveedor lo permite.</li>
+      <li>Archivos: versionado o réplica del bucket/volumen.</li>
+      <li>Secretos/configuración: inventario cifrado y recuperable por dos responsables.</li>
+      <li>Copias fuera del mismo proveedor o zona de fallo.</li>
+      <li>Retención definida por calendario académico, normativa y contrato.</li>
+      <li>Prueba de restauración completa al menos trimestral y antes de cambios mayores.</li>
+    </ul>
+    <p>Ejemplo conceptual; sustituir host, rol y ruta mediante variables seguras y no colocar la contraseña en la línea de comandos:</p>
+    <pre>pg_dump -Fc --no-owner --no-acl -h DB_HOST -U BACKUP_ROLE sagab \
+  -f /backup/sagab_YYYYMMDD.dump
+
+createdb sagab_restore_test
+pg_restore --clean --if-exists --no-owner -d sagab_restore_test \
+  /backup/sagab_YYYYMMDD.dump</pre>
+
+    <h2>14.3 Objetivos de recuperación</h2>
+    <p>Rectorado y proveedor deben acordar formalmente RPO (pérdida máxima de datos aceptable) y RTO (tiempo máximo de recuperación). Valores orientativos como RPO 24 h/RTO 8 h no son una garantía del código; dependen del plan contratado y deben probarse.</p>
+
+    <h2>14.4 Procedimiento de incidente</h2>
+    <ol>
+      <li>Registrar hora, síntoma, alcance, despliegue reciente y quién reporta.</li>
+      <li>Proteger evidencia y limitar accesos; no modificar auditoría.</li>
+      <li>Clasificar disponibilidad, confidencialidad, integridad o operación.</li>
+      <li>Contener: revocar secretos/sesiones, aislar servicio o desactivar función según riesgo.</li>
+      <li>Recuperar desde versión/backup verificado y validar procesos críticos.</li>
+      <li>Notificar según contrato y normativa; documentar causa y acciones preventivas.</li>
+    </ol>
+  </section>
+
+  <section id="pruebas" class="chapter">
+    <h1>15. Pruebas y calidad</h1>
+    <h2>15.1 Comandos de control</h2>
+    <pre>cd backend
+mvn test
+
+cd ../frontend
+npm ci
+npm run type-check
+npm run build</pre>
+    <h2>15.2 Cobertura existente</h2>
+    <p>El repositorio contiene pruebas unitarias para fechas de Ecuador, validación de archivos, papeleta PDF y almacenamiento. Estas pruebas validan piezas específicas, no un sistema completo.</p>
+
+    <h2>15.3 Matriz requerida antes de producción</h2>
+    <table>
+      <thead><tr><th>Tipo</th><th>Cobertura mínima pendiente</th><th>Prioridad</th></tr></thead>
+      <tbody>
+        <tr><td>Integración API/DB</td><td>Transacciones, restricciones, scripts desde cero, concurrencia de pagos y auditoría.</td><td><span class="badge no">Crítica</span></td></tr>
+        <tr><td>Autorización</td><td>Cada endpoint por rol, propiedad y tentativa de IDOR; especialmente dashboard, mora, reportes y archivos.</td><td><span class="badge no">Crítica</span></td></tr>
+        <tr><td>End-to-end</td><td>Login, matrícula, asignación, notas, asistencia, tarea, entrega, calendario, transferencia, DECE y auditoría.</td><td><span class="badge no">Crítica</span></td></tr>
+        <tr><td>Seguridad</td><td>OWASP, cargas maliciosas, JWT, CORS, enumeración, fuerza bruta, errores y dependencias.</td><td><span class="badge no">Crítica</span></td></tr>
+        <tr><td>Carga</td><td>Usuarios concurrentes objetivo, dashboard, búsquedas, reportes y carga/descarga.</td><td><span class="badge warn">Alta</span></td></tr>
+        <tr><td>Recuperación</td><td>Restaurar DB + archivos y verificar consistencia cruzada.</td><td><span class="badge no">Crítica</span></td></tr>
+        <tr><td>Compatibilidad</td><td>Chrome, Edge, Firefox; escritorio, tableta, teléfono.</td><td><span class="badge warn">Alta</span></td></tr>
+        <tr><td>Accesibilidad</td><td>Teclado, foco, lector de pantalla, contraste y formularios; WCAG 2.1 AA.</td><td><span class="badge warn">Alta</span></td></tr>
+      </tbody>
+    </table>
+    <p>No se detectó una canalización CI en el repositorio. Debe impedir merge/despliegue si fallan pruebas, type-check, build, análisis de dependencias o migración de prueba.</p>
+  </section>
+
+  <section id="diagnostico" class="chapter">
+    <h1>16. Diagnóstico y errores</h1>
+    <table>
+      <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Diagnóstico</th></tr></thead>
+      <tbody>
+        <tr><td>No arranca: falta variable.</td><td><code>SecretsGuard</code>.</td><td>Definir <code>SAGAB_DB_PASSWORD</code> y <code>SAGAB_JWT_SECRET</code> en el proceso real.</td></tr>
+        <tr><td>Hibernate validation failed.</td><td>Script faltante o modelo/esquema distintos.</td><td>Comparar migraciones aplicadas; no cambiar a <code>ddl-auto=update</code> como atajo.</td></tr>
+        <tr><td>Connection refused/timeout DB.</td><td>Host, puerto, firewall, SSL o credenciales.</td><td>Probar <code>psql</code> desde el mismo entorno y revisar pool.</td></tr>
+        <tr><td>CORS en navegador.</td><td>Origen no coincide exactamente.</td><td>Comparar esquema, host y puerto con <code>SAGAB_CORS</code>; reiniciar backend.</td></tr>
+        <tr><td>401 al recargar.</td><td>Token expirado/secret cambiado/reloj.</td><td>Revisar expiración, hora y estabilidad de <code>SAGAB_JWT_SECRET</code>.</td></tr>
+        <tr><td>403 en operación legítima.</td><td>Rol, asignación o ownership inconsistente.</td><td>Revisar identidad, relaciones y logs; no ampliar roles globalmente sin análisis.</td></tr>
+        <tr><td>Archivos desaparecen.</td><td>Disco efímero o ruta no montada.</td><td>Configurar bucket/volumen y restaurar copia.</td></tr>
+        <tr><td>413 al subir.</td><td>Límite proxy o Spring menor.</td><td>Alinear proxy, multipart global y límite lógico.</td></tr>
+        <tr><td>Falla S3 al arrancar/usar.</td><td>Variables parciales, endpoint, reloj o permisos.</td><td>Validar conjunto completo, política y conectividad; no hacer bucket público.</td></tr>
+        <tr><td>No llega correo.</td><td>SMTP vacío/rechazado.</td><td>Revisar STARTTLS, cuenta, secreto y logs; el mensaje interno es independiente.</td></tr>
+        <tr><td>Error creando evento.</td><td>Rango inválido, estado/fecha, archivo o esquema no migrado.</td><td>Confirmar script 28, fechas inicio≤fin y límites.</td></tr>
+        <tr><td>Cursos vacíos.</td><td>Periodo/paralelo/asignación/matrícula faltante.</td><td>Verificar catálogos y relaciones con cuenta autorizada.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warning"><strong>Logs.</strong> Mantener INFO en producción, agregar un identificador de correlación y centralizar logs. No habilitar cuerpos HTTP, SQL con parámetros o DEBUG global en un entorno con datos reales.</div>
+  </section>
+
+  <section id="limites-tecnicos" class="chapter">
+    <h1>17. Capacidades y límites técnicos</h1>
+    <table>
+      <thead><tr><th>Elemento</th><th>Límite/estado</th><th>Efecto</th></tr></thead>
+      <tbody>
+        <tr><td>Pool DB</td><td>Máx. 20, mínimo idle 5.</td><td>Ajustar con carga, conexiones disponibles e instancias.</td></tr>
+        <tr><td>Sesión</td><td>JWT 30 minutos, sin refresh activo.</td><td>Reautenticación frecuente; revocación inmediata limitada por stateless.</td></tr>
+        <tr><td>Calendario</td><td>Rango máximo 370 días; refresco UI 30 s.</td><td>No consultar años ilimitados en una llamada.</td></tr>
+        <tr><td>Resultados</td><td>Varias búsquedas hasta 500; revisión 200; mensajes/notificaciones 100; auditoría 50/página.</td><td>No equivale a exportación completa ni paginación uniforme.</td></tr>
+        <tr><td>Archivos</td><td>8/15/100 MB y 10 adjuntos por evento.</td><td>Proxy y storage deben alinearse.</td></tr>
+        <tr><td>Frontend</td><td>SPA con vistas diferidas; formularios y fuentes optimizados; chunk de gráficos pesado.</td><td>Medir build de producción en perfil limpio y redes móviles.</td></tr>
+        <tr><td>Escala</td><td>Sin benchmark de concurrencia.</td><td>No prometer cantidad de usuarios ni SLA sin prueba.</td></tr>
+        <tr><td>API</td><td>Sin OpenAPI/Swagger versionado.</td><td>Integración externa más costosa y riesgo de deriva documental.</td></tr>
+        <tr><td>Observabilidad</td><td>Logs INFO; sin Actuator/métricas/alertas integrales.</td><td>Detección y diagnóstico limitados.</td></tr>
+        <tr><td>Migraciones</td><td>Scripts manuales sin tabla formal de versión.</td><td>Mayor riesgo de orden, repetición y diferencias entre ambientes.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="deuda" class="chapter">
+    <h1>18. Riesgos, deuda técnica y hoja de ruta</h1>
+    <h2>18.1 Bloqueantes antes de producción comercial</h2>
+    <ol>
+      <li><strong>Validar integralmente autorización y privacidad.</strong> La matriz y el alcance del panel fueron corregidos; falta probar acceso negativo de todos los endpoints y roles en integración/E2E.</li>
+      <li><strong>Crear pruebas de integración y E2E.</strong> Cubrir flujos críticos y cada endpoint por rol/ownership.</li>
+      <li><strong>Automatizar CI/CD seguro.</strong> Pruebas, type-check, build, escaneo, imagen, migración y smoke test.</li>
+      <li><strong>Definir backup/restore y almacenamiento persistente.</strong> Ejecutar una restauración comprobable de DB y adjuntos.</li>
+      <li><strong>Desplegar HTTPS con monitoreo.</strong> Métricas, alertas, logs, incidentes y SLA contratados.</li>
+      <li><strong>Gestión administrativa de cuentas.</strong> Desactivar, editar, restablecer y revocar sesiones con auditoría.</li>
+      <li><strong>Evaluación de privacidad y seguridad.</strong> Datos de menores, financieros y DECE exigen mínimo privilegio, retención y respuesta a incidentes.</li>
+    </ol>
+
+    <h2>18.2 Prioridad alta</h2>
+    <ul>
+      <li>Migrar scripts a Flyway/Liquibase y eliminar credenciales/cuentas personales de scripts de distribución.</li>
+      <li>Implementar cierre de parciales, autorización de correcciones y trazabilidad académica amigable.</li>
+      <li>Completar matrícula: lista, edición, retiro/promoción/rematrícula y expedientes.</li>
+      <li>Completar asistencia: atraso, justificativo, evidencia y aprobación.</li>
+      <li>Crear catálogos administrativos de periodo, materia, paralelo y rubro.</li>
+      <li>Documentar API mediante OpenAPI y añadir versionado.</li>
+      <li>Mejorar auditoría visual, filtros y exportación autorizada.</li>
+    </ul>
+
+    <h2>18.3 Evolución funcional</h2>
+    <ul>
+      <li>Facturación electrónica e integración contable solo después de análisis regulatorio.</li>
+      <li>Planificación, horarios, rúbricas y actas académicas.</li>
+      <li>Flujos especializados de DECE con compartimentación y consentimiento.</li>
+      <li>Eventos recurrentes e integración con calendarios externos.</li>
+      <li>Canales de notificación adicionales con consentimiento y trazabilidad.</li>
+    </ul>
+  </section>
+
+  <section id="checklist-tecnico" class="chapter">
+    <h1>19. Listas de verificación</h1>
+    <h2>19.1 Antes de cada despliegue</h2>
+    <ul>
+      <li>☐ Cambio revisado y vinculado a requisito/incidente.</li>
+      <li>☐ <code>mvn test</code>, <code>npm run type-check</code> y <code>npm run build</code> exitosos.</li>
+      <li>☐ Pruebas de autorización y regresión del módulo.</li>
+      <li>☐ Dependencias y secretos revisados.</li>
+      <li>☐ Backup confirmado y rollback definido.</li>
+      <li>☐ Migración ensayada en copia y base limpia.</li>
+      <li>☐ CORS, API URL, storage, SMTP y zona correctos.</li>
+      <li>☐ Ventana, responsable y comunicación aprobados.</li>
+    </ul>
+
+    <h2>19.2 Después del despliegue</h2>
+    <ul>
+      <li>☐ Salud del frontend, API, DB y storage.</li>
+      <li>☐ Login y recuperación de sesión.</li>
+      <li>☐ Un caso de lectura por cada rol.</li>
+      <li>☐ Operación crítica controlada y descarga/subida.</li>
+      <li>☐ Jobs y partición de auditoría.</li>
+      <li>☐ Sin aumento anómalo de 401, 403 o 5xx.</li>
+      <li>☐ Versión y resultado documentados.</li>
+    </ul>
+
+    <h2>19.3 Criterio de salida a producción</h2>
+    <p>La salida se autoriza cuando Rectorado, responsable técnico y responsable de datos aceptan el alcance; los bloqueantes del capítulo 18 están cerrados o formalmente tratados; existe evidencia de pruebas, restauración y seguridad; y la institución dispone de soporte, privacidad, continuidad y capacitación.</p>
+    <div class="signature">
+      <div>Responsable técnico<br>Nombre, firma y fecha</div>
+      <div>Responsable institucional<br>Nombre, firma y fecha</div>
+    </div>
+  </section>
+</body>
+</html>

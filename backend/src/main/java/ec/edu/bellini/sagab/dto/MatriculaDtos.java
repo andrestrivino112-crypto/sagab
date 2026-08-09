@@ -19,7 +19,8 @@ public class MatriculaDtos {
             @Size(max = 150) String institucionProcedencia,
             @NotBlank @Size(min = 8, max = 150) String direccion,
             @Pattern(regexp = "09\\d{8}|0[2-7]\\d{7}|") String telefonoEstudiante,
-            @Size(max = 5) String tipoSangre,
+            @Pattern(regexp = "(?:A|B|AB|O)[+-]|", message = "tipoSangre debe ser un tipo real o estar vacío")
+            String tipoSangre,
             @Size(max = 500) String condicionMedica,
 
             @NotBlank @Size(min = 3, max = 80) String representanteNombres,
@@ -30,13 +31,12 @@ public class MatriculaDtos {
             @NotBlank @Pattern(regexp = "09\\d{8}|0[2-7]\\d{7}") String representanteTelefono,
             @NotBlank @Size(min = 5, max = 150) String contactoEmergencia,
 
-            @NotEmpty List<String> documentos) {}
+            @NotNull @Size(min = 4, max = 4) List<String> documentos) {}
 
     public record MatriculaResponse(
             Long idEstudiante,
             String codigo,
             String usuarioEstudiante,
             boolean representanteNuevo,
-            String usuarioRepresentante,
-            String claveTemporal) {}
+            String usuarioRepresentante) {}
 }

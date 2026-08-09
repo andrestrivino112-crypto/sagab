@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { logout as apiLogout, recuperarSesion, type Sesion, type RolSistema } from "../api/auth";
+import { esRolAdministrativo, logout as apiLogout, recuperarSesion, type Sesion, type RolSistema } from "../api/auth";
 import { NAV, NAV_POR_ROL, ROL_LABEL, Sidebar } from "./components/Sidebar";
 import { LoginScreen } from "./views/LoginScreen";
 import { CambiarClaveScreen } from "./views/CambiarClaveScreen";
@@ -9,6 +9,9 @@ import { useInternalHistoryBoundary } from "./hooks/useInternalHistoryBoundary";
 
 // Cada vista es su propio chunk: solo se descarga la que el usuario visita.
 const DashboardView = lazy(() => import("./views/DashboardView").then(m => ({ default: m.DashboardView })));
+const AdminDashboard = lazy(() => import("./views/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
+const EstudiantesMatriculadosView = lazy(() => import("./views/EstudiantesMatriculadosView").then(m => ({ default: m.EstudiantesMatriculadosView })));
+const GestionCuentasView = lazy(() => import("./views/GestionCuentasView").then(m => ({ default: m.GestionCuentasView })));
 const GradesView = lazy(() => import("./views/GradesView").then(m => ({ default: m.GradesView })));
 const AttendanceView = lazy(() => import("./views/AttendanceView").then(m => ({ default: m.AttendanceView })));
 const MatriculaView = lazy(() => import("./views/MatriculaView").then(m => ({ default: m.MatriculaView })));
@@ -120,11 +123,13 @@ export default function App() {
     <div className="flex h-screen overflow-hidden" style={{ fontFamily:"'Inter', sans-serif" }}>
       <Sidebar active={activo} onNav={irA} onLogout={logout}
         nav={nav} nombre={sesion.nombre} rolLabel={ROL_LABEL[rolPrincipal]} />
-      <main className="flex-1 overflow-y-auto bg-[#F5F7FA]">
+      <main className="min-w-0 flex-1 overflow-y-auto bg-[#F5F7FA]">
         <Suspense fallback={<ViewFallback />}>
           <Routes>
             <Route path="/" element={<Navigate to={pantallaInicial(rolPrincipal)} replace />} />
-            <Route path="/dashboard" element={conPermiso("dashboard", <DashboardView rol={rolPrincipal} />)} />
+            <Route path="/dashboard" element={conPermiso("dashboard", esRolAdministrativo(rolPrincipal) ? <AdminDashboard /> : <DashboardView rol={rolPrincipal} />)} />
+            <Route path="/matriculados" element={conPermiso("matriculados", <EstudiantesMatriculadosView />)} />
+            <Route path="/gestion-cuentas" element={conPermiso("gestion-cuentas", <GestionCuentasView />)} />
             <Route path="/matricula" element={conPermiso("matricula", <MatriculaView />)} />
             <Route path="/grades" element={conPermiso("grades", <GradesView onNavigate={irA} rol={rolPrincipal} />)} />
             <Route path="/attendance" element={conPermiso("attendance", <AttendanceView onNavigate={irA} />)} />

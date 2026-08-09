@@ -9,12 +9,45 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 
 public interface EstudianteRepository extends JpaRepository<Estudiante, Long> {
 
     List<Estudiante> findByParaleloIdAndActivoTrueOrderByApellidosAscNombresAsc(Integer idParalelo);
 
     List<Estudiante> findByRepresentanteIdAndActivoTrue(Long idRepresentante);
+
+    @Query(value = """
+            SELECT e.id_estudiante AS idEstudiante, e.codigo AS codigo,
+                   e.apellidos || ' ' || e.nombres AS nombreCompleto,
+                   p.nivel AS curso, p.seccion AS paralelo, p.anio_lectivo AS anioLectivo
+            FROM sagab.estudiante e
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            WHERE e.activo = true AND p.anio_lectivo = :anioLectivo
+            ORDER BY p.nivel, p.seccion, e.apellidos, e.nombres
+            """, nativeQuery = true)
+    List<MatriculadoProjection> matriculadosDelAnio(@Param("anioLectivo") String anioLectivo);
+
+    @Query(value = """
+            SELECT count(*)
+            FROM sagab.estudiante e
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            WHERE e.activo = true AND p.anio_lectivo = :anioLectivo
+            """, nativeQuery = true)
+    long contarMatriculadosDelAnio(@Param("anioLectivo") String anioLectivo);
+
+    @Query(value = """
+            SELECT e.id_estudiante AS idEstudiante, e.codigo AS codigo,
+                   e.apellidos || ' ' || e.nombres AS nombreCompleto,
+                   p.nivel AS curso, p.seccion AS paralelo, p.anio_lectivo AS anioLectivo,
+                   e.creado_en AS creadoEn
+            FROM sagab.estudiante e
+            JOIN sagab.paralelo p ON p.id_paralelo = e.id_paralelo
+            WHERE e.activo = true AND p.anio_lectivo = :anioLectivo
+            ORDER BY e.creado_en DESC, e.id_estudiante DESC
+            """, nativeQuery = true)
+    List<MatriculaRecienteProjection> matriculasRecientesDelAnio(
+            @Param("anioLectivo") String anioLectivo, Pageable pageable);
 
     /** El estudiante viendo sus propios datos (Portal Familiar) — cuenta 1:1 creada en la matrícula. */
     Optional<Estudiante> findByUsuarioId(Long idUsuario);
@@ -121,4 +154,18 @@ public interface EstudianteRepository extends JpaRepository<Estudiante, Long> {
             ) t
             """, nativeQuery = true)
     List<Long> idsUsuariosDestinatariosPorCurso(@Param("curso") String curso);
+
+    interface MatriculadoProjection {
+        Long getIdEstudiante();
+        String getCodigo();
+        String getNombreCompleto();
+        String getCurso();
+        String getParalelo();
+        String getAnioLectivo();
+    }
+
+    interface MatriculaRecienteProjection extends MatriculadoProjection {
+        Instant getCreadoEn();
+    }
+
 }

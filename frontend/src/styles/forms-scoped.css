@@ -1,0 +1,88 @@
+/* Componentes de formulario necesarios por Matrícula y Portal Familiar.
+   Sustituye la distribución completa de Bootstrap (280 KB) por este subconjunto
+   local y aislado. Las utilidades generales siguen proviniendo de Tailwind. */
+.matricula-form,
+.matricula-form *,
+.matricula-form *::before,
+.matricula-form *::after { box-sizing: border-box; }
+
+.matricula-form { color: #212529; line-height: 1.5; }
+.matricula-form .card { position: relative; display: flex; flex-direction: column; min-width: 0; color: #212529; background: #fff; border: 1px solid #dee2e6; border-radius: .5rem; }
+.matricula-form .card-header { padding: .75rem 1rem; margin: 0; background: rgba(33, 37, 41, .03); border-bottom: 1px solid #dee2e6; }
+.matricula-form .card-body { flex: 1 1 auto; padding: 1rem; }
+.matricula-form .h6 { font-size: 1rem; line-height: 1.2; }
+.matricula-form .small,
+.matricula-form small { font-size: .875em; }
+
+.matricula-form .form-label { display: inline-block; margin-bottom: .5rem; }
+.matricula-form .form-control,
+.matricula-form .form-select {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: .375rem .75rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #212529;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: .375rem;
+  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+.matricula-form .form-select { padding-right: 2rem; }
+.matricula-form textarea.form-control { min-height: 76px; resize: vertical; }
+.matricula-form .form-control:focus,
+.matricula-form .form-select:focus { border-color: #86b7fe; outline: 0; box-shadow: 0 0 0 .25rem rgba(13, 110, 253, .25); }
+.matricula-form .form-control:disabled,
+.matricula-form .form-select:disabled { background-color: #e9ecef; opacity: 1; }
+.matricula-form .form-control[type="file"] { overflow: hidden; padding: 0; }
+.matricula-form .form-control[type="file"]::file-selector-button { padding: .375rem .75rem; margin-right: .75rem; color: #212529; background: #e9ecef; border: 0; border-right: 1px solid #dee2e6; }
+.matricula-form .form-text { margin-top: .25rem; font-size: .875em; color: #6c757d; }
+.matricula-form .form-control.is-valid,
+.matricula-form .form-select.is-valid { border-color: #198754; }
+.matricula-form .form-control.is-invalid,
+.matricula-form .form-select.is-invalid { border-color: #dc3545; }
+.matricula-form .is-valid:focus { box-shadow: 0 0 0 .25rem rgba(25, 135, 84, .25); }
+.matricula-form .is-invalid:focus { box-shadow: 0 0 0 .25rem rgba(220, 53, 69, .25); }
+.matricula-form .invalid-feedback { display: none; width: 100%; margin-top: .25rem; font-size: .875em; color: #dc3545; }
+.matricula-form .is-invalid ~ .invalid-feedback,
+.matricula-form .invalid-feedback.d-block { display: block; }
+
+.matricula-form .form-check { display: block; min-height: 1.5rem; padding-left: 1.5em; margin-bottom: .125rem; }
+.matricula-form .form-check-input { float: left; width: 1em; height: 1em; margin: .25em 0 0 -1.5em; border: 1px solid #adb5bd; appearance: auto; }
+.matricula-form .form-check-label { display: inline-block; }
+.matricula-form .input-group { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; }
+.matricula-form .input-group > .form-control { position: relative; flex: 1 1 auto; width: 1%; min-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.matricula-form .input-group-text { display: flex; align-items: center; padding: .375rem .75rem; color: #212529; background: #e9ecef; border: 1px solid #dee2e6; border-radius: .375rem 0 0 .375rem; }
+
+.matricula-form .btn { display: inline-block; padding: .375rem .75rem; font: inherit; font-weight: 400; line-height: 1.5; text-align: center; text-decoration: none; vertical-align: middle; cursor: pointer; user-select: none; border: 1px solid transparent; border-radius: .375rem; transition: color .15s, background-color .15s, border-color .15s, box-shadow .15s; }
+.matricula-form .btn:focus-visible { outline: 0; box-shadow: 0 0 0 .25rem rgba(13, 110, 253, .25); }
+.matricula-form .btn:disabled { pointer-events: none; opacity: .65; }
+.matricula-form .btn-primary { color: #fff; background: #0d6efd; border-color: #0d6efd; }
+.matricula-form .btn-primary:hover { background: #0b5ed7; border-color: #0a58ca; }
+.matricula-form .btn-danger { color: #fff; background: #dc3545; border-color: #dc3545; }
+.matricula-form .btn-danger:hover { background: #bb2d3b; border-color: #b02a37; }
+.matricula-form .btn-outline-secondary { color: #6c757d; background: transparent; border-color: #6c757d; }
+.matricula-form .btn-outline-secondary:hover { color: #fff; background: #6c757d; }
+
+.matricula-form .alert { position: relative; padding: 1rem; color: inherit; border: 1px solid transparent; border-radius: .375rem; }
+.matricula-form .alert-success { color: #0a3622; background: #d1e7dd; border-color: #a3cfbb; }
+.matricula-form .alert-danger { color: #58151c; background: #f8d7da; border-color: #f1aeb5; }
+.matricula-form .alert-warning { color: #664d03; background: #fff3cd; border-color: #ffe69c; }
+.matricula-form .alert-info { color: #055160; background: #cff4fc; border-color: #9eeaf9; }
+
+.matricula-form .row { --sagab-gutter: 1.5rem; display: flex; flex-wrap: wrap; margin-right: calc(-.5 * var(--sagab-gutter)); margin-left: calc(-.5 * var(--sagab-gutter)); }
+.matricula-form .row > * { width: 100%; max-width: 100%; padding-right: calc(.5 * var(--sagab-gutter)); padding-left: calc(.5 * var(--sagab-gutter)); }
+@media (min-width: 768px) { .matricula-form .col-md-6 { flex: 0 0 auto; width: 50%; } }
+
+.matricula-form .d-block { display: block !important; }
+.matricula-form .d-flex { display: flex !important; }
+.matricula-form .flex-column { flex-direction: column !important; }
+.matricula-form .flex-fill { flex: 1 1 auto !important; }
+.matricula-form .align-items-start { align-items: flex-start !important; }
+.matricula-form .align-items-center { align-items: center !important; }
+.matricula-form .justify-content-end { justify-content: flex-end !important; }
+.matricula-form .fw-semibold { font-weight: 600 !important; }
+.matricula-form .text-primary { color: #0d6efd !important; }
+.matricula-form .text-danger { color: #dc3545 !important; }

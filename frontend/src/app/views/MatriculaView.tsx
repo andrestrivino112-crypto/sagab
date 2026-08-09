@@ -8,7 +8,7 @@ import { TopBar } from "../components/TopBar";
 import { useToast } from "../components/Toast";
 // Bootstrap solo lo usa este formulario: se importa aquí (no en index.css global)
 // para que el code-splitting de MatriculaView lo cargue únicamente cuando se navega a esta vista.
-import "../../styles/bootstrap-scoped.css";
+import "../../styles/forms-scoped.css";
 
 // ── Datos y validación ──────────────────────────────────────────────────────
 interface MatriculaData {
@@ -43,7 +43,7 @@ const MATRICULA_EMPTY: MatriculaData = {
 };
 
 const GENEROS = [{ v: "M", l: "Masculino" }, { v: "F", l: "Femenino" }, { v: "O", l: "Otro" }];
-const TIPOS_SANGRE = ["A+","A-","B+","B-","AB+","AB-","O+","O-","No registra"];
+const TIPOS_SANGRE = ["A+","A-","B+","B-","AB+","AB-","O+","O-"];
 const PARENTESCOS = ["Padre", "Madre", "Tutor legal", "Otro"];
 const NIVEL_EDAD: Record<string, [number, number]> = {
   "1° BGU": [14, 16],
@@ -112,7 +112,9 @@ function fieldErrors(f: MatriculaData): Partial<Record<keyof MatriculaData, stri
   if (!RE_EMAIL.test(f.representanteEmail)) e.representanteEmail = "Correo electrónico inválido";
   if (!RE_TELEFONO.test(f.representanteTelefono)) e.representanteTelefono = "Teléfono inválido (Ecuador)";
   if (f.contactoEmergencia.trim().length < 5 || !/\d{7,}/.test(f.contactoEmergencia)) e.contactoEmergencia = "Incluya nombre y un teléfono de contacto";
-  if (f.documentos.length < DOCUMENTOS_REQUERIDOS.length) e.documentos = "Faltan documentos por adjuntar";
+  if (f.documentos.length !== DOCUMENTOS_REQUERIDOS.length) {
+    e.documentos = "Debe confirmar la entrega de todos los documentos para matricular";
+  }
   return e;
 }
 
@@ -133,10 +135,6 @@ function businessAlerts(f: MatriculaData, nivelSeleccionado?: string): Alerta[] 
   if (f.condicionMedica.trim()) {
     alerts.push({ msg: `Estudiante con condición médica registrada: "${f.condicionMedica.trim()}". Notificar a docentes.`, tipo: "info" });
   }
-  const faltantes = DOCUMENTOS_REQUERIDOS.length - f.documentos.length;
-  if (faltantes > 0) {
-    alerts.push({ msg: `Documentación incompleta: falta${faltantes > 1 ? "n" : ""} ${faltantes} documento${faltantes > 1 ? "s" : ""}.`, tipo: "warning" });
-  }
   return alerts;
 }
 
@@ -149,7 +147,7 @@ export function MatriculaView() {
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<{ codigo: string; usuarioEstudiante: string; usuarioRepresentante: string; representanteNuevo: boolean; claveTemporal: string | null } | null>(null);
+  const [saved, setSaved] = useState<{ codigo: string; usuarioEstudiante: string; usuarioRepresentante: string; representanteNuevo: boolean } | null>(null);
   const [paralelosOpciones, setParalelosOpciones] = useState<ParaleloOpcion[]>([]);
   const [paraleloTexto, setParaleloTexto] = useState("");
 
@@ -222,7 +220,6 @@ export function MatriculaView() {
       setSaved({
         codigo: resp.codigo, usuarioEstudiante: resp.usuarioEstudiante,
         usuarioRepresentante: resp.usuarioRepresentante, representanteNuevo: resp.representanteNuevo,
-        claveTemporal: resp.claveTemporal,
       });
       toast.success(`Matrícula registrada correctamente · código ${resp.codigo}`);
       toast.success(`Usuario creado correctamente: ${resp.usuarioEstudiante}`);
@@ -247,6 +244,16 @@ export function MatriculaView() {
           border-color: #2E75B6;
           box-shadow: none;
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath fill='%232E75B6' d='M2.3 6.73L.6 4.53c-.39-.51-.28-1.24.24-1.62.51-.38 1.24-.28 1.62.24l.9 1.15L6.4 1.4c.4-.5 1.12-.58 1.62-.18.5.4.58 1.13.18 1.63L3.6 6.6c-.4.5-1.1.53-1.3.13z'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-size: 1rem 1rem;
+        }
+        .matricula-form .form-control.is-valid {
+          background-position: right .75rem center;
+          padding-right: 2.5rem;
+        }
+        .matricula-form .form-select.is-valid {
+          background-position: right 2rem center;
+          padding-right: 3.25rem;
         }
         .matricula-form .form-control.is-valid:focus,
         .matricula-form .form-select.is-valid:focus {
@@ -307,7 +314,7 @@ export function MatriculaView() {
             </FormField>
             <FormField label="Género" error={err("genero")}>
               <select className={cls("genero", "form-select")} value={form.genero} onChange={e => set("genero", e.target.value)}>
-                <option value="">Seleccione…</option>
+                <option value="">No registra</option>
                 {GENEROS.map(g => <option key={g.v} value={g.v}>{g.l}</option>)}
               </select>
             </FormField>
@@ -417,7 +424,7 @@ export function MatriculaView() {
               <p className="mb-1 small">Usuario del estudiante (Portal Familiar): <strong>{saved.usuarioEstudiante}</strong> · contraseña inicial: su número de cédula (deberá cambiarla al ingresar por primera vez).</p>
               {saved.representanteNuevo ? (
                 <p className="mb-0 small">
-                  Se creó una cuenta nueva para el representante. Usuario: <strong>{saved.usuarioRepresentante}</strong> · contraseña temporal: <strong>{saved.claveTemporal}</strong> (deberá cambiarla al ingresar por primera vez).
+                  Se creó una cuenta nueva para el representante. Usuario: <strong>{saved.usuarioRepresentante}</strong>. La contraseña inicial corresponde a la cédula registrada y deberá cambiarse al ingresar por primera vez.
                 </p>
               ) : (
                 <p className="mb-0 small">El representante ya tenía una cuenta (usuario <strong>{saved.usuarioRepresentante}</strong>) y fue vinculado a este estudiante.</p>

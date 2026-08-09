@@ -17,9 +17,9 @@ public class PersonalDtos {
             @NotBlank @Pattern(regexp = "DOCENTE|DECE|AUDITOR", message = "rol debe ser DOCENTE, DECE o AUDITOR") String rol,
             @Size(max = 80) String tituloDocente) {}
 
-    /** Se devuelve una sola vez, igual que la clave temporal del representante en Matrícula. */
+    /** Respuesta segura: confirma la cuenta creada sin devolver su contraseña temporal. */
     public record PersonalResponse(
-            Long idUsuario, String nombreCompleto, String username, String email, String rol, String claveTemporal) {}
+            Long idUsuario, String nombreCompleto, String username, String email, String rol) {}
 
     public record PersonalResumen(
             Long idUsuario, String nombreCompleto, String username, String email, String rol, String estado) {}

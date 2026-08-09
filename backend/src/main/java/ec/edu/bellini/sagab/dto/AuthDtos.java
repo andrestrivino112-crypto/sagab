@@ -8,8 +8,8 @@ import java.util.List;
 public class AuthDtos {
 
     public record LoginRequest(
-            @NotBlank String usuario,
-            @NotBlank String password) {
+            @NotBlank @Size(max = 40, message = "El usuario no puede superar 40 caracteres") String usuario,
+            @NotBlank @Size(max = 72, message = "La contraseña no puede superar 72 caracteres") String password) {
         @Override
         public String toString() {
             return "LoginRequest[usuario=" + usuario + ", password=***]";
@@ -39,11 +39,18 @@ public class AuthDtos {
     public record SesionResponse(String nombre, List<String> roles, boolean debeCambiarClave) {}
 
     public record CambiarClaveRequest(
-            @NotBlank String claveActual,
+            @NotBlank @Size(max = 72, message = "La contraseña actual no puede superar 72 caracteres") String claveActual,
             @NotBlank @Size(min = 8, max = 72, message = "La nueva contraseña debe tener al menos 8 caracteres") String claveNueva) {
         @Override
         public String toString() {
             return "CambiarClaveRequest[claveActual=***, claveNueva=***]";
         }
+    }
+
+    /** Token renovado después de cambiar la contraseña. La rotación invalida las demás sesiones
+     * sin expulsar del flujo obligatorio al navegador que acaba de completar el cambio. */
+    public record CambiarClaveResponse(String accessToken) {
+        @Override
+        public String toString() { return "CambiarClaveResponse[accessToken=***]"; }
     }
 }

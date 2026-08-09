@@ -16,7 +16,7 @@ import java.util.List;
 /** Alta y listado de cuentas de personal (DOCENTE, DECE, AUDITOR) — exclusivo de ADMIN. */
 @RestController
 @RequestMapping("/api/personal")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class PersonalController {
 
     private final PersonalService service;

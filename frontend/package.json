@@ -7,6 +7,7 @@
     "build": "vite build",
     "dev": "vite",
     "type-check": "tsc --noEmit",
+    "test:super-admin": "node scripts/super-admin-contract.test.mjs",
     "scope-bootstrap": "node scripts/scope-bootstrap.mjs"
   },
   "dependencies": {

@@ -26,13 +26,25 @@ public interface MensajeDestinatarioRepository extends JpaRepository<MensajeDest
               AND EXISTS (
                   SELECT 1 FROM sagab.usuario_rol ur
                   JOIN sagab.rol r ON r.id_rol = ur.id_rol
-                  WHERE ur.id_usuario = m.id_remitente AND r.codigo = 'ADMIN'
+                  WHERE ur.id_usuario = m.id_remitente AND r.codigo IN ('ADMIN', 'SUPER_ADMIN')
               )
             ORDER BY m.enviado_en DESC
             """, nativeQuery = true)
     List<MensajeDestinatario> bandejaDocenteDesdeAdmin(@Param("idUsuario") Long idUsuario, Pageable pageable);
 
     long countByIdDestinatarioAndLeidoEnIsNull(Long idDestinatario);
+
+    @Query(value = """
+            SELECT m.id_mensaje AS idMensaje, m.asunto AS asunto,
+                   u.nombres || ' ' || u.apellidos AS remitente,
+                   m.enviado_en AS enviadoEn, (md.leido_en IS NOT NULL) AS leido
+            FROM sagab.mensaje_destinatario md
+            JOIN sagab.mensaje m ON m.id_mensaje = md.id_mensaje
+            JOIN sagab.usuario u ON u.id_usuario = m.id_remitente
+            WHERE md.id_destinatario = :idUsuario
+            ORDER BY m.enviado_en DESC
+            """, nativeQuery = true)
+    List<MensajeRecienteProjection> mensajesRecientes(@Param("idUsuario") Long idUsuario, Pageable pageable);
 
     @Query(value = """
             SELECT count(*)
@@ -42,7 +54,7 @@ public interface MensajeDestinatarioRepository extends JpaRepository<MensajeDest
               AND EXISTS (
                   SELECT 1 FROM sagab.usuario_rol ur
                   JOIN sagab.rol r ON r.id_rol = ur.id_rol
-                  WHERE ur.id_usuario = m.id_remitente AND r.codigo = 'ADMIN'
+                  WHERE ur.id_usuario = m.id_remitente AND r.codigo IN ('ADMIN', 'SUPER_ADMIN')
               )
             """, nativeQuery = true)
     long countNoLeidosDocenteDesdeAdmin(@Param("idUsuario") Long idUsuario);
@@ -63,5 +75,13 @@ public interface MensajeDestinatarioRepository extends JpaRepository<MensajeDest
         Long getIdMensaje();
         long getTotalDestinatarios();
         long getLeidos();
+    }
+
+    interface MensajeRecienteProjection {
+        Long getIdMensaje();
+        String getAsunto();
+        String getRemitente();
+        java.time.Instant getEnviadoEn();
+        boolean getLeido();
     }
 }

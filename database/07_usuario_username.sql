@@ -22,7 +22,7 @@ COMMENT ON COLUMN usuario.username IS 'Nombre de usuario para inicio de sesión 
 INSERT INTO usuario (username, email, hash_password, nombres, apellidos, estado, debe_cambiar_clave)
 VALUES ('ANDRESHD', 'andreshd@bellini.edu.ec',
         '$2a$12$iR5aa7eoyTC9mhPyupsRu.6X/j0B6ctx3TpRohoFnrHgD71y5pkT6',
-        'Andrés', 'Administrador', 'ACTIVO', false)
+        'Alexita', 'Administrador', 'ACTIVO', false)
 ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
 WHERE usuario.username IS NULL;
 

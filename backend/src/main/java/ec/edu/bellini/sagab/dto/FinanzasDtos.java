@@ -59,4 +59,16 @@ public class FinanzasDtos {
             @NotNull CanalComunicacion canal,
             @Size(max = 150) String asunto,
             @NotBlank @Size(max = 500) String mensaje) {}
+
+    /** Una fila por estudiante con obligaciones PENDIENTE o VENCIDO. El valor descuenta pagos
+     * aprobados parciales y por eso representa el saldo real, no la suma nominal original. */
+    public record ValorPendienteResponse(
+            Long idEstudiante, String codigo, String nombreCompleto,
+            String curso, String paralelo, String representante,
+            String representanteEmail, String representanteTelefono,
+            BigDecimal valorTotalPendiente, long cantidadObligaciones,
+            long obligacionesVencidas, LocalDate fechaVencimientoMasAntigua) {}
+
+    public record NotificacionValorPendienteRequest(
+            @NotBlank @Size(max = 500) String mensaje) {}
 }

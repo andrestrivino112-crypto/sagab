@@ -1,6 +1,7 @@
 package ec.edu.bellini.sagab.dto;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public class DashboardDtos {
@@ -29,4 +30,27 @@ public class DashboardDtos {
             List<PromedioAgrupado> porParalelo,
             List<PromedioAgrupado> porMateria,
             List<TendenciaAnual> porAnioLectivo) {}
+
+    public record MatriculaReciente(
+            Long idEstudiante, String codigo, String nombreCompleto, String curso,
+            String paralelo, String anioLectivo, OffsetDateTime creadoEn) {}
+
+    public record EventoProximo(
+            Long idEvento, String titulo, OffsetDateTime inicio, OffsetDateTime fin,
+            String lugar, String categoria) {}
+
+    public record MensajeReciente(
+            Long idMensaje, String asunto, String remitente, OffsetDateTime enviadoEn, boolean leido) {}
+
+    /** Resumen acotado para Inicio de Secretaría. Los listados completos se consultan solo al
+     * abrir sus respectivos drill-downs, para no cargar cientos de filas en el dashboard. */
+    public record ResumenAdministrativo(
+            String anioLectivoActivo,
+            long estudiantesMatriculados,
+            List<MatriculaReciente> matriculasRecientes,
+            long pagosPendientesRevision,
+            long estudiantesConValoresPendientes,
+            List<EventoProximo> proximosEventos,
+            long mensajesNoLeidos,
+            List<MensajeReciente> mensajesRecientes) {}
 }

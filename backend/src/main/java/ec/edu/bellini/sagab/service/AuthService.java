@@ -44,9 +44,9 @@ public class AuthService {
         this.minutosAcceso = minutosAcceso;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = {BadCredentialsException.class, LockedException.class})
     public AuthDtos.TokenResponse login(String usuario, String password, String ip, String userAgent) {
-        Usuario u = usuarios.findByUsername(usuario.trim())
+        Usuario u = usuarios.findByUsernameForUpdate(usuario.trim())
                 .orElseThrow(() -> {
                     eventos.loginFallido(usuario, "Usuario inexistente", ip, userAgent);
                     // Mensaje genérico: no revelar si el usuario existe
@@ -97,13 +97,16 @@ public class AuthService {
 
     /** Cambio de contraseña por el propio usuario (incluye el cambio obligatorio en el primer login). */
     @Transactional
-    public void cambiarClave(String email, String claveActual, String claveNueva) {
-        Usuario u = usuarios.findByEmail(email).orElseThrow();
+    public AuthDtos.CambiarClaveResponse cambiarClave(String email, String claveActual, String claveNueva) {
+        Usuario u = usuarios.findByEmailForUpdate(email).orElseThrow();
         if (!encoder.matches(claveActual, u.getHashPassword())) {
             throw new BadCredentialsException("La contraseña actual no es correcta");
         }
         u.setHashPassword(encoder.encode(claveNueva));
         u.setDebeCambiarClave(false);
-        usuarios.save(u);
+        u.setAuthVersion(u.getAuthVersion() + 1);
+        usuarios.revocarRefreshTokens(u.getId());
+        usuarios.saveAndFlush(u);
+        return new AuthDtos.CambiarClaveResponse(jwt.generarAccessToken(u));
     }
 }

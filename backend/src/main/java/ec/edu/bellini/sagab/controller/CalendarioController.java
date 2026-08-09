@@ -22,7 +22,7 @@ public class CalendarioController {
     public CalendarioController(CalendarioService service) { this.service = service; }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','DECE','ESTUDIANTE','REPRESENTANTE','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE','DECE','ESTUDIANTE','REPRESENTANTE','AUDITOR')")
     public List<CalendarioDtos.CalendarioItemResponse> listar(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
@@ -31,31 +31,31 @@ public class CalendarioController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public CalendarioDtos.CalendarioItemResponse crear(@Valid @RequestBody CalendarioDtos.GuardarEventoRequest req,
                                                         Authentication auth) {
         return service.crear(req, auth);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public CalendarioDtos.CalendarioItemResponse editar(@PathVariable Long id,
             @Valid @RequestBody CalendarioDtos.GuardarEventoRequest req) {
         return service.editar(id, req);
     }
 
     @PostMapping("/{id}/duplicar")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public CalendarioDtos.CalendarioItemResponse duplicar(@PathVariable Long id, Authentication auth) {
         return service.duplicar(id, auth);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public void eliminar(@PathVariable Long id) { service.eliminar(id); }
 
     @PostMapping(value = "/{id}/adjuntos", consumes = "multipart/form-data")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public CalendarioDtos.AdjuntoResponse subirAdjunto(@PathVariable Long id,
             @RequestParam(required = false) String nombre,
             @RequestParam("archivo") MultipartFile archivo, Authentication auth) {
@@ -63,13 +63,13 @@ public class CalendarioController {
     }
 
     @GetMapping("/adjuntos/{idAdjunto}/descarga")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','DECE','ESTUDIANTE','REPRESENTANTE','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE','DECE','ESTUDIANTE','REPRESENTANTE','AUDITOR')")
     public ResponseEntity<Map<String, String>> descargarAdjunto(@PathVariable Long idAdjunto,
                                                                  Authentication auth) {
         return ResponseEntity.ok(Map.of("url", service.urlDescargaAdjunto(idAdjunto, auth)));
     }
 
     @DeleteMapping("/adjuntos/{idAdjunto}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public void eliminarAdjunto(@PathVariable Long idAdjunto) { service.eliminarAdjunto(idAdjunto); }
 }

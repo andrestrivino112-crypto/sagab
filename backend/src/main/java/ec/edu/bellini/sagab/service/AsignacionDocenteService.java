@@ -41,7 +41,8 @@ public class AsignacionDocenteService {
     /** ADMIN ve todas las asignaciones; DOCENTE solo las suyas. */
     @Transactional(readOnly = true)
     public List<AsignacionDocenteDtos.AsignacionResponse> mias(Authentication auth) {
-        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         List<AsignacionDocente> lista = esAdmin
                 ? asignaciones.findAllByOrderByPeriodoFechaInicioDesc()
                 : asignaciones.findByDocenteUsuarioEmailOrderByPeriodoFechaInicioDesc(auth.getName());
@@ -160,7 +161,8 @@ public class AsignacionDocenteService {
      * EstudianteService.esPropio() es el punto único de "¿es suyo este estudiante?".
      */
     public void exigirDueñoDeAsignacion(AsignacionDocente asignacion, Authentication auth) {
-        if (auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) return;
+        if (auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))) return;
         if (!esDocenteDeLaAsignacion(asignacion, auth)) {
             throw new AccessDeniedException("No tiene permisos sobre esta asignación");
         }
@@ -181,6 +183,7 @@ public class AsignacionDocenteService {
      */
     public void exigirDocenteDelParalelo(Integer idParalelo, Authentication auth) {
         if (auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
                 || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_DECE"))) return;
         if (!asignaciones.existsByDocenteUsuarioEmailAndParaleloId(auth.getName(), idParalelo)) {
             throw new AccessDeniedException("No tiene una asignación en este paralelo");

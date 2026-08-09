@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -301,7 +303,8 @@ public class FinanzasService {
     @Transactional(readOnly = true)
     public String urlDescargaComprobante(Long idPago, Authentication auth) {
         Pago pago = pagos.findById(idPago).orElseThrow(() -> new NoSuchElementException("El pago no existe"));
-        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         if (!esAdmin && !estudianteService.esPropio(pago.getObligacion().getEstudiante().getId(), auth)) {
             throw new AccessDeniedException("No autorizado para ver este comprobante");
         }
@@ -402,6 +405,37 @@ public class FinanzasService {
                 emailService.enviar(estudiante.getRepresentante().getUsuario().getEmail(), asunto, req.mensaje());
             }
         }
+    }
+
+    /** Drill-down administrativo de todos los saldos reales pendientes, no solo los vencidos. */
+    @Transactional(readOnly = true)
+    public List<FinanzasDtos.ValorPendienteResponse> valoresPendientes() {
+        return obligaciones.buscarValoresPendientes().stream()
+                .map(p -> new FinanzasDtos.ValorPendienteResponse(
+                        p.getIdEstudiante(), p.getCodigo(), p.getNombreCompleto(), p.getCurso(), p.getParalelo(),
+                        p.getRepresentante(), p.getRepresentanteEmail(), p.getRepresentanteTelefono(),
+                        p.getValorTotalPendiente(), p.getCantidadObligaciones(), p.getObligacionesVencidas(),
+                        p.getFechaVencimientoMasAntigua()))
+                .toList();
+    }
+
+    @Transactional
+    public void notificarValoresPendientes(Long idEstudiante, String mensaje) {
+        Estudiante estudiante = estudiantes.findById(idEstudiante)
+                .orElseThrow(() -> new NoSuchElementException("El estudiante no existe"));
+        if (!estudiante.isActivo()) {
+            throw new IllegalArgumentException("El estudiante ya no está activo");
+        }
+        if (!obligaciones.tieneValoresPendientes(idEstudiante)) {
+            throw new IllegalArgumentException("El estudiante ya no tiene valores pendientes");
+        }
+        Set<Long> destinatarios = new LinkedHashSet<>();
+        if (estudiante.getUsuario() != null) destinatarios.add(estudiante.getUsuario().getId());
+        if (estudiante.getRepresentante() != null && estudiante.getRepresentante().getUsuario() != null) {
+            destinatarios.add(estudiante.getRepresentante().getUsuario().getId());
+        }
+        destinatarios.forEach(id -> notificacionService.crearGenerica(
+                id, Notificacion.TipoNotificacion.PAGO, mensaje.trim()));
     }
 
     private String generarNumeroRecibo() {

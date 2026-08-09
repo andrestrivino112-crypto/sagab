@@ -67,7 +67,8 @@ public class RecursoAcademicoService {
         AsignacionDocente asignacion = asignaciones.findById(idAsignacion)
                 .orElseThrow(() -> new NoSuchElementException("La asignación no existe"));
 
-        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean esAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                || auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
         boolean esDocenteDueño = asignacionDocenteService.esDocenteDeLaAsignacion(asignacion, auth);
         if (!esAdmin && !esDocenteDueño) {
             if (idEstudiante == null) {

@@ -22,7 +22,7 @@ public class MateriaController {
 
     /** Materias del estudiante en el período académico vigente, con avance de deberes — Portal Familiar. */
     @GetMapping("/estudiante/{idEstudiante}")
-    @PreAuthorize("hasAnyRole('ADMIN','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public List<MateriaDtos.MateriaEstudianteResponse> porEstudiante(@PathVariable Long idEstudiante, Authentication auth) {
         return service.porEstudiante(idEstudiante, auth);
     }

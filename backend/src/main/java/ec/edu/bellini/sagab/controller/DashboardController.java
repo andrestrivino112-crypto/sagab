@@ -19,15 +19,22 @@ public class DashboardController {
 
     /** REPRESENTANTE tiene su propio Portal Familiar, no esta pantalla. */
     @GetMapping("/resumen")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','DOCENTE','AUDITOR')")
     public DashboardDtos.ResumenDashboard resumen(Authentication auth) {
         return service.resumen(auth);
     }
 
     /** Drill-down de la tarjeta "Promedio institucional": desglose por curso/paralelo/materia/docente/año. */
     @GetMapping("/promedio")
-    @PreAuthorize("hasAnyRole('ADMIN','DOCENTE','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','AUDITOR')")
     public DashboardDtos.PromedioDetalle promedio() {
         return service.promedioDetalle();
     }
+
+    @GetMapping("/administrativo")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public DashboardDtos.ResumenAdministrativo administrativo(Authentication auth) {
+        return service.administrativo(auth);
+    }
+
 }

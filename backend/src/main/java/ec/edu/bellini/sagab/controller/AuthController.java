@@ -33,9 +33,9 @@ public class AuthController {
     }
 
     @PostMapping("/cambiar-clave")
-    public ResponseEntity<Void> cambiarClave(@Valid @RequestBody AuthDtos.CambiarClaveRequest req,
-                                             Authentication auth) {
-        authService.cambiarClave(auth.getName(), req.claveActual(), req.claveNueva());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<AuthDtos.CambiarClaveResponse> cambiarClave(
+            @Valid @RequestBody AuthDtos.CambiarClaveRequest req, Authentication auth) {
+        return ResponseEntity.ok(authService.cambiarClave(
+                auth.getName(), req.claveActual(), req.claveNueva()));
     }
 }

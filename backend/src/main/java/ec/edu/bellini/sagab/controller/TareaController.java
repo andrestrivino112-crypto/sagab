@@ -47,21 +47,21 @@ public class TareaController {
     }
 
     @GetMapping("/asignacion/{idAsignacion}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN')")
     public List<TareaDtos.TareaResponse> porAsignacion(@PathVariable Long idAsignacion, Authentication auth) {
         return service.porAsignacion(idAsignacion, auth);
     }
 
     /** Entregas de todos los estudiantes para una tarea — el docente las revisa aquí. */
     @GetMapping("/{idTarea}/entregas")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN')")
     public List<TareaDtos.EntregaResponse> entregasDeTarea(@PathVariable Long idTarea, Authentication auth) {
         return service.entregasDeTarea(idTarea, auth);
     }
 
     /** Entregas de un estudiante en concreto — Portal Familiar. */
     @GetMapping("/estudiante/{idEstudiante}")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public List<TareaDtos.EntregaResponse> misEntregas(@PathVariable Long idEstudiante, Authentication auth) {
         return service.misEntregas(idEstudiante, auth);
     }
@@ -83,14 +83,14 @@ public class TareaController {
     }
 
     @GetMapping("/entregas/{idEntrega}/descarga")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public ResponseEntity<Map<String, String>> urlDescarga(@PathVariable Long idEntrega, Authentication auth) {
         return ResponseEntity.ok(Map.of("url", service.urlDescarga(idEntrega, auth)));
     }
 
     /** Material de apoyo de la tarea (no la entrega del estudiante) — guías, imágenes de referencia, etc. */
     @GetMapping("/{idTarea}/adjuntos")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public List<TareaDtos.AdjuntoTareaResponse> adjuntosDeTarea(@PathVariable Long idTarea,
             @RequestParam(required = false) Long idEstudiante, Authentication auth) {
         return service.adjuntosDeTarea(idTarea, idEstudiante, auth);
@@ -106,7 +106,7 @@ public class TareaController {
     }
 
     @GetMapping("/adjuntos/{idAdjunto}/descarga")
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','REPRESENTANTE','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','SUPER_ADMIN','REPRESENTANTE','ESTUDIANTE')")
     public ResponseEntity<Map<String, String>> urlDescargaAdjunto(@PathVariable Long idAdjunto,
             @RequestParam(required = false) Long idEstudiante, Authentication auth) {
         return ResponseEntity.ok(Map.of("url", service.urlDescargaAdjunto(idAdjunto, idEstudiante, auth)));

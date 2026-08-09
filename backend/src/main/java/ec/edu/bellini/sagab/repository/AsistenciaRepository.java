@@ -17,6 +17,26 @@ public interface AsistenciaRepository extends JpaRepository<Asistencia, Long> {
     /** Ausencias (justificadas + injustificadas) de la fecha dada — KPI "ausencias hoy". */
     long countByFechaAndEstadoIn(LocalDate fecha, List<Asistencia.EstadoAsistencia> estados);
 
+    /** KPI del docente limitado a los paralelos activos donde realmente dicta clases. */
+    @Query(value = """
+            SELECT count(*)
+            FROM sagab.asistencia a
+            WHERE a.fecha = :fecha
+              AND a.estado IN ('AUSENCIA_JUSTIFICADA', 'AUSENCIA_INJUSTIFICADA')
+              AND EXISTS (
+                  SELECT 1
+                  FROM sagab.asignacion_docente ad
+                  JOIN sagab.docente d ON d.id_docente = ad.id_docente
+                  JOIN sagab.usuario u ON u.id_usuario = d.id_usuario
+                  JOIN sagab.periodo_academico pe ON pe.id_periodo = ad.id_periodo
+                  WHERE ad.id_paralelo = a.id_paralelo
+                    AND pe.activo = true
+                    AND lower(u.email) = lower(:docenteEmail)
+              )
+            """, nativeQuery = true)
+    long countAusenciasDocenteFecha(@Param("fecha") LocalDate fecha,
+                                    @Param("docenteEmail") String docenteEmail);
+
     /** Ausencias injustificadas consecutivas más recientes (alerta DECE: >= 3). */
     @Query(value = """
             SELECT count(*) FROM (

@@ -1,6 +1,6 @@
 import {
   BookOpen, Users, DollarSign, Home, LogOut,
-  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp, AlertTriangle, History, IdCard, CalendarDays, MessagesSquare, UserRoundSearch,
+  GraduationCap, ChevronRight, Smartphone, UserPlus, FileUp, AlertTriangle, History, IdCard, CalendarDays, MessagesSquare, ShieldCheck, UserRoundSearch,
 } from "lucide-react";
 import type { RolSistema } from "../../api/auth";
 import type { Screen } from "../types";
@@ -18,13 +18,16 @@ export const NAV = [
   { id:"tareas"       as Screen, label:"Deberes",             icon: FileUp },
   { id:"financial"    as Screen, label:"Financiero",          icon: DollarSign },
   { id:"personal"     as Screen, label:"Personal",            icon: IdCard },
+  { id:"gestion-cuentas" as Screen, label:"Gestión de cuentas", icon: ShieldCheck },
   { id:"auditoria"    as Screen, label:"Auditoría",           icon: History },
   { id:"parent"       as Screen, label:"Portal Familiar",     icon: Smartphone },
 ];
 
 /** Qué módulos ve cada rol — el docente no debe ver Matrícula ni Financiero. */
 export const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
-  ADMIN:         ["dashboard", "matricula", "grades", "attendance", "calendar", "messages", "financial", "personal"],
+  // "matriculados" es una ruta interna del Inicio de Secretaría, no otro botón permanente.
+  SUPER_ADMIN:   ["dashboard", "matriculados", "matricula", "grades", "attendance", "calendar", "messages", "financial", "personal", "gestion-cuentas"],
+  ADMIN:         ["dashboard", "matriculados", "matricula", "grades", "attendance", "calendar", "messages", "financial", "personal"],
   DOCENTE:       ["dashboard", "grades", "attendance", "calendar", "tareas"],
   DECE:          ["deceSeguimiento", "deceAlertas", "calendar"],
   AUDITOR:       ["dashboard", "auditoria"],
@@ -35,7 +38,7 @@ export const NAV_POR_ROL: Record<RolSistema, Screen[]> = {
 };
 
 export const ROL_LABEL: Record<RolSistema, string> = {
-  ADMIN: "Administrador", DOCENTE: "Docente", REPRESENTANTE: "Representante",
+  SUPER_ADMIN: "Superadministrador", ADMIN: "Administrador", DOCENTE: "Docente", REPRESENTANTE: "Representante",
   AUDITOR: "Auditor", DECE: "Consejería DECE", ESTUDIANTE: "Estudiante",
 };
 

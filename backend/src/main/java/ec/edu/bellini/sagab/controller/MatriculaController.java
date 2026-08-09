@@ -19,7 +19,7 @@ public class MatriculaController {
 
     /** Alta de estudiante — solo ADMIN (los docentes no gestionan matrículas). */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<MatriculaDtos.MatriculaResponse> crear(@Valid @RequestBody MatriculaDtos.MatriculaRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.crear(req));
     }

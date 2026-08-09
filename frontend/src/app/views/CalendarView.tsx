@@ -5,7 +5,7 @@ import {
   Copy, ExternalLink, FileText, Flag, GraduationCap, Loader2, MapPin, Pencil,
   Plus, RefreshCw, Trash2, Users, XCircle,
 } from "lucide-react";
-import type { RolSistema } from "../../api/auth";
+import { esRolAdministrativo, type RolSistema } from "../../api/auth";
 import { ApiError, api } from "../../api/client";
 import {
   calendario as calendarioApi, type CalendarioItemResponse, type CategoriaEventoCalendario,
@@ -111,7 +111,7 @@ export function CalendarView({ rol, embed = false, onOpenRelated }: {
   const [draft, setDraft] = useState<Draft>(() => defaultDraft(selected));
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
-  const canManage = rol === "ADMIN";
+  const canManage = esRolAdministrativo(rol);
 
   const range = useMemo(() => {
     if (vista === "month") return { start: startMonthGrid(anchor), end: endMonthGrid(anchor) };
