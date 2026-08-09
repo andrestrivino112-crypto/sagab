@@ -20,13 +20,35 @@ sagab/
 
 ---
 
+## Arranque completo con Docker
+
+Con Docker y Docker Compose instalados, una copia nueva del repositorio se levanta con un solo
+comando:
+
+```bash
+docker compose up --build
+```
+
+La aplicación queda disponible en <http://localhost:8088>. En el primer arranque se crea un
+volumen PostgreSQL y se aplican automáticamente los 25 scripts estructurales. Los siguientes
+arranques reutilizan esa base. Este modo usa credenciales locales de demostración: no debe
+publicarse como entorno de producción sin rotarlas.
+
+Para apagar los servicios sin borrar la base:
+
+```bash
+docker compose down
+```
+
+---
+
 ## 1. Base de datos (PostgreSQL 15+)
 
 ```bash
 bash database/setup_db.sh
 ```
 
-El inicializador ejecuta los 23 scripts estructurales en su orden real de dependencias. Los datos
+El inicializador ejecuta los 25 scripts estructurales en su orden real de dependencias. Los datos
 de demostración y las cuentas nominales se mantienen fuera de la ejecución automática. En una base
 existente que ya tenga las migraciones 01–27, aplicar:
 

@@ -20,6 +20,19 @@ export default defineConfig({
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
+  server: {
+    host: '0.0.0.0',
+    // Mantiene todas las peticiones bajo un solo origen, tanto en localhost como al
+    // compartir una demo mediante un subdominio temporal de Cloudflare.
+    allowedHosts: ['.trycloudflare.com'],
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
+  },
+
   build: {
     // Desactivado: un sourcemap en el build de producción expone el código fuente legible
     // del bundle público e infla el tamaño del despliegue (ver INFORME_AUDITORIA.md, hallazgo #11).

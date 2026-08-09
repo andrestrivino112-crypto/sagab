@@ -85,7 +85,9 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(origenesPermitidos);
+        // Los patrones permiten autorizar de forma explícita un subdominio temporal de demo
+        // (p. ej. https://*.trycloudflare.com) sin abrir CORS globalmente.
+        cfg.setAllowedOriginPatterns(origenesPermitidos);
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         cfg.setMaxAge(3600L);

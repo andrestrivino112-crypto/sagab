@@ -3,7 +3,10 @@
 // Adjunta el JWT a cada petición y gestiona expiración de sesión.
 // ============================================================================
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+// En desarrollo Vite reenvía /api al backend; en una publicación unificada se usa el
+// mismo origen. VITE_API_URL solo es necesario cuando frontend y backend viven en dominios
+// distintos (por ejemplo, Vercel + Render).
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 const TOKEN_KEY = "sagab_token";
 
