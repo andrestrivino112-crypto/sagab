@@ -271,14 +271,14 @@ BEGIN
                 'trivino.superadmin@bellini.edu.ec'::VARCHAR(120),
                 'Superadministrador'::VARCHAR(80),
                 'Triviño'::VARCHAR(80),
-                '$2b$12$Rrv73Q.oJx2kGiVc1OfJ4OIK3jsasUrRKIkUMb6sJB83ySiD0UwBa'::VARCHAR(100)
+                '$2y$12$buFQn5mDzx2s8ZTx/ziMbeTyHqziZla9Wl7.mO838O//3DiPRkF6S'::VARCHAR(100)
             ),
             (
                 'rea'::VARCHAR(40),
                 'rea.superadmin@bellini.edu.ec'::VARCHAR(120),
                 'Superadministrador'::VARCHAR(80),
                 'Rea'::VARCHAR(80),
-                '$2b$12$AhjUoYzdVg1FFFJ2E9y2LuKV70jJ2/IIy6KA1tSP34Uk8mzrTzx/S'::VARCHAR(100)
+                '$2y$12$8N7AHG7GJfWsh9SgPX5BROOUru935yAd5fon2cgBYjPh9AcB7CSL.'::VARCHAR(100)
             )
         ) AS semillas(username, email, nombres, apellidos, hash_password)
     LOOP
